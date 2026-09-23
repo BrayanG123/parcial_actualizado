@@ -207,15 +207,15 @@ es la forma recomendada de conservar los conteos descritos.
 
 ## 6. Cuentas de demostración
 
-| Cuenta | Rol / sucursal | Contraseña |
-|---|---|---|
-| Valor de `SEED_ADMIN_EMAIL` | Administrador global | `SEED_ADMIN_PASSWORD` |
-| `encargado1@demo.fashionstore.test` | Encargado de La Paz | `SEED_DEMO_PASSWORD` |
+| Cuenta                              | Rol / sucursal          | Contraseña            |
+|---                                  |---                      |---                    |
+| Valor de `SEED_ADMIN_EMAIL`         | Administrador global    | `SEED_ADMIN_PASSWORD` |
+| `encargado1@demo.fashionstore.test` | Encargado de La Paz     | `SEED_DEMO_PASSWORD` |
 | `encargado2@demo.fashionstore.test` | Encargado de Cochabamba | `SEED_DEMO_PASSWORD` |
 | `encargado3@demo.fashionstore.test` | Encargado de Santa Cruz | `SEED_DEMO_PASSWORD` |
-| `cajero1@demo.fashionstore.test` | Cajero de La Paz | `SEED_DEMO_PASSWORD` |
-| `cajero2@demo.fashionstore.test` | Cajero de Cochabamba | `SEED_DEMO_PASSWORD` |
-| `cajero3@demo.fashionstore.test` | Cajero de Santa Cruz | `SEED_DEMO_PASSWORD` |
+| `cajero1@demo.fashionstore.test`    | Cajero de La Paz        | `SEED_DEMO_PASSWORD` |
+| `cajero2@demo.fashionstore.test`    | Cajero de Cochabamba    | `SEED_DEMO_PASSWORD` |
+| `cajero3@demo.fashionstore.test`    | Cajero de Santa Cruz    | `SEED_DEMO_PASSWORD` |
 | `cliente1@demo.fashionstore.test` a `cliente4@demo.fashionstore.test` | Clientes | `SEED_DEMO_PASSWORD` |
 
 Son direcciones ficticias, no se envían correos. Si una cuenta ya existía o se

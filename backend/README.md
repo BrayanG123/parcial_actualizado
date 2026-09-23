@@ -14,6 +14,11 @@ PostgreSQL.
 
 La API utiliza por defecto el prefijo `http://localhost:3000/api/v1`.
 
+Para publicar la imagen Docker del backend en Azure Container Apps, seguir el
+[manual de despliegue en Azure](../docs/despliegue-azure.md). Incluye PostgreSQL,
+secretos, migraciones, datos de demostración, verificación y control de costos
+para una cuenta Azure for Students.
+
 Para instalar el proyecto en otro equipo y poblar una base vacía, seguir la
 [guía de instalación y seed](docs/instalacion-y-seed.md). La carga completa se
 ejecuta con `npm run prisma:seed:demo` e incluye el seed base, usuarios de prueba,

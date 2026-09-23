@@ -44,6 +44,11 @@ las recomendaciones automaticas solo se consultan en modo demo.
 
 ## Puesta en marcha
 
+Para publicar la imagen Docker en Azure Container Apps, seguir el
+[manual de despliegue del frontend](../docs/despliegue-azure-frontend.md). La
+guía reutiliza el entorno, backend e identidad administrada definidos en el
+[manual de despliegue del backend](../docs/despliegue-azure.md).
+
 ```bash
 npm ci
 npm run dev
