@@ -51,7 +51,15 @@ export const environmentValidationSchema = Joi.object({
   AI_PROVIDER: Joi.string().valid('gemini', 'ollama', 'none').default('gemini'),
   AI_TIMEOUT_MS: Joi.number().integer().min(1000).max(300000).default(20000),
   AI_REQUESTS_PER_MINUTE: Joi.number().integer().min(1).max(1000).default(20),
+  AI_IMAGE_TIMEOUT_MS: Joi.number()
+    .integer()
+    .min(5000)
+    .max(300000)
+    .default(90000),
   GEMINI_API_KEY: Joi.string().empty('').optional(),
+  GEMINI_IMAGE_MODEL: Joi.string()
+    .pattern(/^[a-zA-Z0-9._-]+$/)
+    .default('gemini-3.1-flash-image'),
   GEMINI_MODEL: Joi.string()
     .pattern(/^[a-zA-Z0-9._-]+$/)
     .default('gemini-3.6-flash'),

@@ -33,7 +33,30 @@ export function parseModelJson(text: string | undefined): unknown {
   }
 }
 
+/** Gemini responde 503 de forma intermitente cuando esta saturado: vale un reintento. */
+const TRANSIENT_STATUS = new Set([500, 502, 503]);
+const RETRY_DELAY_MS = 600;
+
+class TransientAiError extends AiUnavailableError {}
+
 export async function postJson(
+  url: string,
+  body: unknown,
+  headers: Record<string, string>,
+  timeoutMs: number,
+): Promise<unknown> {
+  const deadline = Date.now() + timeoutMs;
+  try {
+    return await postJsonOnce(url, body, headers, timeoutMs);
+  } catch (error) {
+    const remaining = deadline - Date.now() - RETRY_DELAY_MS;
+    if (!(error instanceof TransientAiError) || remaining < 1000) throw error;
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    return postJsonOnce(url, body, headers, remaining);
+  }
+}
+
+async function postJsonOnce(
   url: string,
   body: unknown,
   headers: Record<string, string>,
@@ -55,8 +78,12 @@ export async function postJson(
     );
   }
   // El cuerpo de error puede repetir datos de la solicitud: solo se informa el estado.
-  if (!response.ok)
-    throw new AiUnavailableError(`AI provider responded ${response.status}`);
+  if (!response.ok) {
+    const message = `AI provider responded ${response.status}`;
+    throw TRANSIENT_STATUS.has(response.status)
+      ? new TransientAiError(message)
+      : new AiUnavailableError(message);
+  }
   return response.json();
 }
 

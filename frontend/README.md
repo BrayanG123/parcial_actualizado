@@ -66,17 +66,22 @@ Scripts disponibles:
 
 ## Variables de entorno
 
-Copiar `.env.example` a `.env.local`:
+Copiar `.env.example` a `.env` (o `.env.local`). Apunta por defecto a la API
+desplegada en Azure Container Apps:
 
 ```
-VITE_API_URL=http://localhost:3000/api/v1
+VITE_API_URL=https://tiendaropa-backend.delightfulplant-4b0ba886.canadacentral.azurecontainerapps.io/api/v1
 VITE_USE_MOCKS=false
 ```
 
+Para trabajar contra el backend local usar en su lugar
+`VITE_API_URL=http://localhost:3000/api/v1`.
+
 La API real es el modo predeterminado incluso sin archivo de entorno. Para usar
 la demo local hay que establecer explicitamente `VITE_USE_MOCKS=true`. Reiniciar
-Vite tras cambiar estas variables. Configurar `CORS_ORIGINS` en el backend para
-permitir el origen de Vite (normalmente `http://localhost:5173`).
+Vite tras cambiar estas variables. El backend debe incluir el origen de Vite
+(normalmente `http://localhost:5173`) en `CORS_ORIGINS`; el despliegue de Azure
+ya lo permite.
 
 En modo real usar una cuenta de PostgreSQL o registrar un cliente desde
 `/registro`. Las cuentas indicadas abajo pertenecen exclusivamente a la demo.

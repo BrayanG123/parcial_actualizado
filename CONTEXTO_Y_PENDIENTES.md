@@ -136,7 +136,11 @@ Prioridad acordada: backend → frontend → mobile. Mobile se adaptó a los con
   - cámara, galería y visor 3D con un modelo registrado.
   - Si no conecta, permitir el puerto 3000 en el firewall de Windows (lo hace el usuario).
 - [ ] Registrar al menos un modelo 3D real de prenda para la demo. La base no tiene ninguno; la prueba de contratos creó uno de ejemplo y lo desactivó.
-- Nota: `VirtualFittingController` sigue vacío. La RA no necesita lógica de servidor además del registro de recursos.
+- [x] (23/09) **Probador en vivo sobre la persona**: MediaPipe Pose en un WebView (Expo Go), la prenda sigue hombros/cadera. Verificado en Chrome headless con cámara simulada; **falta probar en teléfono**.
+- [x] (23/09) `VirtualFittingModule` registrado en `AppModule` (antes no estaba) con `GET /virtual-fitting/status` y `POST /virtual-fitting/try-on` (foto con IA, Gemini imagen). Cuerpo JSON hasta 10 MB.
+- [ ] La clave de Gemini del 23/09 tiene **cuota 0 para modelos de imagen** (capa gratuita): el try-on responde 503 hasta activar facturación. Texto sí funciona.
+- [ ] Subir fotos reales de prendas (fondo claro) desde la web: la semilla solo tiene marcadores SVG de `placehold.co`, que el try-on rechaza (422) y que se ven como un recuadro en la RA.
+- [ ] Redesplegar la API en Azure (el `mobile/.env` apunta allí) o apuntar el móvil a la IP local para usar el try-on.
 
 ### Etapa D — Ensayo general, responsive y entrega
 
@@ -182,7 +186,7 @@ Conservar estas simplificaciones salvo que el usuario pida cambiarlas:
 - Se cargó la semilla DEMO el 13/09 (referencia 2026-09-13): 3 sucursales, 12 productos, 30 ventas, 7 reservas y 7 notificaciones.
   - `SEED_DEMO_PASSWORD` quedó en `backend/.env`.
   - La contraseña del administrador es la de `SEED_ADMIN_PASSWORD`.
-- `frontend/.env`: `VITE_USE_MOCKS=false`, `VITE_API_URL=http://localhost:3000/api/v1`.
+- `frontend/.env`: `VITE_USE_MOCKS=false`, `VITE_API_URL=https://tiendaropa-backend.delightfulplant-4b0ba886.canadacentral.azurecontainerapps.io/api/v1` (API desplegada en Azure; para trabajar en local se cambia por `http://localhost:3000/api/v1`).
 - Dependencias instaladas con `npm ci` en backend y frontend. OneDrive sincroniza `node_modules`; conviene pausar la sincronización o excluir esas carpetas.
 - No ejecutar semillas generales para "empezar de nuevo" sin revisar sus efectos.
 

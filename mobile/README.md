@@ -182,11 +182,30 @@ preciso sobre **que hace y que no hace**.
 |---|---|
 | ViroReact (ARKit/ARCore nativo) | Requiere build nativo propio, no corre en Expo Go y es pesado para los equipos modestos del equipo. Descartada. |
 | three.js sobre expo-gl | Suma un motor 3D completo al bundle y sigue sin resolver el seguimiento del cuerpo. Descartada. |
-| Deteccion de pose (MediaPipe / TensorFlow) | Es lo unico que daria un "probador" real sobre el cuerpo, pero el costo de CPU deja inutilizable un telefono modesto y no funciona en Expo Go. Descartada, y no se finge. |
-| Camara + superposicion ajustable | Funciona en cualquier telefono, sin dependencias pesadas. **Elegida** como modo principal. |
+| Deteccion de pose nativa (MediaPipe / TensorFlow como modulo RN) | No funciona en Expo Go. Descartada. |
+| MediaPipe Pose Landmarker **dentro de un WebView** | El WebView del sistema ya trae camara, WebAssembly y WebGL: seguimiento real del cuerpo en Expo Go, con el modelo *lite*. **Elegida** como modo principal ("En vivo"). |
+| Camara + superposicion ajustable | Funciona en cualquier telefono. Se conserva como modo "Manual" de respaldo. |
+| IA generativa (Gemini, en el backend) | Foto realista de la persona usando la prenda. Opcional: requiere sesion y cuota de imagenes. |
 | `<model-viewer>` en WebView | Delega en Scene Viewer (ARCore) y AR Quick Look (iOS): 3D en todos lados y RA nativa donde el sistema la soporta. **Elegida** para el `RecursoRA`. |
 
 ### Lo que quedo implementado
+
+**Modo En vivo** (`src/features/ar/ProbadorEnVivo.tsx` + `paginaProbadorVivo.ts`):
+
+- detecta hombros, cadera, rodillas y tobillos en cada cuadro (modelo *lite* en el telefono, *full* en la PC);
+- deforma la foto con una malla entre dos lineas del cuerpo (hombros-cadera o cadera-rodillas): se estira con el torso y sigue inclinaciones y giros. Tipo Superior, Inferior o Vestido, deducido de la categoria;
+- mide el ancho de hombros o cintura de la propia foto para dimensionarla; se ajusta arrastrando o pellizcando (mouse y rueda en la PC);
+- quita el fondo de estudio respetando el contorno, incluso con prenda blanca sobre fondo blanco;
+- mangas articuladas (hombro, codo, muneca); cara, cuello y manos se repintan con el video real por delante de la prenda;
+- seguimiento con filtro One Euro (estable quieto, rapido en movimiento);
+- talla segun quien posa: la silueta (segmentacion de MediaPipe) mide pecho y cintura sin brazos y ajusta la prenda entera, como maximo un 10%;
+- de frente la prenda queda plana; al girar mas de ~15 grados envuelve un cilindro que sigue la profundidad 3D de los hombros;
+- las mangas siguen el brazo solo si esta razonablemente estirado; volumen sutil y algo mas de contraste;
+- en la PC ademas: pliegues y sombras copiados de la ropa real, tono de la luz de la escena y sombra de contacto;
+- "Tomar foto" guarda la composicion en la galeria y, con sesion, ofrece "Foto realista con IA" (`POST /virtual-fitting/try-on`);
+- necesita internet para descargar el detector (jsDelivr y Google Storage). El video no sale del telefono salvo que se pida la foto con IA.
+- Para que se vea bien, las prendas deben tener **fotos reales sobre fondo claro** (la semilla solo trae marcadores de texto).
+
 
 **Modo Camara** (`src/features/ar/ProbadorCamara.tsx`), disponible para
 cualquier prenda:

@@ -50,4 +50,8 @@ export const endpoints = {
     asistente: '/ai/assistant',
     recomendaciones: '/ai/recommendations',
   },
+  probador: {
+    estado: '/virtual-fitting/status',
+    probarConIA: '/virtual-fitting/try-on',
+  },
 } as const;

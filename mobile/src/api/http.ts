@@ -65,6 +65,13 @@ const TRADUCCIONES: Record<string, string> = {
   'Stock or reservation changed concurrently; retry the operation':
     'El stock cambio durante la operacion. Vuelve a intentarlo.',
   'Too many AI requests; wait a minute and retry': 'Hiciste muchas consultas al asistente. Espera un minuto.',
+  'Virtual try-on is not available': 'El probador con IA no esta habilitado en el servidor.',
+  'Virtual try-on quota exceeded':
+    'Se agoto la cuota de la IA de imagenes. Usa el probador en vivo o intenta mas tarde.',
+  'Virtual try-on failed; retry': 'La IA no pudo generar la imagen. Intenta de nuevo.',
+  'Product photo cannot be used for virtual try-on': 'Esta prenda no tiene una foto real para el probador con IA.',
+  'The photo could not be processed; use a clear photo of one person':
+    'No pudimos procesar la foto. Usa una foto clara de una sola persona.',
 };
 
 function traducir(mensaje: string): string {
@@ -80,6 +87,8 @@ function normalizarError(error: unknown): ErrorApi {
     const err = error as AxiosError<{ message?: string | string[] }>;
     const status = err.response?.status ?? 0;
     if (!err.response) {
+      if (err.code === 'ECONNABORTED')
+        return new ErrorApi('El servidor tardo demasiado en responder. Intenta nuevamente.', 0);
       return new ErrorApi('No pudimos conectar con el servidor. Revisa tu conexion y la direccion de la API.', 0);
     }
     const detalle = err.response.data?.message;
@@ -116,7 +125,7 @@ async function peticion<T>(metodo: Metodo, url: string, datos?: unknown, config?
 
 export const api = {
   get: <T>(url: string, params?: object) => peticion<T>('GET', url, undefined, { params }),
-  post: <T>(url: string, datos?: unknown) => peticion<T>('POST', url, datos),
+  post: <T>(url: string, datos?: unknown, config?: AxiosRequestConfig) => peticion<T>('POST', url, datos, config),
   put: <T>(url: string, datos?: unknown) => peticion<T>('PUT', url, datos),
   patch: <T>(url: string, datos?: unknown) => peticion<T>('PATCH', url, datos),
   delete: <T>(url: string) => peticion<T>('DELETE', url),

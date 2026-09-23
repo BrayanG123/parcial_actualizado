@@ -1,8 +1,10 @@
 /**
- * Probador virtual. Dos modos, segun lo que el producto tenga disponible:
+ * Probador virtual. Tres modos, segun lo que el producto tenga disponible:
  *
- *   Camara  -> superpone la prenda sobre la imagen de la camara (todos los
- *              productos, cualquier telefono).
+ *   En vivo -> realidad aumentada sobre la persona: detecta el cuerpo y la
+ *              prenda sigue hombros o cadera. Opcional: foto realista con IA.
+ *   Manual  -> superpone la prenda sobre la camara y se ajusta con los dedos
+ *              (respaldo si el telefono no puede ejecutar el detector).
  *   Modelo  -> visor 3D del RecursoRA y, si el equipo lo soporta, realidad
  *              aumentada nativa (ARCore / AR Quick Look).
  *
@@ -16,16 +18,17 @@ import { useProducto, useRecursosRA } from '../../hooks/useCatalogo';
 import type { PropsStack } from '../../navigation/tipos';
 import { colores, esp, radio, texto } from '../../theme';
 import { ProbadorCamara } from './ProbadorCamara';
+import { ProbadorEnVivo } from './ProbadorEnVivo';
 import { VisorModelo3D } from './VisorModelo3D';
 
-type Modo = 'camara' | 'modelo';
+type Modo = 'vivo' | 'camara' | 'modelo';
 
 /** Formatos que el visor 3D puede abrir. */
 const FORMATOS_3D = ['GLB', 'GLTF', 'USDZ'];
 
 export function PantallaProbador({ navigation, route }: PropsStack<'Probador'>) {
   const { idProducto, nombre } = route.params;
-  const [modo, setModo] = useState<Modo>('camara');
+  const [modo, setModo] = useState<Modo>('vivo');
 
   const producto = useProducto(idProducto);
   const recursos = useRecursosRA(idProducto);
@@ -39,9 +42,7 @@ export function PantallaProbador({ navigation, route }: PropsStack<'Probador'>) 
     return <ErrorVista error={producto.error} onReintentar={() => void producto.refetch()} />;
   }
 
-  const recurso3D = (recursos.data ?? []).find((r) =>
-    FORMATOS_3D.includes((r.formato ?? '').toUpperCase()),
-  );
+  const recurso3D = (recursos.data ?? []).find((r) => FORMATOS_3D.includes((r.formato ?? '').toUpperCase()));
 
   return (
     <View style={estilos.contenedor}>
@@ -50,21 +51,29 @@ export function PantallaProbador({ navigation, route }: PropsStack<'Probador'>) 
           {nombre}
         </Text>
         <View style={estilos.conmutador}>
-          <Opcion texto="Camara" activo={modo === 'camara'} onPress={() => setModo('camara')} />
+          <Opcion texto="En vivo" activo={modo === 'vivo'} onPress={() => setModo('vivo')} />
+          <Opcion texto="Manual" activo={modo === 'camara'} onPress={() => setModo('camara')} />
           <Opcion
-            texto="Modelo 3D"
+            texto="3D"
             activo={modo === 'modelo'}
             deshabilitado={!recurso3D}
             onPress={() => setModo('modelo')}
           />
         </View>
-        {!recurso3D ? (
+        {modo !== 'vivo' && !recurso3D ? (
           <Text style={estilos.aviso}>Esta prenda todavia no tiene modelo 3D cargado.</Text>
         ) : null}
       </View>
 
       {modo === 'modelo' && recurso3D ? (
         <VisorModelo3D recurso={recurso3D} />
+      ) : modo === 'vivo' ? (
+        <ProbadorEnVivo
+          idProducto={idProducto}
+          urlPrenda={producto.data.imagen_url}
+          nombre={producto.data.nombre}
+          categoria={producto.data.categoria?.nombre}
+        />
       ) : (
         <ProbadorCamara urlPrenda={producto.data.imagen_url} nombre={producto.data.nombre} />
       )}
@@ -115,7 +124,12 @@ const estilos = StyleSheet.create({
     padding: 4,
     gap: 4,
   },
-  opcion: { flex: 1, paddingVertical: esp.s, borderRadius: radio.pill, alignItems: 'center' },
+  opcion: {
+    flex: 1,
+    paddingVertical: esp.s,
+    borderRadius: radio.pill,
+    alignItems: 'center',
+  },
   opcionActiva: { backgroundColor: colores.blanco },
   opcionInactiva: { opacity: 0.45 },
   opcionTexto: { ...texto.cuerpo, color: colores.tinta3, fontWeight: '500' },

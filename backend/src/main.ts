@@ -18,6 +18,8 @@ async function bootstrap() {
   const corsOrigins = configService.get<string[]>('app.corsOrigins') ?? [];
   const port = configService.get<number>('app.port') ?? 3000;
 
+  // El probador con IA recibe una foto en base64; el limite por defecto (100 kb) no alcanza.
+  app.useBodyParser('json', { limit: '10mb' });
   app.setGlobalPrefix(apiPrefix);
   app.enableCors({
     origin: corsOrigins.length > 0 ? corsOrigins : true,

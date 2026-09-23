@@ -21,6 +21,7 @@ import { PaymentsModule } from './modules/payments/payments.module.js';
 import { ReportsModule } from './modules/reports/reports.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { AiModule } from './modules/ai/ai.module.js';
+import { VirtualFittingModule } from './modules/virtual-fitting/virtual-fitting.module.js';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { AiModule } from './modules/ai/ai.module.js';
     ReportsModule,
     NotificationsModule,
     AiModule,
+    VirtualFittingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

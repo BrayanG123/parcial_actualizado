@@ -350,36 +350,21 @@ Stripe y Cloudinary son opcionales, pero cada integración debe configurarse con
 Desde la carpeta `backend`, usa una etiqueta única:
 
 ```powershell
-$TAG = Get-Date -Format 'yyyyMMdd-HHmm'
-$NEW_IMAGE = "tiendaropa.azurecr.io/backend:$TAG"
+az containerapp env create -g $RG -n $ENVNAME -l $LOC
+$ACR_PWD = az acr credential show -n $ACR --query 'passwords[0].value' -o tsv
 
-docker build -t $NEW_IMAGE .
-docker push $NEW_IMAGE
-
-az containerapp update `
-  --resource-group $RG `
-  --name $APP `
-  --image $NEW_IMAGE
+az containerapp create -g $RG -n fashionstore-api --environment $ENVNAME `
+  --image "$ACR.azurecr.io/fashionstore-api:1" --registry-server "$ACR.azurecr.io" `
+  --registry-username $ACR --registry-password $ACR_PWD `
+  --target-port 3000 --ingress external --min-replicas 1 --max-replicas 1 --cpu 0.5 --memory 1Gi `
+  --secrets database-url='<DATABASE_URL>' jwt-secret='<JWT_64_HEX>' gemini-key='<GEMINI_API_KEY>' `
+  --env-vars NODE_ENV=production RUN_MIGRATIONS=true DATABASE_URL=secretref:database-url `
+    JWT_SECRET=secretref:jwt-secret AI_PROVIDER=gemini GEMINI_API_KEY=secretref:gemini-key `
+    GEMINI_MODEL=gemini-3.6-flash GEMINI_IMAGE_MODEL=gemini-3.1-flash-image RESERVATION_TIME_ZONE=America/La_Paz SALES_CURRENCY=BOB
 ```
 
-`RUN_MIGRATIONS=true` aplicará las migraciones pendientes al iniciar la nueva revisión. Como `max-replicas=1`, no habrá varias instancias intentando mantener las tareas periódicas al mismo tiempo.
-
-## 11. Ahorrar el crédito estudiantil
-
-Después de una demostración puedes dejar la API en escala a cero y detener PostgreSQL:
-
-```powershell
-az containerapp update -g $RG -n $APP --min-replicas 0 --max-replicas 1
-az postgres flexible-server stop -g $RG -n $PG
-```
-
-Advertencias:
-
-- Con cero réplicas habrá arranque en frío y no se ejecutarán los vencimientos ni conciliaciones mientras la API duerma.
-- PostgreSQL deja de cobrar cómputo al detenerse, pero sigue cobrando almacenamiento y respaldo.
-- Azure vuelve a iniciar automáticamente PostgreSQL después de siete días; revisa el recurso o crea una tarea programada.
-
-Para volver a realizar una demostración:
+- `--min-replicas 1`: los procesos de vencimiento de reservas y checkouts corren dentro de la API. Además, una sola réplica mantiene coherente el límite de solicitudes de IA, que se guarda en memoria.
+- Stripe y Cloudinary: agregar las tres variables de cada uno como secretos, igual que en `backend/.env`. Usa solo claves de prueba de Stripe.
 
 ```powershell
 az postgres flexible-server start -g $RG -n $PG

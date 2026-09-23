@@ -75,6 +75,23 @@ Sin modelo, `parseIntentWithRules` entiende frases como "hoy", "ayer", "últimos
 
 Límites actuales: los reportes son por día. No hay reportes por hora, caja o turno; ampliarlos requiere nuevos filtros en `/reports`.
 
+## Probador virtual: RA en vivo y foto con IA
+
+**RA en vivo (sin servidor).** El móvil abre un WebView con MediaPipe Pose Landmarker, detecta hombros y cadera en cada cuadro y dibuja la foto de la prenda encima (rotada y escalada con el cuerpo). El fondo claro de la foto se quita en el teléfono. Funciona en Expo Go y no consume cuota de IA. Necesita internet la primera vez para descargar el detector (CDN de jsDelivr y Google Storage).
+
+**Foto realista con IA (opcional).** Sobre la foto tomada, el cliente con sesión puede pedir `POST /virtual-fitting/try-on`:
+
+```json
+{ "productId": 7, "image": "<JPEG en base64 o data URI>", "mimeType": "image/jpeg" }
+```
+
+- El backend descarga la foto principal del producto y envía ambas imágenes a `GEMINI_IMAGE_MODEL` (por defecto `gemini-3.1-flash-image`). Responde `{ image, mimeType, model, productId, productName }`.
+- La foto de la persona no se guarda ni se registra en logs.
+- `GET /virtual-fitting/status` indica si está habilitado.
+- Errores: `401` sin sesión; `404` producto inexistente; `422` si la foto del producto no es JPEG/PNG/WebP (los marcadores SVG de la semilla no sirven); `503` sin clave o **sin cuota**; `502` si el proveedor falla.
+- **Cuota:** la capa gratuita de Google AI Studio tiene límite 0 para modelos de imagen. Para usar este modo hay que activar la facturación del proyecto de la clave. La RA en vivo no depende de esto.
+- El cuerpo JSON admite hasta 10 MB (`main.ts`).
+
 ## Pruebas
 
 ```powershell
@@ -88,3 +105,5 @@ Las pruebas cubren:
 - Descarte de productos inventados.
 - Puntaje por historial, talla y colección.
 - Interpretación de fechas en español y lista blanca de filtros.
+- Reintento único ante 500/502/503 del proveedor (Gemini se satura de forma intermitente).
+- Probador con IA: envío de ambas fotos, foto de producto no válida, cuota agotada y producto inexistente (`src/modules/virtual-fitting`).

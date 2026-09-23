@@ -88,13 +88,37 @@ describe('AI providers', () => {
     expect(parseModelJson('```json\n{"a":1}\n```')).toEqual({ a: 1 });
   });
 
+  it('retries once when the provider is temporarily overloaded', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({}, 503))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }],
+        }),
+      );
+    vi.stubGlobal('fetch', fetch);
+    const provider = new GeminiProvider({
+      apiKey: 'test-key',
+      model: 'gemini-3.6-flash',
+      baseUrl: 'https://example.test',
+      timeoutMs: 5000,
+    });
+    await expect(
+      provider.generateJson({ system: '', prompt: '' }),
+    ).resolves.toEqual({ ok: true });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it('selects the provider from configuration', () => {
     const base = {
       timeoutMs: 1000,
       requestsPerMinute: 20,
+      imageTimeoutMs: 1000,
       gemini: {
         apiKey: undefined,
         model: 'gemini-2.5-flash',
+        imageModel: 'gemini-3.1-flash-image',
         baseUrl: 'https://example.test',
       },
       ollama: { baseUrl: 'http://localhost:11434', model: 'qwen2.5:3b' },
