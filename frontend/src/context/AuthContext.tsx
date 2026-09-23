@@ -12,6 +12,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { desactivarPush } from '../lib/push';
 import { useQueryClient } from '@tanstack/react-query';
 import { obtenerToken, revisionSesion, suscribirSesion } from '../api/sesion';
 import { authService, type CredencialesLogin, type DatosRegistro } from '../services/auth.service';
@@ -129,6 +130,8 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
   const cerrarSesion = useCallback(async () => {
     borrarIdentidadOffline();
     setSesionOffline(false);
+    // Antes de perder la sesion: este navegador deja de recibir avisos de la cuenta.
+    await desactivarPush().catch(() => undefined);
     await authService.logout();
     setUsuario(null);
     queryClient.clear();

@@ -109,6 +109,7 @@ model User {
   createdSales Sale[] @relation("SaleCreator")
   cashShifts CashShift[]
   notificationReads NotificationRead[]
+  pushTokens PushToken[]
 
   @@index([supplierId])
   @@map("usuarios")
@@ -626,6 +627,20 @@ model Notification {
   @@index([branchId, createdAt, id])
   @@index([createdAt, id])
   @@map("notificaciones")
+}
+
+// Dispositivos del personal que reciben notificaciones push (Firebase Cloud Messaging).
+model PushToken {
+  id        Int      @id @default(autoincrement()) @map("id_token_push")
+  userId    Int      @map("id_usuario")
+  token     String   @unique
+  platform  String   @default("WEB") @map("plataforma") @db.VarChar(20)
+  createdAt DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("tokens_push")
 }
 
 model NotificationRead {

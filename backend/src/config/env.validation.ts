@@ -69,11 +69,16 @@ export const environmentValidationSchema = Joi.object({
   OLLAMA_MODEL: Joi.string()
     .pattern(/^[a-zA-Z0-9._:/-]+$/)
     .default('qwen2.5:3b'),
+  // Notificaciones push (Firebase Cloud Messaging): las tres juntas o ninguna.
+  FIREBASE_PROJECT_ID: Joi.string().empty('').optional(),
+  FIREBASE_CLIENT_EMAIL: Joi.string().email().empty('').optional(),
+  FIREBASE_PRIVATE_KEY: Joi.string().empty('').optional(),
   SEED_ADMIN_EMAIL: Joi.string().email().optional(),
   SEED_ADMIN_PASSWORD: Joi.string().min(8).max(72).optional(),
 })
   .and('STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_PUBLISHABLE_KEY')
   .and('CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET')
+  .and('FIREBASE_PROJECT_ID', 'FIREBASE_CLIENT_EMAIL', 'FIREBASE_PRIVATE_KEY')
   .unknown(true);
 
 export const validateEnvironment = (

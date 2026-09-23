@@ -5,11 +5,13 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { Role } from '../../common/enums/role.enum.js';
 import { Prisma } from '../../generated/prisma/client.js';
+import { PushService } from '../push/push.service.js';
 import {
   InStoreSelectionDto,
   SearchPosCustomersDto,
@@ -40,7 +42,13 @@ export class SalesService {
   constructor(
     private readonly repository: SalesRepository,
     private readonly config: ConfigService,
+    @Optional() private readonly push?: PushService,
   ) {}
+
+  /** Aviso push al personal, fuera de la transaccion: nunca bloquea ni revierte la venta. */
+  private avisarCompra(saleId: number) {
+    if (this.push) void this.push.notifySale(saleId);
+  }
 
   async createInStore(dto: CreateInStoreSaleDto, user: AuthenticatedUser) {
     const items = sortedItems(dto.items);
@@ -349,6 +357,7 @@ export class SalesService {
       quoteHash: dto.quoteHash,
       ...delivery,
     });
+    let creada = false;
     const sale = await this.repository.transaction(async (tx) => {
       const clientId = await this.customer(user, tx);
       const replay = await this.replay(
@@ -408,8 +417,11 @@ export class SalesService {
         );
       }
       await this.repository.convertCart(dto.cartId, tx);
+      creada = true;
       return created;
     });
+    // El pedido contra entrega ya es una compra: el personal debe prepararlo y entregarlo.
+    if (creada && cashOnDelivery) this.avisarCompra(sale.id);
     return this.present(sale);
   }
 
@@ -534,7 +546,7 @@ export class SalesService {
         payment.status === 'APPROVED' &&
         payment.externalReference === externalReference
       ) {
-        return { sale, expired: false };
+        return { sale, expired: false, nueva: false };
       }
       if (
         sale.status !== 'PENDING_PAYMENT' ||
@@ -547,6 +559,7 @@ export class SalesService {
         return {
           sale: await this.cancelPending(sale, 'PAYMENT_WINDOW_EXPIRED', tx),
           expired: true,
+          nueva: false,
         };
       }
       for (const item of sortedItems(sale.items)) {
@@ -580,8 +593,10 @@ export class SalesService {
           tx,
         ),
         expired: false,
+        nueva: true,
       };
     });
+    if (result.nueva) this.avisarCompra(result.sale.id);
     if (result.expired)
       throw new ConflictException(
         'Payment arrived after expiration; stock was released. Payments must reconcile or refund the provider transaction',

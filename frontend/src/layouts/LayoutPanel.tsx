@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { AvisosPush } from '../features/notifications/AvisosPush';
 import { CampanaNotificaciones } from '../features/notifications/CampanaNotificaciones';
 import { RolNombre } from '../types/domain';
 import { iniciales } from '../lib/format';
@@ -18,6 +19,8 @@ export function LayoutPanel() {
     : tieneRol(RolNombre.ENCARGADO_SUCURSAL)
       ? '/sucursal/reservas'
       : null;
+  // Avisos push de compras: el personal que atiende ventas.
+  const recibeCompras = tieneRol(RolNombre.ADMINISTRADOR, RolNombre.ENCARGADO_SUCURSAL, RolNombre.CAJERO);
 
   async function salir() {
     await cerrarSesion();
@@ -67,6 +70,7 @@ export function LayoutPanel() {
           </button>
           <div className="fs-crecer" />
           <div className="fs-fila">
+            {recibeCompras && <AvisosPush />}
             {rutaReservas && <CampanaNotificaciones rutaReservas={rutaReservas} />}
             <div style={{ textAlign: 'right' }}>
               <p style={{ fontWeight: 600, fontSize: '0.88rem' }}>{usuario?.nombre}</p>

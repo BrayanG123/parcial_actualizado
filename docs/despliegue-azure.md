@@ -360,7 +360,7 @@ az containerapp create -g $RG -n fashionstore-api --environment $ENVNAME `
   --secrets database-url='<DATABASE_URL>' jwt-secret='<JWT_64_HEX>' gemini-key='<GEMINI_API_KEY>' `
   --env-vars NODE_ENV=production RUN_MIGRATIONS=true DATABASE_URL=secretref:database-url `
     JWT_SECRET=secretref:jwt-secret AI_PROVIDER=gemini GEMINI_API_KEY=secretref:gemini-key `
-    GEMINI_MODEL=gemini-3.6-flash GEMINI_IMAGE_MODEL=gemini-3.1-flash-image RESERVATION_TIME_ZONE=America/La_Paz SALES_CURRENCY=BOB
+    GEMINI_MODEL=gemini-3.6-flash GEMINI_IMAGE_MODEL=gemini-3.1-flash-image FIREBASE_PROJECT_ID=shoping-a72ce FIREBASE_CLIENT_EMAIL=secretref:firebase-email FIREBASE_PRIVATE_KEY=secretref:firebase-key RESERVATION_TIME_ZONE=America/La_Paz SALES_CURRENCY=BOB
 ```
 
 - `--min-replicas 1`: los procesos de vencimiento de reservas y checkouts corren dentro de la API. Además, una sola réplica mantiene coherente el límite de solicitudes de IA, que se guarda en memoria.
@@ -423,22 +423,14 @@ az containerapp logs show -g $RG -n $APP --type console --tail 100
 Verifica que el servidor esté en estado `Ready`, que exista la base `tienda_ropa`, que la URL incluya `sslmode=require` y que exista la regla de firewall `0.0.0.0`:
 
 ```powershell
-az postgres flexible-server show -g $RG -n $PG --query state -o tsv
-az postgres flexible-server db list -g $RG -s $PG -o table
-az postgres flexible-server firewall-rule list -g $RG -n $PG -o table
+az acr build -r $ACR -t fashionstore-api:2 ./backend
+az containerapp update -g $RG -n fashionstore-api --image "$ACR.azurecr.io/fashionstore-api:2"
+# Al terminar la presentacion:
+az group delete -n $RG --yes
 ```
 
-### La API responde pero el navegador muestra error CORS
 
-El valor debe ser solamente el origen exacto del frontend, por ejemplo `https://mi-web.azurecontainerapps.io`, sin ruta ni `/` final. Actualiza `CORS_ORIGINS` y espera que la nueva revisión quede activa.
+## Notificaciones push (Firebase)
 
-## Referencias oficiales
-
-- [Instalar Azure CLI en Windows](https://learn.microsoft.com/cli/azure/install-azure-cli-windows)
-- [Desplegar una imagen existente en Azure Container Apps](https://learn.microsoft.com/azure/container-apps/get-started-existing-container-image)
-- [Extraer una imagen de ACR con identidad administrada](https://learn.microsoft.com/azure/container-apps/managed-identity-image-pull)
-- [Variables y secretos de Container Apps](https://learn.microsoft.com/azure/container-apps/environment-variables)
-- [Sondas de estado de Container Apps](https://learn.microsoft.com/azure/container-apps/health-probes)
-- [Reglas de firewall de PostgreSQL Flexible Server](https://learn.microsoft.com/azure/postgresql/security/security-firewall-rules)
-- [Detener PostgreSQL Flexible Server para ahorrar cómputo](https://learn.microsoft.com/azure/postgresql/configure-maintain/how-to-stop-server)
-- [Azure for Students](https://azure.microsoft.com/es-es/free/students)
+- **API:** agregar los secretos `firebase-email` y `firebase-key` (valores `client_email` y `private_key` del JSON de la cuenta de servicio) y las variables `FIREBASE_*` (ver [notificaciones](../backend/docs/notificaciones.md)). La migración `push_tokens` se aplica sola con `RUN_MIGRATIONS=true`.
+- **Web:** construir la imagen con `--build-arg VITE_FIREBASE_API_KEY=... --build-arg VITE_FIREBASE_VAPID_KEY=...` (y el resto de `VITE_FIREBASE_*`), o construir con `frontend/.env` completo.

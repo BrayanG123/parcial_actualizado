@@ -150,6 +150,12 @@ Prioridad acordada: backend → frontend → mobile. Mobile se adaptó a los con
 - [ ] Matriz de requisitos de `Examen.md`: cumplido, simplificado, pendiente o no verificado.
 - [ ] Guion de demostración.
 
+### Notificaciones push de compras (23/09)
+
+- [x] Backend: módulo `push` (firebase-admin), tabla `tokens_push`, `POST/DELETE /push/tokens` y `GET /push/status`. Avisa a administradores, encargados y cajeros de la sucursal cuando un cliente paga con Stripe o crea un pedido contra entrega.
+- [x] Frontend: botón "Activar avisos" en el panel, `public/push-sw.js` (importado por `sw.js`), aviso dentro de la app con la pestaña abierta, y baja del token al cerrar sesión.
+- [ ] Falta la clave VAPID (`VITE_FIREBASE_VAPID_KEY`) y la cuenta de servicio (`FIREBASE_*` en el backend y en Azure). Después, redesplegar la API y la web.
+
 ## 4. Mobile y realidad aumentada
 
 - `mobile/` ya está conectado a la API real y compila (typecheck), pero **no se probó en un teléfono**: no afirmar que la RA o el pago móvil funcionan en hardware hasta ensayarlos.

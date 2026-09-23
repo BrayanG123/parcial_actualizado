@@ -178,5 +178,5 @@ export const api = {
   post: <T>(url: string, datos?: unknown) => peticion<T>('POST', url, datos),
   put: <T>(url: string, datos?: unknown) => peticion<T>('PUT', url, datos),
   patch: <T>(url: string, datos?: unknown) => peticion<T>('PATCH', url, datos),
-  delete: <T>(url: string) => peticion<T>('DELETE', url),
+  delete: <T>(url: string, datos?: unknown) => peticion<T>('DELETE', url, datos),
 };

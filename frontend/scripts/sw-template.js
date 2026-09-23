@@ -1,3 +1,5 @@
+// Notificaciones push de compras (Firebase Cloud Messaging).
+if (typeof importScripts === 'function') importScripts('/push-sw.js');
 const CACHE = '__CACHE__';
 const ASSETS = __ASSETS__;
 self.addEventListener('install', (event) =>

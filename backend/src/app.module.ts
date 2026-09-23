@@ -22,6 +22,7 @@ import { ReportsModule } from './modules/reports/reports.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { AiModule } from './modules/ai/ai.module.js';
 import { VirtualFittingModule } from './modules/virtual-fitting/virtual-fitting.module.js';
+import { PushModule } from './modules/push/push.module.js';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { VirtualFittingModule } from './modules/virtual-fitting/virtual-fitting.
     NotificationsModule,
     AiModule,
     VirtualFittingModule,
+    PushModule,
   ],
   controllers: [AppController],
   providers: [AppService],

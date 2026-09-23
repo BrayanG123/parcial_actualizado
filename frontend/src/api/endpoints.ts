@@ -83,6 +83,10 @@ export const endpoints = {
     reservas: '/reports/reservations',
     caja: '/reports/cash-shifts',
   },
+  push: {
+    estado: '/push/status',
+    tokens: '/push/tokens',
+  },
   notificaciones: {
     lista: '/notifications',
     noLeidas: '/notifications/unread-count',

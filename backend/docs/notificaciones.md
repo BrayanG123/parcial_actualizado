@@ -142,3 +142,36 @@ Las pruebas E2E usan esquemas temporales y cubren aislamiento por sucursal,
 lecturas por usuario, concurrencia, rollback junto al inventario, paginación,
 actualización desde datos anteriores y repetición del seed. Sin `TEST_DATABASE_URL`
 se omiten explícitamente las pruebas PostgreSQL.
+
+## Notificaciones push de compras (Firebase Cloud Messaging)
+
+Cuando un **cliente** compra por la web o la app, el personal recibe un aviso en su navegador, aunque la pestaña esté cerrada:
+
+- **Quién lo recibe:** administradores (todas las sucursales) y encargados y cajeros de la sucursal de la venta.
+- **Cuándo:** al confirmarse un pago con Stripe (`confirmElectronicPayment`) o al crearse un pedido contra entrega (`checkout`). Los reintentos idempotentes no repiten el aviso. Las ventas de caja no avisan, porque las hace el propio personal.
+- **Texto:** por ejemplo, "Nueva compra pagada (web) — Ana Rojas compró 3 prendas: Camisa Oxford x2 y Jean Slim. Bs 349.90 - Sucursal Centro". Al hacer clic se abre la lista de ventas del rol.
+- El envío ocurre **fuera de la transacción** y nunca lanza errores: si Firebase falla, la venta no se ve afectada.
+
+Endpoints (personal: `ADMINISTRATOR`, `BRANCH_MANAGER`, `CASHIER`):
+
+| Método | Ruta | Uso |
+|---|---|---|
+| GET | `/push/status` | `{ enabled }`: si el backend tiene credenciales de Firebase |
+| POST | `/push/tokens` | `{ token, platform }`: registra este navegador (si se repite, se actualiza) |
+| DELETE | `/push/tokens` | `{ token }`: se llama al cerrar sesión |
+
+Los tokens se guardan en `tokens_push` (migración `20260920000000_push_tokens`). FCM informa los dispositivos que ya no existen y se borran solos.
+
+### Configuración
+
+**Backend** (`backend/.env` o secretos de Azure). Salen del JSON de *Configuración del proyecto > Cuentas de servicio > Generar nueva clave privada*:
+
+```
+FIREBASE_PROJECT_ID=shoping-a72ce
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxx@shoping-a72ce.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+
+**Frontend** (`frontend/.env`, o `--build-arg` en Docker): la configuración de la app web `VITE_FIREBASE_*` (pública) y `VITE_FIREBASE_VAPID_KEY`, de *Cloud Messaging > Certificados push web*.
+
+**En el navegador:** el personal pulsa **"Activar avisos"** en la barra superior del panel. El navegador pide permiso una sola vez. Requiere HTTPS o `localhost`.
