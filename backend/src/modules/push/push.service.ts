@@ -16,10 +16,12 @@ const LOTE = 500;
 const TOKENS_INVALIDOS = new Set([
   'messaging/registration-token-not-registered',
   'messaging/invalid-registration-token',
-  'messaging/invalid-argument',
 ]);
 
 type RoleName = 'ADMINISTRATOR' | 'BRANCH_MANAGER' | 'CASHIER';
+export type CustomerSaleEvent =
+  'ORDER_PLACED' | 'PAYMENT_CONFIRMED' | 'ORDER_DELIVERED';
+export type CustomerReservationEvent = 'READY' | 'CANCELLED' | 'EXPIRED';
 
 /** Pantalla de ventas que abre la notificacion segun el rol de quien la recibe. */
 const RUTA_POR_ROL: [RoleName, string][] = [
@@ -168,6 +170,136 @@ export class PushService {
       this.logger.warn(
         `Push notification for sale ${saleId} failed: ${error instanceof Error ? error.message : 'unknown'}`,
       );
+    }
+  }
+
+  /** Invocar tras una transicion confirmada, nunca dentro de la transaccion. */
+  async notifyCustomerSale(
+    saleId: number,
+    event: CustomerSaleEvent,
+  ): Promise<void> {
+    try {
+      if (!this.enabled) return;
+      const sale = await this.prisma.sale.findUnique({
+        where: { id: saleId },
+        select: {
+          status: true,
+          cashOnDelivery: true,
+          channel: true,
+          client: { select: { userId: true } },
+        },
+      });
+      if (!sale?.client || sale.channel === 'IN_STORE') return;
+      const expected =
+        event === 'ORDER_PLACED' ? 'PENDING_PAYMENT' : 'COMPLETED';
+      if (
+        sale.status !== expected ||
+        sale.cashOnDelivery !== (event !== 'PAYMENT_CONFIRMED')
+      )
+        return;
+      const messages = {
+        ORDER_PLACED: [
+          'Pedido registrado',
+          'Recibimos tu pedido contra entrega. Consulta el detalle en Mis compras.',
+        ],
+        PAYMENT_CONFIRMED: [
+          'Pago confirmado',
+          'Tu compra fue confirmada. Consulta el detalle en Mis compras.',
+        ],
+        ORDER_DELIVERED: [
+          'Entrega confirmada',
+          'Registramos la entrega y el cobro de tu pedido.',
+        ],
+      } as const;
+      const [title, body] = messages[event];
+      await this.sendCustomer(sale.client.userId, title, body, {
+        tipo: 'COMPRA_CLIENTE',
+        saleId: String(saleId),
+        event,
+        eventId: 'sale-' + saleId + '-' + event,
+      });
+    } catch {
+      this.logger.warn('Customer push failed for sale ' + saleId);
+    }
+  }
+
+  async notifyCustomerReservation(
+    id: number,
+    event: CustomerReservationEvent,
+  ): Promise<void> {
+    try {
+      if (!this.enabled) return;
+      const reservation = await this.prisma.reservation.findUnique({
+        where: { id },
+        select: { status: true, client: { select: { userId: true } } },
+      });
+      if (!reservation || reservation.status !== event) return;
+      const messages = {
+        READY: [
+          'Tu reserva esta lista',
+          'Tus prendas estan listas para probar en tienda. Consulta tu reserva.',
+        ],
+        CANCELLED: [
+          'Reserva cancelada',
+          'Tu reserva fue cancelada. Puedes consultar el detalle en la app.',
+        ],
+        EXPIRED: [
+          'Reserva vencida',
+          'Vencio el plazo de tu reserva y las prendas se liberaron.',
+        ],
+      } as const;
+      const [title, body] = messages[event];
+      await this.sendCustomer(reservation.client.userId, title, body, {
+        tipo: 'RESERVA_CLIENTE',
+        reservationId: String(id),
+        event,
+        eventId: 'reservation-' + id + '-' + event,
+      });
+    } catch {
+      this.logger.warn('Customer push failed for reservation ' + id);
+    }
+  }
+
+  private async sendCustomer(
+    userId: number,
+    title: string,
+    body: string,
+    data: Record<string, string>,
+  ) {
+    const messaging = this.client();
+    if (!messaging) return;
+    const devices = await this.prisma.pushToken.findMany({
+      where: {
+        userId,
+        platform: 'ANDROID',
+        user: { active: true, roles: { some: { role: { name: 'CUSTOMER' } } } },
+      },
+      select: { token: true },
+    });
+    for (let i = 0; i < devices.length; i += LOTE) {
+      const tokens = devices.slice(i, i + LOTE).map((device) => device.token);
+      const result = await messaging.sendEachForMulticast({
+        tokens,
+        notification: { title, body },
+        data: { ...data, userId: String(userId) },
+        android: {
+          priority: 'high',
+          ttl: 24 * 60 * 60 * 1000,
+          notification: {
+            channelId: 'customer-updates',
+            tag: data.eventId,
+            sound: 'default',
+          },
+        },
+      });
+      const invalid = tokens.filter((_, index) => {
+        const response = result.responses[index];
+        return response?.error && TOKENS_INVALIDOS.has(response.error.code);
+      });
+      if (invalid.length)
+        await this.prisma.pushToken.deleteMany({
+          where: { userId, token: { in: invalid } },
+        });
     }
   }
 

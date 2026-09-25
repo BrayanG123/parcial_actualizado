@@ -19,10 +19,10 @@ import {
 } from './dto/push-token.dto.js';
 import { PushService } from './push.service.js';
 
-/** Solo el personal que debe enterarse de las compras registra sus dispositivos. */
+/** Cada usuario registra o elimina sus propios dispositivos. */
 @Controller('push')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMINISTRATOR, Role.BRANCH_MANAGER, Role.CASHIER)
+@Roles(Role.ADMINISTRATOR, Role.BRANCH_MANAGER, Role.CASHIER, Role.CUSTOMER)
 export class PushController {
   constructor(private readonly push: PushService) {}
 

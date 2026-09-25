@@ -11,7 +11,7 @@ import PaginaReservasOperacion from '../src/features/reservations/PaginaReservas
 import { instancia } from '../src/api/http';
 import { guardarToken } from '../src/api/sesion';
 import { adaptarProducto } from '../src/api/catalogo.contratos';
-import { prenda, pagina } from './catalogo-fixtures';
+import { prenda, pagina, stock } from './catalogo-fixtures';
 import { reserva } from './reservas-fixtures';
 import { respuesta, rechazo, usuarioBackend } from './fixtures';
 let root: Root;
@@ -34,7 +34,7 @@ async function esperar() {
     await new Promise((r) => setTimeout(r, 30));
   });
 }
-async function montar(e: ReactNode, ruta = '/') {
+async function montar(e: ReactNode, ruta: string | { pathname: string; state: unknown } = '/') {
   await act(async () =>
     root.render(
       <QueryClientProvider client={qc}>
@@ -74,7 +74,7 @@ function catalogo() {
     ['sucursales'],
     [{ id_sucursal: 2, nombre: 'Centro', ciudad: 'La Paz', activa: true }],
   );
-  qc.setQueryData(['productos', { page: 1, page_size: 6 }], {
+  qc.setQueryData(['productos', { page: 1, page_size: 6, id_sucursal: 2 }], {
     items: [adaptarProducto(prenda), adaptarProducto({ ...prenda, id: 2, name: 'Blusa' })],
     total: 2,
     page: 1,
@@ -86,8 +86,8 @@ function catalogo() {
       adaptarProducto({ ...prenda, id, name: id === 1 ? 'Camisa' : 'Blusa' }),
     );
     qc.setQueryData(
-      ['disponibilidad', { id_producto: id, id_talla: 9, id_color: 10, id_sucursal: 2 }],
-      [{ cantidad_disponible: 3 }],
+      ['disponibilidad', { id_producto: id, id_sucursal: 2 }],
+      [{ id_producto: id, id_sucursal: 2, id_talla: 9, id_color: 10, cantidad_disponible: 3 }],
     );
   }
 }
@@ -98,6 +98,97 @@ async function agregar(nombre: string) {
   await click('Agregar a la reserva');
 }
 describe('reservas en React', () => {
+  it('conserva la preseleccion del catalogo en la primera sucursal y la valida alli', async () => {
+    catalogo();
+    instancia.defaults.adapter = async (c) => respuesta(c, usuarioBackend);
+    await montar(<PaginaNuevaReserva />, { pathname: '/reservar',
+      state: { id_producto: 1, id_talla: 9, id_color: 10, cantidad: 2 } });
+    expect(botones('Agregar a la reserva')).toHaveLength(0);
+    await select('sucursal-reserva', '2'); await esperar();
+    expect(botones('Agregar a la reserva')[0].disabled).toBe(false);
+    expect(botones('M')[0].className).toContain('fs-chip--activo');
+    expect(botones('Azul')[0].className).toContain('fs-chip--activo');
+  });
+  it('una respuesta tardia de otra sucursal no vuelve a mostrar sus prendas', async () => {
+    qc.setQueryData(['sucursales'], [2, 3].map((id) => ({
+      id_sucursal: id, nombre: 'Sucursal ' + id, ciudad: 'La Paz', activa: true,
+    })));
+    let liberar!: () => void;
+    const espera = new Promise<void>((resolve) => { liberar = resolve; });
+    instancia.defaults.adapter = async (c) => {
+      if (c.url === '/auth/me') return respuesta(c, usuarioBackend);
+      if (c.url === '/products') return respuesta(c, pagina([prenda, { ...prenda, id: 2, name: 'Blusa' }]));
+      expect(c.url).toBe('/inventory/availability');
+      if (c.params.branchId === 2) await espera;
+      const id = c.params.branchId === 2 ? 1 : 2;
+      return respuesta(c, pagina([{ ...stock, product: { id, name: id === 1 ? 'Camisa' : 'Blusa' } }]));
+    };
+    await montar(<PaginaNuevaReserva />);
+    await select('sucursal-reserva', '2'); await esperar();
+    expect(document.querySelectorAll('.fs-pos__item')).toHaveLength(0);
+    await select('sucursal-reserva', '3'); await esperar();
+    expect(document.querySelector('.fs-pos__resultados')?.textContent).toContain('Blusa');
+    liberar(); await esperar();
+    expect(document.querySelector('.fs-pos__resultados')?.textContent).not.toContain('CamisaCamisas');
+    expect(document.querySelector('.fs-pos__resultados')?.textContent).toContain('Blusa');
+  });
+
+  it('filtra por sucursal antes de paginar y reinicia seleccion/pagina al cambiarla', async () => {
+    qc.setQueryData(['sucursales'], [2, 3, 4].map((id) => ({
+      id_sucursal: id, nombre: 'Sucursal ' + id, ciudad: 'La Paz', activa: true,
+    })));
+    const prendas = Array.from({ length: 8 }, (_, i) => ({ ...prenda, id: i + 1, name: 'Prenda ' + (i + 1) }));
+    instancia.defaults.adapter = async (c) => {
+      if (c.url === '/auth/me') return respuesta(c, usuarioBackend);
+      if (c.url === '/products') return respuesta(c, pagina(prendas));
+      if (c.url?.startsWith('/products/')) return respuesta(c, prendas[Number(c.url.split('/').pop()) - 1]);
+      expect(c.url).toBe('/inventory/availability');
+      const ids = c.params.branchId === 2 ? [1, 2, 3, 4, 5, 6, 7] : c.params.branchId === 3 ? [8] : [];
+      return respuesta(c, pagina(ids.filter((id) => !c.params.productId || c.params.productId === id)
+        .map((id) => ({ ...stock, product: { id, name: 'Prenda ' + id },
+          branch: { ...stock.branch, id: c.params.branchId } }))));
+    };
+    await montar(<PaginaNuevaReserva />);
+    expect(document.querySelectorAll('.fs-pos__item')).toHaveLength(0);
+    await select('sucursal-reserva', '2'); await esperar();
+    expect(document.querySelectorAll('.fs-pos__item')).toHaveLength(6);
+    expect(document.querySelector('.fs-pos__resultados')?.textContent).not.toContain('Prenda 8');
+    const siguiente = document.querySelector('button[aria-label="Pagina siguiente"]') as HTMLButtonElement
+      || [...document.querySelectorAll('button')].find((b) => /siguiente/i.test(b.getAttribute('aria-label') ?? b.textContent ?? ''))!;
+    await act(async () => siguiente.click()); await esperar();
+    expect(document.querySelectorAll('.fs-pos__item')).toHaveLength(1);
+    await act(async () => (document.querySelector('.fs-pos__item') as HTMLButtonElement).click()); await esperar();
+    await select('sucursal-reserva', '3'); await esperar();
+    expect(document.querySelector('.fs-pos__resultados')?.textContent).toContain('Prenda 8');
+    expect(botones('Agregar a la reserva')).toHaveLength(0);
+    await select('sucursal-reserva', '4'); await esperar();
+    expect(document.querySelectorAll('.fs-pos__item')).toHaveLength(0);
+    expect(document.body.textContent).toContain('No hay prendas disponibles en esta sucursal');
+  });
+  it('deshabilita variantes agotadas y limita la cantidad a la combinacion elegida', async () => {
+    catalogo();
+    qc.setQueryData(['producto', 1], adaptarProducto({ ...prenda,
+      sizes: [...prenda.sizes, { id: 11, name: 'L' }],
+      colors: [...prenda.colors, { id: 12, name: 'Rojo', hexCode: '#ff0000' }],
+    }));
+    qc.setQueryData(['disponibilidad', { id_producto: 1, id_sucursal: 2 }], [
+      { id_producto: 1, id_sucursal: 2, id_talla: 9, id_color: 10, cantidad_disponible: 1 },
+      { id_producto: 1, id_sucursal: 2, id_talla: 9, id_color: 12, cantidad_disponible: 0 },
+      { id_producto: 1, id_sucursal: 3, id_talla: 11, id_color: 12, cantidad_disponible: 8 },
+    ]);
+    instancia.defaults.adapter = async (c) => respuesta(c, usuarioBackend);
+    await montar(<PaginaNuevaReserva />);
+    await select('sucursal-reserva', '2');
+    await click('CamisaCamisas');
+    expect(botones('L')[0].disabled).toBe(true);
+    expect(botones('Azul')[0].disabled).toBe(true);
+    await click('M');
+    expect(botones('Rojo')[0].disabled).toBe(true);
+    await click('Azul');
+    expect(botones('+')[0].disabled).toBe(true);
+    expect(botones('Agregar a la reserva')[0].disabled).toBe(false);
+  });
+
   it('crea varias prendas, valida horario y fija la sucursal mientras hay seleccion', async () => {
     catalogo();
     vi.spyOn(qc, 'invalidateQueries').mockResolvedValue();

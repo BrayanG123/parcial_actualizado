@@ -1,3 +1,4 @@
+import { ProveedorPush } from './src/context/PushContext';
 /**
  * FashionStore movil.
  *
@@ -48,11 +49,13 @@ export default function App() {
       {listo ? (
         <QueryClientProvider client={clienteQuery}>
           <ProveedorSesion>
-            <ProveedorAvisos>
-              <ProveedorBorradorReserva>
-                <Navegacion />
-              </ProveedorBorradorReserva>
-            </ProveedorAvisos>
+            <ProveedorPush>
+              <ProveedorAvisos>
+                <ProveedorBorradorReserva>
+                  <Navegacion />
+                </ProveedorBorradorReserva>
+              </ProveedorAvisos>
+            </ProveedorPush>
           </ProveedorSesion>
         </QueryClientProvider>
       ) : (

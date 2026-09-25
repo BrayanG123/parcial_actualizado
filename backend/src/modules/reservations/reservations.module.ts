@@ -1,3 +1,4 @@
+import { PushModule } from '../push/push.module.js';
 import { Module } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule } from '@nestjs/config';
@@ -7,7 +8,11 @@ import { ReservationsRepository } from './reservations.repository.js';
 import { ReservationsService } from './reservations.service.js';
 
 @Module({
-  imports: [ConfigModule, PassportModule.register({ defaultStrategy: 'jwt' })],
+  imports: [
+    PushModule,
+    ConfigModule,
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+  ],
   controllers: [ReservationsController],
   providers: [
     ReservationsService,

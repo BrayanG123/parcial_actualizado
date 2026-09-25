@@ -325,3 +325,9 @@ La forma de cada respuesta esta en los adaptadores de `src/api/*.contratos.ts`.
   - inicio de sesion;
   - pago Stripe en el WebView;
   - camara, galeria y visor de RA (dependen de hardware real).
+
+## Notificaciones push Android para clientes
+
+Implementadas con FCM directo: reservas listas/canceladas/vencidas y pedidos/pagos/entregas confirmados.
+Activar desde Perfil en una APK propia (no Expo Go). Configuracion, compilacion, pruebas y limites en
+[Notificaciones Android](docs/notificaciones-android.md).

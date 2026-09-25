@@ -25,7 +25,7 @@ export const instancia = axios.create({
 
 instancia.interceptors.request.use((config) => {
   const token = obtenerToken();
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (token && !config.headers.Authorization) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
@@ -108,7 +108,8 @@ type Metodo = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 export type ParamsConsulta = Record<string, unknown>;
 
 async function peticion<T>(metodo: Metodo, url: string, datos?: unknown, config?: AxiosRequestConfig): Promise<T> {
-  const token = obtenerToken();
+  const authorization = config?.headers?.Authorization;
+  const token = typeof authorization === 'string' ? authorization.replace(/^Bearer /, '') : obtenerToken();
   try {
     if (USAR_MOCKS) {
       return await mockRequest<T>(metodo, url, datos, config?.params as ParamsConsulta);
@@ -128,5 +129,5 @@ export const api = {
   post: <T>(url: string, datos?: unknown, config?: AxiosRequestConfig) => peticion<T>('POST', url, datos, config),
   put: <T>(url: string, datos?: unknown) => peticion<T>('PUT', url, datos),
   patch: <T>(url: string, datos?: unknown) => peticion<T>('PATCH', url, datos),
-  delete: <T>(url: string) => peticion<T>('DELETE', url),
+  delete: <T>(url: string, datos?: unknown, config?: AxiosRequestConfig) => peticion<T>('DELETE', url, datos, config),
 };

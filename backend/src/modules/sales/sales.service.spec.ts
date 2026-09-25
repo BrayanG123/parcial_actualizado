@@ -1,3 +1,4 @@
+import type { PushService } from '../push/push.service.js';
 import { ConfigService } from '@nestjs/config';
 import { Role } from '../../common/enums/role.enum.js';
 import { Prisma } from '../../generated/prisma/client.js';
@@ -29,6 +30,7 @@ describe('SalesService', () => {
     findClient: vi.fn(),
     findClientById: vi.fn(),
     findCart: vi.fn(),
+    convertCart: vi.fn(),
     findBranch: vi.fn(),
     findRequest: vi.fn(),
     findStock: vi.fn(),
@@ -41,9 +43,11 @@ describe('SalesService', () => {
     findExpired: vi.fn(),
     findAll: vi.fn(),
   };
+  const push = { notifySale: vi.fn(), notifyCustomerSale: vi.fn() };
   const service = new SalesService(
     repository as unknown as SalesRepository,
     new ConfigService({ SALES_CURRENCY: 'BOB' }),
+    push as unknown as PushService,
   );
   let pending: Record<string, unknown>;
 
@@ -280,5 +284,98 @@ describe('SalesService', () => {
       0,
     );
     expect(repository.changeStock).not.toHaveBeenCalled();
+  });
+  it('notifies a verified payment once, including webhook replays', async () => {
+    const confirmation = {
+      amount: '20',
+      currency: 'BOB',
+      reference: 'payment_1',
+    };
+    await service.confirmElectronicPayment(9, confirmation);
+    expect(push.notifyCustomerSale).toHaveBeenCalledWith(
+      9,
+      'PAYMENT_CONFIRMED',
+    );
+    pending.status = 'COMPLETED';
+    pending.payments = [
+      {
+        id: 8,
+        type: 'ELECTRONIC',
+        amount: new Prisma.Decimal(20),
+        status: 'APPROVED',
+        externalReference: 'GATEWAY:payment_1',
+      },
+    ];
+    await service.confirmElectronicPayment(9, confirmation);
+    expect(push.notifyCustomerSale).toHaveBeenCalledTimes(1);
+  });
+
+  it('notifies delivery only after a new committed collection', async () => {
+    pending.cashOnDelivery = true;
+    pending.payments = [
+      {
+        id: 8,
+        method: 'CASH',
+        type: 'IN_STORE',
+        amount: new Prisma.Decimal(20),
+        status: 'PENDING',
+      },
+    ];
+    repository.transaction.mockImplementation((fn) =>
+      fn({ cashShift: { findUnique: async () => ({ userId: cashier.id }) } }),
+    );
+    await service.deliver(9, { shiftId: 1, expectedTotal: 20 }, cashier);
+    expect(push.notifyCustomerSale).toHaveBeenCalledWith(9, 'ORDER_DELIVERED');
+    pending.status = 'COMPLETED';
+    pending.shiftId = 1;
+    pending.payments = [
+      {
+        id: 8,
+        method: 'CASH',
+        type: 'IN_STORE',
+        amount: new Prisma.Decimal(20),
+        status: 'APPROVED',
+      },
+    ];
+    await service.deliver(9, { shiftId: 1, expectedTotal: 20 }, cashier);
+    expect(push.notifyCustomerSale).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not notify an aborted checkout attempt when the retry finds a replay', async () => {
+    repository.findCart.mockResolvedValue({
+      id: 4,
+      updatedAt: new Date(),
+      items: [item],
+      client: { wholesale: false },
+    });
+    const quote = await service.previewCheckout(
+      { cartId: 4, branchId: 1 },
+      customer,
+    );
+    repository.create.mockImplementation(async (data) => ({
+      ...pending,
+      requestHash: data.requestHash,
+    }));
+    repository.transaction.mockImplementation(async (fn) => {
+      const discarded = await fn({});
+      repository.findRequest.mockResolvedValue(discarded.sale);
+      return fn({});
+    });
+    await service.checkout(
+      {
+        cartId: 4,
+        branchId: 1,
+        channel: 'MOBILE',
+        quoteHash: quote.quoteHash,
+        idempotencyKey: dto.idempotencyKey,
+        paymentOption: 'CASH_ON_DELIVERY',
+        deliveryName: 'Cliente',
+        deliveryPhone: '70000000',
+        deliveryAddress: 'Direccion de ejemplo',
+      },
+      customer,
+    );
+    expect(push.notifyCustomerSale).not.toHaveBeenCalled();
+    expect(push.notifySale).not.toHaveBeenCalled();
   });
 });

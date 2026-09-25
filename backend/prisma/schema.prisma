@@ -629,7 +629,7 @@ model Notification {
   @@map("notificaciones")
 }
 
-// Dispositivos del personal que reciben notificaciones push (Firebase Cloud Messaging).
+// Dispositivos del personal y clientes que reciben push mediante Firebase Cloud Messaging.
 model PushToken {
   id        Int      @id @default(autoincrement()) @map("id_token_push")
   userId    Int      @map("id_usuario")

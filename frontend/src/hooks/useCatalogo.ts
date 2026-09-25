@@ -9,9 +9,10 @@ import { claves } from './claves';
 
 const CACHE_LARGO = 10 * 60 * 1000; // catalogos de apoyo cambian poco
 
-export function useProductos(filtros: FiltrosProducto = {}) {
+export function useProductos(filtros: FiltrosProducto = {}, habilitado = true) {
   return useQuery({
     queryKey: claves.productos(filtros),
+    enabled: habilitado,
     queryFn: () => catalogoService.listarProductos(filtros),
     staleTime: 60 * 1000,
   });

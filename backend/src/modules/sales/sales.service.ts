@@ -357,8 +357,7 @@ export class SalesService {
       quoteHash: dto.quoteHash,
       ...delivery,
     });
-    let creada = false;
-    const sale = await this.repository.transaction(async (tx) => {
+    const result = await this.repository.transaction(async (tx) => {
       const clientId = await this.customer(user, tx);
       const replay = await this.replay(
         user.id,
@@ -366,7 +365,7 @@ export class SalesService {
         requestHash,
         tx,
       );
-      if (replay) return replay;
+      if (replay) return { sale: replay, created: false };
       const quote = await this.checkoutQuote(dto, clientId, tx);
       if (quote.quoteHash !== dto.quoteHash)
         throw new ConflictException(
@@ -417,12 +416,14 @@ export class SalesService {
         );
       }
       await this.repository.convertCart(dto.cartId, tx);
-      creada = true;
-      return created;
+      return { sale: created, created: true };
     });
     // El pedido contra entrega ya es una compra: el personal debe prepararlo y entregarlo.
-    if (creada && cashOnDelivery) this.avisarCompra(sale.id);
-    return this.present(sale);
+    if (result.created && cashOnDelivery) {
+      this.avisarCompra(result.sale.id);
+      void this.push?.notifyCustomerSale(result.sale.id, 'ORDER_PLACED');
+    }
+    return this.present(result.sale);
   }
 
   async deliver(id: number, dto: DeliverSaleDto, user: AuthenticatedUser) {
@@ -452,7 +453,7 @@ export class SalesService {
         });
         if (shift?.userId !== user.id)
           throw new ForbiddenException('El cobro pertenece a otro cajero.');
-        return sale;
+        return { sale, delivered: false };
       }
       if (
         sale.status !== 'PENDING_PAYMENT' ||
@@ -495,7 +496,7 @@ export class SalesService {
         { status: 'APPROVED', paidAt: now },
         tx,
       );
-      return this.repository.update(
+      const delivered = await this.repository.update(
         id,
         {
           status: 'COMPLETED',
@@ -507,8 +508,11 @@ export class SalesService {
         },
         tx,
       );
+      return { sale: delivered, delivered: true };
     });
-    return this.present(result);
+    if (result.delivered)
+      void this.push?.notifyCustomerSale(result.sale.id, 'ORDER_DELIVERED');
+    return this.present(result.sale);
   }
 
   // Internal integration boundary: call only after the Payments module verifies the provider event.
@@ -596,7 +600,10 @@ export class SalesService {
         nueva: true,
       };
     });
-    if (result.nueva) this.avisarCompra(result.sale.id);
+    if (result.nueva) {
+      this.avisarCompra(result.sale.id);
+      void this.push?.notifyCustomerSale(result.sale.id, 'PAYMENT_CONFIRMED');
+    }
     if (result.expired)
       throw new ConflictException(
         'Payment arrived after expiration; stock was released. Payments must reconcile or refund the provider transaction',

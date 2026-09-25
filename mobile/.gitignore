@@ -42,3 +42,6 @@ yarn-error.*
 
 # variables locales
 .env
+
+# Configuracion Firebase Android (archivo local o variable de archivo EAS)
+/google-services.json

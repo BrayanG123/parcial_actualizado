@@ -1,3 +1,4 @@
+import type { PushService } from '../push/push.service.js';
 import {
   BadRequestException,
   ConflictException,
@@ -42,9 +43,11 @@ describe('ReservationsService', () => {
     updateStatus: vi.fn(),
     findExpired: vi.fn(),
   };
+  const push = { notifyCustomerReservation: vi.fn() };
   const service = new ReservationsService(
     repository as unknown as ReservationsRepository,
     new ConfigService({ RESERVATION_TIME_ZONE: 'America/La_Paz' }),
+    push as unknown as PushService,
   );
   let reservation: ReservationRecord;
 
@@ -179,6 +182,7 @@ describe('ReservationsService', () => {
     reservation.status = 'CANCELLED';
     await service.cancel(10, customer);
     expect(repository.releaseStock).not.toHaveBeenCalled();
+    expect(push.notifyCustomerReservation).not.toHaveBeenCalled();
   });
 
   it('the customer cannot cancel after checking in', async () => {
@@ -209,6 +213,7 @@ describe('ReservationsService', () => {
       service.updateStatus(10, { status: ReservationStatus.READY }, manager),
     ).rejects.toThrow('expired');
     expect(repository.releaseStock).toHaveBeenCalledOnce();
+    expect(push.notifyCustomerReservation).toHaveBeenCalledWith(10, 'EXPIRED');
     expect(repository.updateStatus).toHaveBeenCalledWith(
       10,
       'EXPIRED',
@@ -223,9 +228,45 @@ describe('ReservationsService', () => {
     expect(repository.releaseStock).not.toHaveBeenCalled();
   });
 
+  it('notifies READY after commit and does not repeat the same state', async () => {
+    reservation.status = 'PREPARING';
+    let committed = false;
+    repository.transaction.mockImplementation(async (fn) => {
+      const result = await fn({});
+      committed = true;
+      return result;
+    });
+    push.notifyCustomerReservation.mockImplementation(() => {
+      expect(committed).toBe(true);
+    });
+    await service.updateStatus(
+      10,
+      { status: ReservationStatus.READY },
+      manager,
+    );
+    expect(push.notifyCustomerReservation).toHaveBeenCalledWith(10, 'READY');
+    reservation.status = 'READY';
+    await service.updateStatus(
+      10,
+      { status: ReservationStatus.READY },
+      manager,
+    );
+    expect(push.notifyCustomerReservation).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not notify a rolled back change', async () => {
+    repository.transaction.mockImplementation(async (fn) => {
+      await fn({});
+      throw new Error('rollback');
+    });
+    await expect(service.cancel(10, customer)).rejects.toThrow('rollback');
+    expect(push.notifyCustomerReservation).not.toHaveBeenCalled();
+  });
+
   it('expires overdue reservations and releases stock', async () => {
     repository.findExpired.mockResolvedValue([{ id: 10 }]);
     expect(await service.expireDueReservations(new Date('2040-01-01'))).toBe(1);
+    expect(push.notifyCustomerReservation).toHaveBeenCalledWith(10, 'EXPIRED');
     expect(repository.releaseStock).toHaveBeenCalledOnce();
   });
 });

@@ -1,6 +1,6 @@
 import { ErrorEstado } from '../../components/ui/Estados';
 import { Paginacion } from '../../components/ui/Paginacion';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { BadgeStock } from '../../components/ui/Badges';
 import { ImagenProducto } from '../../components/ui/ImagenProducto';
@@ -55,22 +55,32 @@ export default function PaginaNuevaReserva() {
   const [idColor, setIdColor] = useState<number | null>(preseleccion?.id_color ?? null);
   const [cantidad, setCantidad] = useState(preseleccion?.cantidad ?? 1);
 
-  const resultados = useProductos({ q: busqueda || undefined, page: paginaBusqueda, page_size: 6 });
+  const resultados = useProductos({
+    q: busqueda || undefined, page: paginaBusqueda, page_size: 6,
+    id_sucursal: idSucursal || undefined,
+  }, Boolean(idSucursal));
   const producto = useProducto(idProducto ?? undefined);
   const disponibilidad = useDisponibilidad(
-    idProducto && idTalla && idColor && idSucursal
+    idProducto && idSucursal
       ? {
           id_producto: idProducto,
-          id_talla: idTalla,
-          id_color: idColor,
           id_sucursal: Number(idSucursal),
         }
       : null,
   );
 
-  const disponible = useMemo(
-    () => (disponibilidad.data ?? []).reduce((acc, i) => acc + stockDisponible(i), 0),
-    [disponibilidad.data],
+  const stockConfirmado = disponibilidad.isSuccess && !disponibilidad.isFetching;
+  const variantes = (disponibilidad.data ?? []).filter(
+    (i) => i.id_producto === idProducto && i.id_sucursal === idSucursal,
+  );
+  const disponible = variantes
+    .filter((i) => i.id_talla === idTalla && i.id_color === idColor)
+    .reduce((acc, i) => acc + stockDisponible(i), 0);
+  const tallaDisponible = (id: number) => stockConfirmado && variantes.some(
+    (i) => i.id_talla === id && stockDisponible(i) > 0,
+  );
+  const colorDisponible = (id: number) => stockConfirmado && !!idTalla && variantes.some(
+    (i) => i.id_talla === idTalla && i.id_color === id && stockDisponible(i) > 0,
   );
 
   function elegirProducto(p: Producto) {
@@ -99,7 +109,7 @@ export default function PaginaNuevaReserva() {
     if (!Number.isInteger(cantidad) || cantidad < 1 || cantidad > 100)
       return setError('Elige entre 1 y 100 unidades por variante.');
     if (lineas.length >= 50) return setError('La reserva admite hasta 50 variantes.');
-    if (!disponibilidad.isSuccess)
+    if (!stockConfirmado)
       return setError('Espera a que se confirme la disponibilidad de esta variante.');
     if (disponible < cantidad) {
       setError('No hay unidades suficientes de esa combinacion en la sucursal elegida.');
@@ -193,7 +203,18 @@ export default function PaginaNuevaReserva() {
                 disabled={lineas.length > 0 || crear.isPending}
                 className="fs-select"
                 value={idSucursal}
-                onChange={(e) => setIdSucursal(e.target.value ? Number(e.target.value) : '')}
+                onChange={(e) => {
+                  setIdSucursal(e.target.value ? Number(e.target.value) : '');
+                  setPaginaBusqueda(1);
+                  // Conserva la prenda llegada desde el catalogo al elegir la primera sucursal.
+                  if (idSucursal) {
+                    setIdProducto(null);
+                    setIdTalla(null);
+                    setIdColor(null);
+                    setCantidad(1);
+                  }
+                  setError('');
+                }}
               >
                 <option value="">Selecciona una sucursal</option>
                 {sucursales.data?.map((s) => (
@@ -244,13 +265,14 @@ export default function PaginaNuevaReserva() {
             />
           </div>
 
-          {resultados.isPending && <p>Buscando prendas...</p>}
-          {resultados.isError && (
+          {!idSucursal && <p>Selecciona una sucursal para ver las prendas disponibles.</p>}
+          {idSucursal && resultados.isPending && <p>Buscando prendas disponibles...</p>}
+          {idSucursal && resultados.isError && (
             <ErrorEstado error={resultados.error} onReintentar={() => resultados.refetch()} />
           )}
-          {resultados.data?.total === 0 && <p>No hay prendas que coincidan con la busqueda.</p>}
+          {idSucursal && resultados.data?.total === 0 && <p>No hay prendas disponibles en esta sucursal que coincidan con la busqueda.</p>}
           <div className="fs-pos__resultados">
-            {resultados.data?.items.map((p) => (
+            {idSucursal && !resultados.isError && resultados.data?.items.map((p) => (
               <button
                 key={p.id_producto}
                 type="button"
@@ -266,7 +288,7 @@ export default function PaginaNuevaReserva() {
             ))}
           </div>
 
-          {resultados.data && (
+          {idSucursal && !resultados.isError && resultados.data && (
             <Paginacion
               page={resultados.data.page}
               pageSize={resultados.data.page_size}
@@ -284,13 +306,16 @@ export default function PaginaNuevaReserva() {
               onReintentar={() => disponibilidad.refetch()}
             />
           )}
-          {idSucursal && idTalla && idColor && disponibilidad.isPending && (
+          {idSucursal && idProducto && disponibilidad.isFetching && (
             <p>Consultando disponibilidad...</p>
           )}
-          {producto.data && (
+          {idSucursal && producto.data && (
             <div className="fs-pila" style={{ gap: 12 }}>
               <hr className="fs-divisor" />
               <strong>{producto.data.nombre}</strong>
+              {stockConfirmado && !variantes.some((i) => stockDisponible(i) > 0) && (
+                <p>Esta prenda ya no tiene stock disponible en la sucursal. Elige otra prenda.</p>
+              )}
 
               <div className="fs-pila" style={{ gap: 8 }}>
                 <span className="fs-filtros__titulo">Talla</span>
@@ -300,7 +325,9 @@ export default function PaginaNuevaReserva() {
                       key={t.id_talla}
                       type="button"
                       className={`fs-chip${idTalla === t.id_talla ? ' fs-chip--activo' : ''}`}
-                      onClick={() => setIdTalla(t.id_talla)}
+                      disabled={!tallaDisponible(t.id_talla)}
+                      title={tallaDisponible(t.id_talla) ? undefined : 'Sin disponibilidad en esta sucursal'}
+                      onClick={() => { setIdTalla(t.id_talla); setIdColor(null); setCantidad(1); setError(''); }}
                     >
                       {t.nombre}
                     </button>
@@ -316,7 +343,9 @@ export default function PaginaNuevaReserva() {
                       key={c.id_color}
                       type="button"
                       className={`fs-chip fs-chip--color${idColor === c.id_color ? ' fs-chip--activo' : ''}`}
-                      onClick={() => setIdColor(c.id_color)}
+                      disabled={!colorDisponible(c.id_color)}
+                      title={colorDisponible(c.id_color) ? undefined : 'Sin disponibilidad para esta talla'}
+                      onClick={() => { setIdColor(c.id_color); setCantidad(1); setError(''); }}
                     >
                       <span className="fs-punto-color" style={{ background: c.codigo_hex }} />
                       {c.nombre}
@@ -338,7 +367,7 @@ export default function PaginaNuevaReserva() {
                   <button
                     type="button"
                     onClick={() => setCantidad((c) => c + 1)}
-                    disabled={cantidad >= Math.min(100, disponible) || !disponibilidad.isSuccess}
+                    disabled={cantidad >= Math.min(100, disponible) || !stockConfirmado}
                   >
                     +
                   </button>
@@ -354,8 +383,9 @@ export default function PaginaNuevaReserva() {
                   onClick={agregarLinea}
                   disabled={
                     crear.isPending ||
-                    !disponibilidad.isSuccess ||
+                    !stockConfirmado ||
                     !producto.data.activo ||
+                    !idTalla || !idColor || disponible < cantidad ||
                     lineas.length >= 50
                   }
                 >

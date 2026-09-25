@@ -1,3 +1,4 @@
+import { PushService } from '../push/push.service.js';
 import {
   BadRequestException,
   ConflictException,
@@ -5,6 +6,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
@@ -29,6 +31,7 @@ export class ReservationsService {
   constructor(
     private readonly reservationsRepository: ReservationsRepository,
     private readonly config: ConfigService,
+    @Optional() private readonly push?: PushService,
   ) {}
 
   async create(dto: CreateReservationDto, user: AuthenticatedUser) {
@@ -177,9 +180,11 @@ export class ReservationsService {
             tx,
           ),
           expired: true,
+          changed: true,
         };
       }
-      if (reservation.status === status) return { reservation, expired: false };
+      if (reservation.status === status)
+        return { reservation, expired: false, changed: false };
       if (!transitions[reservation.status].includes(status)) {
         throw new ConflictException(
           `Invalid transition from ${reservation.status} to ${status}`,
@@ -199,8 +204,11 @@ export class ReservationsService {
           tx,
         ),
         expired: false,
+        changed: true,
       };
     });
+    if (result.changed)
+      this.notifyCustomer(result.reservation.id, result.reservation.status);
     // Raise only after committing the automatic expiration and stock release.
     if (result.expired)
       throw new ConflictException(
@@ -237,7 +245,10 @@ export class ReservationsService {
               return true;
             },
           );
-          if (changed) expired++;
+          if (changed) {
+            expired++;
+            this.notifyCustomer(id, 'EXPIRED');
+          }
         } catch (error) {
           // One inconsistent record must not block expiration of other reservations.
           this.logger.error(
@@ -249,6 +260,11 @@ export class ReservationsService {
       }
       if (batch.length < 100) return expired;
     }
+  }
+
+  private notifyCustomer(id: number, status: ReservationStatus) {
+    if (status === 'READY' || status === 'CANCELLED' || status === 'EXPIRED')
+      void this.push?.notifyCustomerReservation(id, status);
   }
 
   private async getReservation(id: number, tx?: Prisma.TransactionClient) {

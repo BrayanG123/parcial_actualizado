@@ -1,3 +1,5 @@
+import { Alert } from 'react-native';
+import { pushService } from '../services/push.service';
 /**
  * Sesion del cliente: token, usuario actual y acciones de acceso.
  * Es el unico estado verdaderamente global de la aplicacion; el resto de los
@@ -89,7 +91,10 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   );
 
   const cerrarSesion = useCallback(async () => {
+    let bajaPendiente = false;
+    try { await pushService.retirar(); } catch { bajaPendiente = true; }
     await authService.logout();
+    if (bajaPendiente) Alert.alert('Sesion cerrada', 'No pudimos desactivar los avisos de este dispositivo. Puedes desactivarlos en los ajustes de Android hasta volver a iniciar sesion con conexion.');
     setUsuario(null);
     // Los datos en cache son del cliente anterior: se descartan por completo.
     queryClient.clear();

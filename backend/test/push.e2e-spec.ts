@@ -15,7 +15,7 @@ describe.skipIf(!databaseUrl)('Push tokens (HTTP and PostgreSQL)', () => {
   }, 30000);
   afterAll(async () => ctx?.close());
 
-  it('lets staff register and remove their devices, but not customers', async () => {
+  it('lets staff register and remove their devices; rejects anonymous requests', async () => {
     expect(
       (
         await request(server())
@@ -25,11 +25,6 @@ describe.skipIf(!databaseUrl)('Push tokens (HTTP and PostgreSQL)', () => {
       ).body.data,
     ).toEqual({ enabled: false });
 
-    await request(server())
-      .post('/api/v1/push/tokens')
-      .set(customer())
-      .send({ token })
-      .expect(403);
     await request(server())
       .post('/api/v1/push/tokens')
       .send({ token })
@@ -69,6 +64,47 @@ describe.skipIf(!databaseUrl)('Push tokens (HTTP and PostgreSQL)', () => {
           .expect(200)
       ).body.data,
     ).toEqual({ removed: true });
+    expect(await ctx.prisma.pushToken.count()).toBe(0);
+  });
+  it('registers Android customers and protects token ownership across account changes', async () => {
+    await request(server())
+      .post('/api/v1/push/tokens')
+      .set(customer())
+      .send({ token, platform: 'ANDROID', userId: ctx.users[1]!.id })
+      .expect(400);
+    await request(server())
+      .post('/api/v1/push/tokens')
+      .set(customer())
+      .send({ token, platform: 'ANDROID' })
+      .expect(200);
+    expect(
+      await ctx.prisma.pushToken.findUnique({ where: { token } }),
+    ).toMatchObject({ userId: ctx.users[0]!.id, platform: 'ANDROID' });
+    const other = { Authorization: 'Bearer ' + ctx.tokens[1]! };
+    const denied = await request(server())
+      .delete('/api/v1/push/tokens')
+      .set(other)
+      .send({ token })
+      .expect(200);
+    expect(denied.body.data.removed).toBe(false);
+    await request(server())
+      .post('/api/v1/push/tokens')
+      .set(other)
+      .send({ token, platform: 'ANDROID' })
+      .expect(200);
+    await request(server())
+      .delete('/api/v1/push/tokens')
+      .set(customer())
+      .send({ token })
+      .expect(200);
+    expect(
+      await ctx.prisma.pushToken.findUnique({ where: { token } }),
+    ).toMatchObject({ userId: ctx.users[1]!.id });
+    await request(server())
+      .delete('/api/v1/push/tokens')
+      .set(other)
+      .send({ token })
+      .expect(200);
     expect(await ctx.prisma.pushToken.count()).toBe(0);
   });
 });

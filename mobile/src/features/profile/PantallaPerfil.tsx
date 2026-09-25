@@ -1,3 +1,4 @@
+import { AvisosPush } from '../notifications/AvisosPush';
 /**
  * Perfil del cliente: sus datos, accesos a compras y reservas, y cierre de
  * sesion. Solo se muestran los campos que existen en el modelo de dominio
@@ -162,6 +163,8 @@ export function PantallaPerfil({ navigation }: PropsTab<'Perfil'>) {
             valor={USAR_MOCKS ? 'Datos de prueba locales' : 'Backend NestJS'}
           />
         </View>
+
+        <AvisosPush />
 
         <Boton titulo="Cerrar sesion" variante="peligro" icono="log-out-outline" ancho onPress={confirmarSalida} />
       </ScrollView>

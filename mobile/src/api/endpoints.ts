@@ -3,6 +3,7 @@
  * Ningun componente ni servicio debe escribir rutas a mano.
  */
 export const endpoints = {
+  push: { estado: '/push/status', tokens: '/push/tokens' },
   auth: {
     login: '/auth/login',
     registro: '/auth/register',
