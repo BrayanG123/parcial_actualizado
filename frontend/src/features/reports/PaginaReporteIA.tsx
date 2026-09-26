@@ -1,3 +1,5 @@
+import { BotonesExportar } from './BotonesExportar';
+import { cargarReporteIA } from './datos-exportacion';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ErrorEstado, Vacio } from '../../components/ui/Estados';
 import { esRespuestaIA, etiquetaOrigen } from '../../api/ia.contratos';
@@ -171,7 +173,7 @@ export default function PaginaReporteIA() {
       </section>
 
       {reporte.isError && <ErrorEstado error={reporte.error} onReintentar={() => generar(null)} />}
-      {reporte.data && <ResultadoReporteIA reporte={reporte.data} />}
+      {reporte.data && <><BotonesExportar cargar={() => cargarReporteIA(reporte.data!)} deshabilitado={reporte.isPending || reporte.isError} /><ResultadoReporteIA reporte={reporte.data} /></>}
       {!reporte.data && !reporte.isError && !reporte.isPending && (
         <Vacio titulo="Sin reporte" mensaje="Escribe o dicta una solicitud para generar un reporte." />
       )}

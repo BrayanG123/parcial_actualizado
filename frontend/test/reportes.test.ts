@@ -125,7 +125,7 @@ describe('contratos de reportes NestJS', () => {
           { productId: 4, productName: 'Otro', currency: 'USD', unitsSold: 9, saleCount: 1, revenue: 10, rank: 1 },
         ],
       }),
-    ).toEqual([{ id_producto: 3, nombre: 'Blazer', unidades: 5, total: 900, ventas: 4, posicion: 1 }]);
+    ).toEqual([{ id_producto: 3, moneda: 'BOB', nombre: 'Blazer', unidades: 5, total: 900, ventas: 4, posicion: 1 }]);
 
     const metricas = { variantCount: 1, physical: 4, reserved: 1, available: 3, incoming: 6, lowStockCount: 1, outOfStockCount: 0 };
     const inv = adaptarReporteInventario({

@@ -1,3 +1,5 @@
+import { BotonesExportar } from './BotonesExportar';
+import { cargarReporteGeneral } from './datos-exportacion';
 import { useMemo, useState } from 'react';
 import { ErrorEstado, FilasSkeleton, Vacio } from '../../components/ui/Estados';
 import { Paginacion } from '../../components/ui/Paginacion';
@@ -74,6 +76,10 @@ export default function PaginaReportes() {
             {esAdmin ? '.' : ' para tu sucursal.'}
           </p>
         </div>
+        <BotonesExportar cargar={() => cargarReporteGeneral(filtros, {
+          id_sucursal: sucursalFiltro, umbral, solo_stock_bajo: soloBajo,
+        }, esAdmin ? idSucursal ? sucursales.data?.find((s) => s.id_sucursal === idSucursal)?.nombre ?? ('Sucursal ' + idSucursal)
+          : 'Todas las autorizadas' : 'Sucursal asignada al encargado')} />
       </header>
 
       <section className="fs-tarjeta fs-tarjeta--pad">

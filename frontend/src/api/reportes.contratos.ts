@@ -221,6 +221,7 @@ export function adaptarTopProductos(v: TopProductosBackend): TopProducto[] {
     .filter((i) => i.currency === moneda)
     .map((i) => ({
       id_producto: i.productId,
+      moneda: i.currency,
       nombre: i.productName,
       unidades: i.unitsSold,
       total: i.revenue,

@@ -33,6 +33,7 @@ export interface InterpretacionReporteIA {
   canal: CanalVenta | null;
   limite: number | null;
   solo_stock_bajo: boolean;
+  umbral_stock_bajo?: number;
   explicacion: string;
 }
 

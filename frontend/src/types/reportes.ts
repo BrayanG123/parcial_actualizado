@@ -63,6 +63,7 @@ export interface ReporteVentas {
 }
 
 export interface TopProducto {
+  moneda?: string;
   id_producto: number;
   nombre: string;
   unidades: number;

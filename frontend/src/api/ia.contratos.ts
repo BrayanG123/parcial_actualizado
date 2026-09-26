@@ -104,6 +104,7 @@ export function adaptarReporteIA(v: ReporteIABackend): ReporteIA {
       canal: i.channel ? CANALES_UI[i.channel] : null,
       limite: i.limit ?? null,
       solo_stock_bajo: i.lowStockOnly ?? false,
+      umbral_stock_bajo: i.lowStockThreshold ?? 5,
       explicacion: i.explanation,
     },
   };
