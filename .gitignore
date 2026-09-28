@@ -1,0 +1,5 @@
+.env
+!.env.example
+1er_Parcial_SI2.code-workspace
+# Credenciales privadas de cuentas de servicio Firebase
+*-firebase-adminsdk-*.json

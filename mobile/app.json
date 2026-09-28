@@ -1,0 +1,74 @@
+{
+  "expo": {
+    "name": "FashionStore",
+    "slug": "fashionstore-movil",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#faf7f3",
+    "scheme": "fashionstore",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "bo.fashionstore.movil",
+      "infoPlist": {
+        "NSCameraUsageDescription": "FashionStore usa la camara para el probador virtual de prendas.",
+        "NSPhotoLibraryAddUsageDescription": "Permite guardar en tu galeria las fotos del probador virtual."
+      }
+    },
+    "android": {
+      "package": "bo.fashionstore.movil",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#faf7f3",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#faf7f3"
+        }
+      ],
+      "expo-image",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "FashionStore usa la camara para el probador virtual de prendas."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "Permite guardar en tu galeria las fotos del probador virtual.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "bc4e6ecf-2ded-48b7-851b-a7cd4aeca70c"
+      }
+    }
+  }
+}

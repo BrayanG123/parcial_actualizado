@@ -1,0 +1,11 @@
+node_modules
+dist
+src/generated
+coverage
+test
+docs
+*.log
+.env
+.env.*
+!.env.example
+Readme.md.md

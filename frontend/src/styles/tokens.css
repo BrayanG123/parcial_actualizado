@@ -1,0 +1,121 @@
+/* Identidad visual FashionStore: crema calido, tinta profunda y acento vino. */
+:root {
+  /* color */
+  --fs-crema: #faf7f3;
+  --fs-crema-2: #f2ece5;
+  --fs-blanco: #ffffff;
+  --fs-tinta: #1c1b1a;
+  --fs-tinta-2: #4a4644;
+  --fs-tinta-3: #7d7671;
+  --fs-borde: #e4dcd3;
+  --fs-borde-fuerte: #d3c7ba;
+
+  --fs-acento: #8c2f39;
+  --fs-acento-oscuro: #6f2129;
+  --fs-acento-suave: #f7ecec;
+  --fs-oro: #b08344;
+
+  --fs-exito: #2f6b4f;
+  --fs-exito-suave: #e8f2ec;
+  --fs-alerta: #9a6a10;
+  --fs-alerta-suave: #fbf1dd;
+  --fs-error: #a32d2d;
+  --fs-error-suave: #fbeaea;
+  --fs-info: #2d5b8c;
+  --fs-info-suave: #e9f0f8;
+
+  /* tipografia */
+  --fs-fuente: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --fs-fuente-titulo: 'Playfair Display', Georgia, 'Times New Roman', serif;
+
+  /* espaciado */
+  --fs-esp-1: 4px;
+  --fs-esp-2: 8px;
+  --fs-esp-3: 12px;
+  --fs-esp-4: 16px;
+  --fs-esp-5: 24px;
+  --fs-esp-6: 32px;
+  --fs-esp-7: 48px;
+  --fs-esp-8: 64px;
+
+  /* forma */
+  --fs-radio-s: 6px;
+  --fs-radio-m: 10px;
+  --fs-radio-l: 16px;
+  --fs-sombra-s: 0 1px 2px rgba(28, 27, 26, 0.06);
+  --fs-sombra-m: 0 4px 16px rgba(28, 27, 26, 0.08);
+  --fs-sombra-l: 0 12px 32px rgba(28, 27, 26, 0.12);
+
+  /* layout */
+  --fs-ancho: 1280px;
+  --fs-header: 68px;
+  --fs-sidebar: 244px;
+
+  --fs-transicion: 140ms ease;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--fs-crema);
+  color: var(--fs-tinta);
+  font-family: var(--fs-fuente);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-family: var(--fs-fuente-titulo);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+h1 { font-size: clamp(1.75rem, 3vw, 2.5rem); }
+h2 { font-size: clamp(1.35rem, 2vw, 1.75rem); }
+h3 { font-size: 1.15rem; }
+
+p { margin: 0; }
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--fs-acento);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--fs-borde-fuerte); border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }

@@ -1,0 +1,88 @@
+.fs-campana {
+  position: relative;
+}
+.fs-campana__boton {
+  position: relative;
+  font-size: 1.1rem;
+}
+.fs-campana__contador {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--fs-acento);
+  color: var(--fs-blanco);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+.fs-campana__panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: min(360px, calc(100vw - 32px));
+  background: var(--fs-blanco);
+  border: 1px solid var(--fs-borde);
+  border-radius: var(--fs-radio-m);
+  box-shadow: var(--fs-sombra-l);
+  z-index: 50;
+  overflow: hidden;
+}
+.fs-campana__cabecera,
+.fs-campana__pie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fs-esp-2);
+  padding: var(--fs-esp-3) var(--fs-esp-4);
+}
+.fs-campana__cabecera {
+  border-bottom: 1px solid var(--fs-borde);
+}
+.fs-campana__lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.fs-campana__item {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: var(--fs-esp-3) var(--fs-esp-4);
+  border: 0;
+  border-bottom: 1px solid var(--fs-borde);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 0.86rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--fs-transicion);
+}
+.fs-campana__item:hover,
+.fs-campana__item:focus-visible {
+  background: var(--fs-crema);
+}
+.fs-campana__item--nueva {
+  background: var(--fs-acento-suave);
+}
+.fs-campana__item--nueva strong::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--fs-acento);
+  vertical-align: middle;
+}
+.fs-reserva--resaltada {
+  outline: 2px solid var(--fs-acento);
+  outline-offset: 2px;
+}

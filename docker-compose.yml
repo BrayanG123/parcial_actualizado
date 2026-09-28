@@ -1,0 +1,69 @@
+# FashionStore - entorno local con contenedores.
+# Las mismas imagenes de backend y frontend se publican en Azure (ver docs/despliegue-azure.md).
+#
+#   docker compose up -d db                     # solo PostgreSQL para desarrollo (npm run start:dev)
+#   docker compose up -d --build                # base + API + web en http://localhost:8080
+#   docker compose --profile ia-local up -d     # agrega Ollama como IA local
+name: fashionstore
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tienda_ropa}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el .env de la raiz}
+    ports:
+      - '${POSTGRES_PORT:-5433}:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-tienda_ropa}']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    # JWT, Stripe, Cloudinary y la clave de IA salen de backend/.env; aqui solo se ajusta la red interna.
+    env_file: ./backend/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tienda_ropa}?schema=public
+      CORS_ORIGINS: ${WEB_ORIGIN:-http://localhost:8080},http://localhost:8081
+      RUN_MIGRATIONS: 'true'
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+    ports:
+      - '${API_PORT:-3000}:3000'
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${PUBLIC_API_URL:-/api/v1}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      API_UPSTREAM: http://backend:3000
+    ports:
+      - '${WEB_PORT:-8080}:8080'
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ['ia-local']
+    restart: unless-stopped
+    ports:
+      - '11434:11434'
+    volumes:
+      - ollama-data:/root/.ollama
+
+volumes:
+  db-data:
+  ollama-data:

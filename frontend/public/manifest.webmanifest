@@ -1,0 +1,10 @@
+{
+  "name": "FashionStore Caja",
+  "short_name": "FashionStore",
+  "start_url": "/caja/offline",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f5f0",
+  "theme_color": "#242424",
+  "icons": [{ "src": "/pwa-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
