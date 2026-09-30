@@ -8,7 +8,7 @@ import { ProveedorPush } from './src/context/PushContext';
  *   3. la sesion guardada se recupera dentro de ProveedorSesion.
  */
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -41,6 +41,17 @@ export default function App() {
   useEffect(() => {
     if (!USAR_MOCKS) return;
     restaurarEstado().finally(() => setListo(true));
+  }, []);
+
+  // Al volver a la app se refrescan reservas y compras: el personal pudo
+  // cambiarlas mientras tanto aunque el aviso push no haya llegado.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (estado) => {
+      if (estado !== 'active') return;
+      for (const clave of ['reservas', 'reserva', 'ventas', 'venta'])
+        void clienteQuery.invalidateQueries({ queryKey: [clave] });
+    });
+    return () => sub.remove();
   }, []);
 
   return (

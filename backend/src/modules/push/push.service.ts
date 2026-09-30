@@ -21,7 +21,15 @@ const TOKENS_INVALIDOS = new Set([
 type RoleName = 'ADMINISTRATOR' | 'BRANCH_MANAGER' | 'CASHIER';
 export type CustomerSaleEvent =
   'ORDER_PLACED' | 'PAYMENT_CONFIRMED' | 'ORDER_DELIVERED';
-export type CustomerReservationEvent = 'READY' | 'CANCELLED' | 'EXPIRED';
+/** Cada estado de la reserva genera su aviso; PENDING corresponde a la creacion. */
+export type CustomerReservationEvent =
+  | 'PENDING'
+  | 'PREPARING'
+  | 'READY'
+  | 'CUSTOMER_PRESENT'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'EXPIRED';
 
 /** Pantalla de ventas que abre la notificacion segun el rol de quien la recibe. */
 const RUTA_POR_ROL: [RoleName, string][] = [
@@ -68,6 +76,9 @@ export class PushService {
       create: { userId, token: dto.token, platform: dto.platform ?? 'WEB' },
       update: { userId, platform: dto.platform ?? 'WEB' },
     });
+    this.logger.log(
+      `Push token registered for user ${userId} (${dto.platform ?? 'WEB'})`,
+    );
     return { registered: true };
   }
 
@@ -179,7 +190,12 @@ export class PushService {
     event: CustomerSaleEvent,
   ): Promise<void> {
     try {
-      if (!this.enabled) return;
+      if (!this.enabled) {
+        this.logger.warn(
+          `Customer push skipped for sale ${saleId}: FIREBASE_* variables are not configured`,
+        );
+        return;
+      }
       const sale = await this.prisma.sale.findUnique({
         where: { id: saleId },
         select: {
@@ -218,8 +234,10 @@ export class PushService {
         event,
         eventId: 'sale-' + saleId + '-' + event,
       });
-    } catch {
-      this.logger.warn('Customer push failed for sale ' + saleId);
+    } catch (error) {
+      this.logger.warn(
+        `Customer push failed for sale ${saleId}: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
     }
   }
 
@@ -228,16 +246,38 @@ export class PushService {
     event: CustomerReservationEvent,
   ): Promise<void> {
     try {
-      if (!this.enabled) return;
+      if (!this.enabled) {
+        this.logger.warn(
+          `Customer push skipped for reservation ${id}: FIREBASE_* variables are not configured`,
+        );
+        return;
+      }
       const reservation = await this.prisma.reservation.findUnique({
         where: { id },
         select: { status: true, client: { select: { userId: true } } },
       });
+      // Un aviso tardio no debe anunciar un estado que ya cambio.
       if (!reservation || reservation.status !== event) return;
       const messages = {
+        PENDING: [
+          'Reserva registrada',
+          'Recibimos tu reserva. Te avisaremos cuando la sucursal la prepare.',
+        ],
+        PREPARING: [
+          'Preparando tu reserva',
+          'La sucursal esta preparando tus prendas.',
+        ],
         READY: [
           'Tu reserva esta lista',
           'Tus prendas estan listas para probar en tienda. Consulta tu reserva.',
+        ],
+        CUSTOMER_PRESENT: [
+          'Te estamos atendiendo',
+          'Registramos tu llegada a la sucursal. Disfruta tu visita.',
+        ],
+        COMPLETED: [
+          'Reserva atendida',
+          'Gracias por tu visita. Tu reserva quedo cerrada.',
         ],
         CANCELLED: [
           'Reserva cancelada',
@@ -255,8 +295,10 @@ export class PushService {
         event,
         eventId: 'reservation-' + id + '-' + event,
       });
-    } catch {
-      this.logger.warn('Customer push failed for reservation ' + id);
+    } catch (error) {
+      this.logger.warn(
+        `Customer push failed for reservation ${id}: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
     }
   }
 
@@ -276,6 +318,13 @@ export class PushService {
       },
       select: { token: true },
     });
+    // Diagnostico sin datos personales: solo IDs, conteos y codigos de FCM.
+    if (!devices.length) {
+      this.logger.warn(
+        `Customer push ${data.eventId}: user ${userId} has no Android device registered`,
+      );
+      return;
+    }
     for (let i = 0; i < devices.length; i += LOTE) {
       const tokens = devices.slice(i, i + LOTE).map((device) => device.token);
       const result = await messaging.sendEachForMulticast({
@@ -292,6 +341,17 @@ export class PushService {
           },
         },
       });
+      const errores = result.responses.flatMap((r) =>
+        r.success || !r.error ? [] : [r.error.code],
+      );
+      if (errores.length)
+        this.logger.warn(
+          `Customer push ${data.eventId}: ${errores.length}/${tokens.length} failed (${[...new Set(errores)].join(', ')})`,
+        );
+      else
+        this.logger.log(
+          `Customer push ${data.eventId}: sent to ${tokens.length} device(s)`,
+        );
       const invalid = tokens.filter((_, index) => {
         const response = result.responses[index];
         return response?.error && TOKENS_INVALIDOS.has(response.error.code);

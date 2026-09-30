@@ -72,6 +72,13 @@ test('abre unicamente destinos de compra y reserva conocidos', () => {
   assert.deepEqual(destinoPush(compra), { pantalla: 'DetalleCompra', id: 42, userId: 7, eventId: compra.eventId });
   assert.equal(destinoPush({ tipo: 'RESERVA_CLIENTE', reservationId: '2', userId: '7', event: 'READY', eventId: 'reservation-2-READY' }).pantalla, 'DetalleReserva');
 });
+test('acepta todos los estados de reserva y rechaza estados de compra en reservas', () => {
+  for (const event of ['PENDING', 'PREPARING', 'READY', 'CUSTOMER_PRESENT', 'COMPLETED', 'CANCELLED', 'EXPIRED']) {
+    const reserva = { tipo: 'RESERVA_CLIENTE', reservationId: '2', userId: '7', event, eventId: 'reservation-2-' + event };
+    assert.equal(destinoPush(reserva)?.pantalla, 'DetalleReserva', event);
+  }
+  assert.equal(destinoPush({ tipo: 'RESERVA_CLIENTE', reservationId: '2', userId: '7', event: 'ORDER_PLACED', eventId: 'reservation-2-ORDER_PLACED' }), null);
+});
 test('rechaza rutas arbitrarias, destinatarios ausentes y datos malformados', () => {
   for (const d of [null, {}, { url: 'https://externo.test' }, { ...compra, userId: undefined },
     { ...compra, saleId: '-1' }, { ...compra, saleId: '1.5' }, { ...compra, saleId: '9007199254740993' },

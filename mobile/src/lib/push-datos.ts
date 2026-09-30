@@ -20,7 +20,7 @@ export function destinoPush(datos: unknown): DestinoPush | null {
   const id = entero(compra ? d.saleId : d.reservationId);
   const eventos = compra
     ? ['ORDER_PLACED', 'PAYMENT_CONFIRMED', 'ORDER_DELIVERED']
-    : ['READY', 'CANCELLED', 'EXPIRED'];
+    : ['PENDING', 'PREPARING', 'READY', 'CUSTOMER_PRESENT', 'COMPLETED', 'CANCELLED', 'EXPIRED'];
   if (!id || typeof d.event !== 'string' || !eventos.includes(d.event)) return null;
   const eventId = (compra ? 'sale-' : 'reservation-') + id + '-' + d.event;
   if (d.eventId !== eventId) return null;

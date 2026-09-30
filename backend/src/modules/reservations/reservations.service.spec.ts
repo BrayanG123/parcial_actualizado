@@ -93,6 +93,35 @@ describe('ReservationsService', () => {
       10,
       expect.anything(),
     );
+    expect(push.notifyCustomerReservation).toHaveBeenCalledWith(10, 'PENDING');
+  });
+
+  it('does not announce a reservation whose creation rolled back', async () => {
+    repository.reserveStock.mockRejectedValue(new Error('rollback'));
+    await expect(service.create(dto, customer)).rejects.toThrow('rollback');
+    expect(push.notifyCustomerReservation).not.toHaveBeenCalled();
+  });
+
+  it('notifies intermediate statuses such as PREPARING and COMPLETED', async () => {
+    await service.updateStatus(
+      10,
+      { status: ReservationStatus.PREPARING },
+      manager,
+    );
+    expect(push.notifyCustomerReservation).toHaveBeenCalledWith(
+      10,
+      'PREPARING',
+    );
+    reservation.status = 'CUSTOMER_PRESENT';
+    await service.updateStatus(
+      10,
+      { status: ReservationStatus.COMPLETED },
+      manager,
+    );
+    expect(push.notifyCustomerReservation).toHaveBeenCalledWith(
+      10,
+      'COMPLETED',
+    );
   });
 
   it('rejects duplicate variants before writing', async () => {

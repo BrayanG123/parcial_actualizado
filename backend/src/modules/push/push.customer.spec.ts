@@ -23,14 +23,12 @@ describe('Customer Android push', () => {
   function database() {
     return {
       sale: {
-        findUnique: vi
-          .fn()
-          .mockResolvedValue({
-            status: 'COMPLETED',
-            channel: 'MOBILE',
-            cashOnDelivery: false,
-            client: { userId: 7 },
-          }),
+        findUnique: vi.fn().mockResolvedValue({
+          status: 'COMPLETED',
+          channel: 'MOBILE',
+          cashOnDelivery: false,
+          client: { userId: 7 },
+        }),
       },
       reservation: {
         findUnique: vi
@@ -106,17 +104,34 @@ describe('Customer Android push', () => {
     await service.notifyCustomerSale(42, 'ORDER_DELIVERED');
     expect(send.mock.calls[1][0].notification.title).toBe('Entrega confirmada');
   });
-  it('sends ready, cancelled and expired reservations, suppressing stale events', async () => {
-    for (const status of ['READY', 'CANCELLED', 'EXPIRED'] as const) {
+  it('sends every reservation status, suppressing stale events', async () => {
+    const statuses = [
+      'PENDING',
+      'PREPARING',
+      'READY',
+      'CUSTOMER_PRESENT',
+      'COMPLETED',
+      'CANCELLED',
+      'EXPIRED',
+    ] as const;
+    for (const status of statuses) {
       db.reservation.findUnique.mockResolvedValue({
         status,
         client: { userId: 7 },
       });
       await service.notifyCustomerReservation(4, status);
     }
-    expect(send).toHaveBeenCalledTimes(3);
+    expect(send).toHaveBeenCalledTimes(statuses.length);
+    expect(send.mock.calls.map(([m]) => m.data.eventId)).toEqual(
+      statuses.map((status) => 'reservation-4-' + status),
+    );
     await service.notifyCustomerReservation(4, 'READY');
-    expect(send).toHaveBeenCalledTimes(3);
+    expect(send).toHaveBeenCalledTimes(statuses.length);
+  });
+  it('skips sending when the customer has no Android device', async () => {
+    db.pushToken.findMany.mockResolvedValue([]);
+    await service.notifyCustomerReservation(4, 'READY');
+    expect(send).not.toHaveBeenCalled();
   });
   it('removes unregistered tokens but not tokens with a payload error', async () => {
     db.pushToken.findMany.mockResolvedValue([
