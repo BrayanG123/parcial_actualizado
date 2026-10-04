@@ -63,44 +63,52 @@ export class ReservationsService {
       this.config.get<string>('RESERVATION_TIME_ZONE') ?? 'America/La_Paz',
     );
 
-    return this.reservationsRepository.transaction(async (tx) => {
-      const client = await this.reservationsRepository.findClient(user.id, tx);
-      if (!client)
-        throw new ForbiddenException('A customer profile is required');
-      const branch = await this.reservationsRepository.findBranch(
-        dto.branchId,
-        tx,
-      );
-      if (!branch?.active)
-        throw new BadRequestException('Branch does not exist or is inactive');
-      for (const item of items) {
-        await this.reservationsRepository.requireAvailableStock(
-          dto.branchId,
-          item,
+    const created = await this.reservationsRepository.transaction(
+      async (tx) => {
+        const client = await this.reservationsRepository.findClient(
+          user.id,
           tx,
         );
-      }
-      const reservation = await this.reservationsRepository.create(
-        {
-          clientId: client.id,
-          branchId: dto.branchId,
-          approximateTime,
-          expiresAt,
-          observation: dto.observation,
-          items,
-        },
-        tx,
-      );
-      for (const item of items) {
-        await this.reservationsRepository.reserveStock(
+        if (!client)
+          throw new ForbiddenException('A customer profile is required');
+        const branch = await this.reservationsRepository.findBranch(
           dto.branchId,
-          item,
-          reservation.id,
           tx,
         );
-      }
-      return reservation;
-    });
+        if (!branch?.active)
+          throw new BadRequestException('Branch does not exist or is inactive');
+        for (const item of items) {
+          await this.reservationsRepository.requireAvailableStock(
+            dto.branchId,
+            item,
+            tx,
+          );
+        }
+        const reservation = await this.reservationsRepository.create(
+          {
+            clientId: client.id,
+            branchId: dto.branchId,
+            approximateTime,
+            expiresAt,
+            observation: dto.observation,
+            items,
+          },
+          tx,
+        );
+        for (const item of items) {
+          await this.reservationsRepository.reserveStock(
+            dto.branchId,
+            item,
+            reservation.id,
+            tx,
+          );
+        }
+        return reservation;
+      },
+    );
+    // Aviso fuera de la transaccion: solo se anuncia una reserva confirmada.
+    this.notifyCustomer(created.id, 'PENDING');
+    return created;
   }
 
   async findMine(query: ListReservationsQueryDto, user: AuthenticatedUser) {
@@ -262,9 +270,9 @@ export class ReservationsService {
     }
   }
 
+  /** Todo cambio de estado confirmado avisa al cliente en su movil. */
   private notifyCustomer(id: number, status: ReservationStatus) {
-    if (status === 'READY' || status === 'CANCELLED' || status === 'EXPIRED')
-      void this.push?.notifyCustomerReservation(id, status);
+    void this.push?.notifyCustomerReservation(id, status);
   }
 
   private async getReservation(id: number, tx?: Prisma.TransactionClient) {

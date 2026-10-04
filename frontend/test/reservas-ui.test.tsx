@@ -117,9 +117,13 @@ describe('reservas en React', () => {
     const espera = new Promise<void>((resolve) => { liberar = resolve; });
     instancia.defaults.adapter = async (c) => {
       if (c.url === '/auth/me') return respuesta(c, usuarioBackend);
-      if (c.url === '/products') return respuesta(c, pagina([prenda, { ...prenda, id: 2, name: 'Blusa' }]));
+      // La API filtra por stock de la sucursal (branchId + inStock).
+      if (c.url === '/products') {
+        expect(c.params).toMatchObject({ inStock: true });
+        if (c.params.branchId === 2) await espera;
+        return respuesta(c, pagina(c.params.branchId === 2 ? [prenda] : [{ ...prenda, id: 2, name: 'Blusa' }]));
+      }
       expect(c.url).toBe('/inventory/availability');
-      if (c.params.branchId === 2) await espera;
       const id = c.params.branchId === 2 ? 1 : 2;
       return respuesta(c, pagina([{ ...stock, product: { id, name: id === 1 ? 'Camisa' : 'Blusa' } }]));
     };
@@ -140,10 +144,16 @@ describe('reservas en React', () => {
     const prendas = Array.from({ length: 8 }, (_, i) => ({ ...prenda, id: i + 1, name: 'Prenda ' + (i + 1) }));
     instancia.defaults.adapter = async (c) => {
       if (c.url === '/auth/me') return respuesta(c, usuarioBackend);
-      if (c.url === '/products') return respuesta(c, pagina(prendas));
+      const conStock = (b: number) => (b === 2 ? [1, 2, 3, 4, 5, 6, 7] : b === 3 ? [8] : []);
+      if (c.url === '/products') {
+        // La API filtra por stock de la sucursal y pagina sobre el resultado.
+        const lista = prendas.filter((p) => conStock(c.params.branchId).includes(p.id));
+        const page = c.params.page ?? 1, limit = c.params.limit ?? 20;
+        return respuesta(c, pagina(lista.slice((page - 1) * limit, page * limit), page, limit, lista.length));
+      }
       if (c.url?.startsWith('/products/')) return respuesta(c, prendas[Number(c.url.split('/').pop()) - 1]);
       expect(c.url).toBe('/inventory/availability');
-      const ids = c.params.branchId === 2 ? [1, 2, 3, 4, 5, 6, 7] : c.params.branchId === 3 ? [8] : [];
+      const ids = conStock(c.params.branchId);
       return respuesta(c, pagina(ids.filter((id) => !c.params.productId || c.params.productId === id)
         .map((id) => ({ ...stock, product: { id, name: 'Prenda ' + id },
           branch: { ...stock.branch, id: c.params.branchId } }))));

@@ -10,7 +10,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://tiendaropa-backend.delightfulplant-4b0ba886.canadacentral.azurecontainerapps.io/api/v1",
+        "EXPO_PUBLIC_API_URL": "https://fashionstore-backend.delightfulflower-0ec0e697.eastus2.azurecontainerapps.io/api/v1",
         "EXPO_PUBLIC_USE_MOCKS": "false"
       }
     },
@@ -19,7 +19,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://tiendaropa-backend.delightfulplant-4b0ba886.canadacentral.azurecontainerapps.io/api/v1",
+        "EXPO_PUBLIC_API_URL": "https://fashionstore-backend.delightfulflower-0ec0e697.eastus2.azurecontainerapps.io/api/v1",
         "EXPO_PUBLIC_USE_MOCKS": "false"
       }
     }

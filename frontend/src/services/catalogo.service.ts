@@ -25,7 +25,6 @@ import {
 import type { ParamsPaginacion } from '../types/api';
 import type { Categoria, Coleccion, Color, Talla, Temporada } from '../types/domain';
 import { catalogoService as catalogoMock } from '../mocks/servicios/catalogo';
-import { disponibilidadService } from './disponibilidad.service';
 import { ErrorApi } from '../types/api';
 
 export interface FiltrosProducto extends ParamsPaginacion {
@@ -102,7 +101,12 @@ function filtrosParaApi(f: FiltrosProducto) {
 }
 
 async function listarProductos(f: FiltrosProducto = {}) {
-  const filtros = filtrosParaApi(f);
+  const filtros = {
+    ...filtrosParaApi(f),
+    // La API resuelve el stock en una consulta: no se descarga el inventario completo.
+    branchId: f.id_sucursal,
+    inStock: f.solo_disponibles || f.id_sucursal ? true : undefined,
+  };
   const pagina = (page: number, limit: number, active = true) =>
     api.get<PaginaBackend<ProductoBackend>>(endpoints.catalogo.productos, {
       ...filtros,
@@ -114,13 +118,11 @@ async function listarProductos(f: FiltrosProducto = {}) {
     !f.mayorista &&
     !f.solo_promocion &&
     !f.orden &&
-    !f.id_sucursal &&
-    !f.solo_disponibles &&
     !f.incluir_inactivos
   ) {
     return adaptarPagina(await pagina(f.page ?? 1, f.page_size ?? 20), adaptarProducto);
   }
-  // La API no soporta orden/promocion/sucursal en /products: no filtrar solo una pagina.
+  // La API no soporta orden ni promocion en /products: no filtrar solo una pagina.
   const grupos = await Promise.all([
     todasLasPaginas((page, limit) => pagina(page, limit)),
     f.incluir_inactivos ? todasLasPaginas((page, limit) => pagina(page, limit, false)) : [],
@@ -137,15 +139,6 @@ async function listarProductos(f: FiltrosProducto = {}) {
         (f.precio_min == null || precio(p) >= f.precio_min) &&
         (f.precio_max == null || precio(p) <= f.precio_max),
     );
-  if (f.id_sucursal || f.solo_disponibles) {
-    const stock = await disponibilidadService.listar({
-      id_sucursal: f.id_sucursal,
-      id_talla: f.id_talla,
-      id_color: f.id_color,
-    });
-    const ids = new Set(stock.filter((i) => i.cantidad_disponible > 0).map((i) => i.id_producto));
-    productos = productos.filter((p) => ids.has(p.id_producto));
-  }
   productos.sort((a, b) => {
     let orden = 0;
     if (f.orden === 'nombre') orden = a.nombre.localeCompare(b.nombre, 'es');

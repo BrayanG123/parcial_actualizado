@@ -57,3 +57,18 @@ npm run build
 ```
 
 Comprobar en la presentación: crear producto con dos fotos, cambiar la principal, editarlo sin perder fotos, marcar un cliente como mayorista y comparar su carrito con el de un cliente minorista. Los escenarios HTTP de `test/catalog-foundation.e2e-spec.ts` usan un esquema temporal de PostgreSQL y lo eliminan al finalizar.
+
+## Filtro de stock en `GET /api/v1/products` (01/10/2026)
+
+- `inStock=true`: solo productos con unidades disponibles (`cantidad_fisica > cantidad_reservada`)
+  en alguna sucursal activa. Respeta `sizeId` y `colorId`.
+- `branchId=N`: solo productos con unidades disponibles en esa sucursal (implica `inStock`).
+- Es la misma regla que `GET /inventory/availability`, resuelta en una sola consulta y paginada
+  en la base. Web y móvil la usan para "solo disponibles", el filtro por sucursal y la portada,
+  en lugar de descargar todo el inventario (que, con el surtido completo, son ~6.700 filas).
+- Requiere el backend desplegado con este cambio; la APK y la web anteriores siguen funcionando,
+  pero descargan el inventario completo y se vuelven lentas con mucho stock.
+
+Ese mismo día se completó el surtido: cada producto activo tiene stock (5 a 15 unidades por
+talla/color) en cada sucursal activa, registrado como `ENTRY` con referencia
+`CARGA-SURTIDO-20261001` en `movimientos_inventario`.

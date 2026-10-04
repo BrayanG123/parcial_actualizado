@@ -70,7 +70,7 @@ Copiar `.env.example` a `.env` (o `.env.local`). Apunta por defecto a la API
 desplegada en Azure Container Apps:
 
 ```
-VITE_API_URL=https://tiendaropa-backend.delightfulplant-4b0ba886.canadacentral.azurecontainerapps.io/api/v1
+VITE_API_URL=https://fashionstore-backend.delightfulflower-0ec0e697.eastus2.azurecontainerapps.io/api/v1
 VITE_USE_MOCKS=false
 ```
 

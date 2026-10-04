@@ -7,8 +7,12 @@ NestJS envía con `firebase-admin`; no interviene Expo Push Service ni se usa VA
 
 | Cambio confirmado | Aviso | Destino |
 |---|---|---|
+| Reserva creada (PENDING) | Reserva registrada | DetalleReserva |
+| Reserva PREPARING | Preparando tu reserva | DetalleReserva |
 | Reserva READY | Reserva lista | DetalleReserva |
-| Reserva CANCELLED | Reserva cancelada | DetalleReserva |
+| Reserva CUSTOMER_PRESENT | Te estamos atendiendo | DetalleReserva |
+| Reserva COMPLETED | Reserva atendida | DetalleReserva |
+| Reserva CANCELLED (personal o cliente) | Reserva cancelada | DetalleReserva |
 | Reserva EXPIRED | Reserva vencida | DetalleReserva |
 | Checkout contra entrega nuevo | Pedido registrado | DetalleCompra |
 | Stripe confirma pago | Pago confirmado | DetalleCompra |
@@ -63,6 +67,24 @@ Si el permiso está bloqueado, el botón abre los ajustes de Android.
 
 Expo Go Android no admite este push remoto. Web, iOS y mocks no inicializan
 la integración. Exportar Metro comprueba el bundle JS, no genera una APK.
+
+Desde el 30/09/2026 todo cambio de estado de una reserva avisa al cliente
+(antes solo READY, CANCELLED y EXPIRED). El móvil acepta esos eventos en
+`src/lib/push-datos.ts`; agregar un evento solo en el backend haría que el
+aviso no abra el detalle y se descarte con la app abierta, y requiere nueva APK.
+Al volver a primer plano la app refresca reservas y compras aunque no llegue el aviso.
+
+## Diagnóstico en el log del backend
+
+Sin datos personales, solo IDs, conteos y códigos FCM:
+
+| Mensaje | Significado |
+|---|---|
+| `Push token registered for user N (ANDROID)` | El teléfono registró su token |
+| `Customer push skipped ...: FIREBASE_* variables are not configured` | Faltan credenciales en el servidor |
+| `... user N has no Android device registered` | Ese cliente no activó avisos o cerró sesión |
+| `... sent to N device(s)` | FCM aceptó el envío |
+| `... N/M failed (messaging/...)` | FCM rechazó; el código indica la causa |
 
 ## Sesión y navegación
 

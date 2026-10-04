@@ -3,8 +3,8 @@
  *   GET /products, /products/:id, /products/:id/ar-resources
  *   GET /catalog/categories | sizes | colors | seasons | collections
  *   GET /branches, /inventory/availability
- * /products no ordena ni filtra por promocion o sucursal: esos filtros se
- * aplican sobre el catalogo completo antes de paginar.
+ * /products filtra por stock disponible (inStock / branchId) en la base de datos;
+ * el orden y las promociones se aplican sobre el resultado completo antes de paginar.
  */
 import { api, USAR_MOCKS } from '../api/http';
 import { endpoints } from '../api/endpoints';
@@ -29,7 +29,7 @@ import {
   type TemporadaBackend,
 } from '../api/catalogo.contratos';
 import { adaptarPagina, paginarEnMemoria, todasLasPaginas, type PaginaBackend } from '../api/contratos';
-import { precioActual, promocionVigente, stockDisponible } from '../lib/domain';
+import { precioActual, promocionVigente } from '../lib/domain';
 import { rutasMock } from '../mocks/endpoints';
 import type { Paginado, ParamsPaginacion } from '../types/api';
 import type {
@@ -92,20 +92,18 @@ async function listarProductos(f: FiltrosProducto = {}): Promise<Paginado<Produc
     collectionId: f.id_coleccion,
     minPrice: f.precio_min,
     maxPrice: f.precio_max,
+    // La API resuelve el stock en una consulta: no se descarga el inventario completo.
+    branchId: f.id_sucursal,
+    inStock: f.solo_disponibles || f.id_sucursal ? true : undefined,
   };
   const pagina = (page: number, limit: number) =>
     api.get<PaginaBackend<ProductoBackend>>(endpoints.catalogo.productos, { ...filtros, page, limit });
 
-  if (!f.solo_promocion && !f.orden && !f.id_sucursal && !f.solo_disponibles) {
+  if (!f.solo_promocion && !f.orden) {
     return adaptarPagina(await pagina(f.page ?? 1, f.page_size ?? 20), adaptarProducto);
   }
   let productos = (await todasLasPaginas(pagina)).map(adaptarProducto);
   if (f.solo_promocion) productos = productos.filter((p) => promocionVigente(p));
-  if (f.id_sucursal || f.solo_disponibles) {
-    const stock = await disponibilidad({ id_sucursal: f.id_sucursal, id_talla: f.id_talla, id_color: f.id_color });
-    const conStock = new Set(stock.filter((i) => stockDisponible(i) > 0).map((i) => i.id_producto));
-    productos = productos.filter((p) => conStock.has(p.id_producto));
-  }
   productos.sort((a, b) => {
     let orden = 0;
     if (f.orden === 'nombre') orden = a.nombre.localeCompare(b.nombre, 'es');
