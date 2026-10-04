@@ -81,16 +81,13 @@ describe('catalogo HTTP real', () => {
     ).toMatchObject({ total: 2, items: [{ id_producto: 101 }] });
     expect(vistas).toEqual([1, 2]);
   });
-  it('combina disponibilidad por sucursal/talla/color incluso en paginas posteriores', async () => {
+  it('delega el filtro de stock por sucursal/talla/color a la API sin descargar inventario', async () => {
+    const urls: string[] = [];
     instancia.defaults.adapter = async (c) => {
-      if (c.url === '/products') return respuesta(c, pagina([prenda, { ...prenda, id: 2 }]));
-      expect(c.url).toBe('/inventory/availability');
-      expect(c.params).toMatchObject({ branchId: 2, sizeId: 9, colorId: 10 });
-      const data =
-        c.params.page === 1
-          ? Array.from({ length: 100 }, (_, i) => ({ ...stock, id: i, availableQuantity: 0 }))
-          : [{ ...stock, product: { id: 2, name: 'Otra' } }];
-      return respuesta(c, pagina(data, c.params.page, 100, 101));
+      urls.push(c.url!);
+      expect(c.url).toBe('/products');
+      expect(c.params).toMatchObject({ branchId: 2, inStock: true, sizeId: 9, colorId: 10, page: 1, limit: 1 });
+      return respuesta(c, pagina([{ ...prenda, id: 2 }], 1, 1, 1));
     };
     expect(
       await catalogoService.listarProductos({
@@ -100,6 +97,15 @@ describe('catalogo HTTP real', () => {
         page_size: 1,
       }),
     ).toMatchObject({ total: 1, items: [{ id_producto: 2 }] });
+    expect(urls).toEqual(['/products']);
+  });
+  it('solo_disponibles pide inStock sin sucursal', async () => {
+    instancia.defaults.adapter = async (c) => {
+      expect(c.params).toMatchObject({ inStock: true });
+      expect(c.params.branchId).toBeUndefined();
+      return respuesta(c, pagina([prenda]));
+    };
+    expect((await catalogoService.listarProductos({ solo_disponibles: true })).total).toBe(1);
   });
   it('incluye productos inactivos solo en la consulta administrativa', async () => {
     const activos: boolean[] = [];

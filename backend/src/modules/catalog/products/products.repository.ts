@@ -133,6 +133,22 @@ export class ProductsRepository {
       ...(query.colorId
         ? { colors: { some: { colorId: query.colorId } } }
         : {}),
+      // Misma regla que /inventory/availability: fisico > reservado en sucursal activa.
+      ...(query.inStock || query.branchId
+        ? {
+            inventory: {
+              some: {
+                branchId: query.branchId,
+                sizeId: query.sizeId,
+                colorId: query.colorId,
+                physicalQuantity: {
+                  gt: this.prisma.inventory.fields.reservedQuantity,
+                },
+                branch: { active: true },
+              },
+            },
+          }
+        : {}),
     };
 
     const [data, total] = await this.prisma.$transaction([

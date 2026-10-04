@@ -88,4 +88,25 @@ export class ListProductsQueryDto {
   })
   @IsBoolean()
   active?: boolean;
+
+  /** Solo productos con stock disponible en esta sucursal (implica inStock). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @IsPositive()
+  branchId?: number;
+
+  /**
+   * Solo productos con stock disponible en alguna sucursal activa; respeta
+   * sizeId y colorId. Evita que los clientes descarguen todo el inventario.
+   */
+  @IsOptional()
+  @Transform(({ obj, key }) => {
+    const value: unknown = obj[key];
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return value;
+  })
+  @IsBoolean()
+  inStock?: boolean;
 }

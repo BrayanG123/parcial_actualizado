@@ -192,7 +192,7 @@ Conservar estas simplificaciones salvo que el usuario pida cambiarlas:
 - Se cargó la semilla DEMO el 13/09 (referencia 2026-09-13): 3 sucursales, 12 productos, 30 ventas, 7 reservas y 7 notificaciones.
   - `SEED_DEMO_PASSWORD` quedó en `backend/.env`.
   - La contraseña del administrador es la de `SEED_ADMIN_PASSWORD`.
-- `frontend/.env`: `VITE_USE_MOCKS=false`, `VITE_API_URL=https://tiendaropa-backend.delightfulplant-4b0ba886.canadacentral.azurecontainerapps.io/api/v1` (API desplegada en Azure; para trabajar en local se cambia por `http://localhost:3000/api/v1`).
+- `frontend/.env`: `VITE_USE_MOCKS=false`, `VITE_API_URL=https://fashionstore-backend.delightfulflower-0ec0e697.eastus2.azurecontainerapps.io/api/v1` (API desplegada en Azure; para trabajar en local se cambia por `http://localhost:3000/api/v1`).
 - Dependencias instaladas con `npm ci` en backend y frontend. OneDrive sincroniza `node_modules`; conviene pausar la sincronización o excluir esas carpetas.
 - No ejecutar semillas generales para "empezar de nuevo" sin revisar sus efectos.
 

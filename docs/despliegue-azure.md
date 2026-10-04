@@ -1,5 +1,30 @@
 # Manual: desplegar el backend de FashionStore en Azure
 
+> **Despliegue vigente (01/10/2026)** — suscripción `Azure subscription 1`, grupo `fashionstore-rg`.
+>
+> | Recurso | Nombre | Región |
+> |---|---|---|
+> | Registro de imágenes | `fashionstoreacr` (imágenes `backend` y `frontend`, etiqueta `20261001-1804`) | centralus |
+> | PostgreSQL 17 B1ms | `fashionstore-pg-3860`, base `tienda_ropa`, usuario `fsadmin` | centralus |
+> | Entorno Container Apps | `fashionstore-env` | eastus2 |
+> | API | `https://fashionstore-backend.delightfulflower-0ec0e697.eastus2.azurecontainerapps.io/api/v1` | eastus2 |
+> | Web | `https://fashionstore-frontend.delightfulflower-0ec0e697.eastus2.azurecontainerapps.io` | eastus2 |
+> | Identidad AcrPull | `fashionstore-acr-pull` | centralus |
+>
+> Datos restaurados con `pg_restore` desde el respaldo en formato custom del 30/09/2026
+> (12 migraciones, 158 usuarios, 95 productos, 441 ventas, 18 reservas); el archivo de respaldo
+> no se versiona (`.gitignore`). Secretos (BD, JWT, Stripe, Gemini, Firebase) guardados como
+> secretos de la Container App; Cloudinary sin configurar.
+>
+> Limitaciones encontradas en esta suscripción, que cambian los pasos de este manual:
+> - `az acr build` está bloqueado (`TasksOperationsNotAllowed`): las imágenes se compilan con
+>   Docker local (`docker build --platform linux/amd64`) y se suben con `az acr login` + `docker push`.
+> - Solo se permite **un** entorno de Container Apps por suscripción.
+> - centralus no tenía capacidad para entornos nuevos (`AKSCapacityHeavyUsage`); por eso el
+>   entorno está en eastus2 y PostgreSQL en centralus (la regla `0.0.0.0` permite el acceso).
+> - En Azure CLI 2.90 `postgres flexible-server db create` usa `-n` para la base y
+>   `firewall-rule create` usa `-s` para el servidor; `--high-availability` no existe en `create`.
+
 Esta guía despliega la imagen que ya está publicada:
 
 ```text
