@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { tenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../database/prisma/prisma.service.js';
+import { reportingDateBetween } from '../reports/reports.repository.js';
 
 /** Maximo de series producto-sucursal que acepta el servicio de ML. */
 export const MAX_SERIES = 5000;
 const HISTORY_WEEKS = 156;
+const historyStart = () =>
+  new Date(Date.now() - HISTORY_WEEKS * 7 * 86_400_000);
 
 /**
  * Datos agregados que se envian al servicio de ML. Las consultas `$queryRaw` filtran
@@ -74,7 +77,7 @@ export class MlRepository {
       JOIN productos p ON p.id_producto = d.id_producto
       WHERE v.id_empresa = ${tenantContext.requireTenantId()}
         AND v.estado = 'COMPLETED' AND v.id_sucursal IS NOT NULL
-        AND COALESCE(v.fecha_confirmacion, v.fecha) >= now() - make_interval(weeks => ${HISTORY_WEEKS})
+        AND ${reportingDateBetween(historyStart())}
       GROUP BY 1, 2, 3, 4 ORDER BY 1`;
   }
 
@@ -89,7 +92,7 @@ export class MlRepository {
       FROM ventas v
       WHERE v.id_empresa = ${tenantContext.requireTenantId()}
         AND v.estado = 'COMPLETED' AND v.id_cliente IS NOT NULL
-        AND COALESCE(v.fecha_confirmacion, v.fecha) >= now() - make_interval(weeks => ${HISTORY_WEEKS})`;
+        AND ${reportingDateBetween(historyStart())}`;
   }
 
   async names(productIds: number[], branchIds: number[]) {

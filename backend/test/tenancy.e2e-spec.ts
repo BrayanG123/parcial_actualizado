@@ -291,6 +291,77 @@ describe.skipIf(!databaseUrl)('SaaS multitenant (HTTP + PostgreSQL)', () => {
     expect(upgraded.body.data.subscription.plan.code).toBe('PROFESSIONAL');
   });
 
+  it('aplica las funcionalidades de un plan configurado por la plataforma', async () => {
+    const features = {
+      products: true,
+      sales: true,
+      reservations: false,
+      offline: false,
+      conventionalReports: true,
+      aiReports: false,
+      mlAnalytics: false,
+    };
+    const plan = await http()
+      .post('/api/v1/platform/plans')
+      .set(bearer(platform))
+      .send({
+        code: 'SIN_RESERVAS',
+        name: 'Sin reservas',
+        maxActiveBranches: 2,
+        features,
+      })
+      .expect(201);
+    const tenantC = await tenantContext.runAsSystem(() =>
+      ctx.prisma.tenant.findUniqueOrThrow({ where: { slug: 'empresa-c' } }),
+    );
+    await http()
+      .patch(`/api/v1/platform/tenants/${tenantC.id}/subscription/plan`)
+      .set(bearer(platform))
+      .send({ planCode: 'SIN_RESERVAS' })
+      .expect(200);
+    const adminC = await login(
+      'admin@empresa-c.test',
+      'Password123',
+      'empresa-c',
+    );
+    const code = async (req: request.Test) => (await req.expect(403)).body.code;
+    expect(
+      await code(http().get('/api/v1/reservations').set(bearer(adminC))),
+    ).toBe('PLAN_FEATURE_REQUIRED');
+    expect(
+      await code(http().get('/api/v1/sync/snapshot').set(bearer(adminC))),
+    ).toBe('PLAN_FEATURE_REQUIRED');
+    expect(
+      await code(http().get('/api/v1/ml/dashboard').set(bearer(adminC))),
+    ).toBe('PLAN_FEATURE_REQUIRED');
+    // Lo que el plan si incluye sigue disponible.
+    await http().get('/api/v1/cash/shifts').set(bearer(adminC)).expect(200);
+    await http()
+      .post('/api/v1/catalog/categories')
+      .set(bearer(adminC))
+      .send({ name: 'Abrigos' })
+      .expect(201);
+
+    // Sin gestion de productos: el catalogo publico se lee, pero no se modifica.
+    await http()
+      .patch(`/api/v1/platform/plans/${plan.body.data.id}`)
+      .set(bearer(platform))
+      .send({ features: { ...features, products: false } })
+      .expect(200);
+    expect(
+      await code(
+        http()
+          .post('/api/v1/catalog/categories')
+          .set(bearer(adminC))
+          .send({ name: 'Gorras' }),
+      ),
+    ).toBe('PLAN_FEATURE_REQUIRED');
+    await http()
+      .get('/api/v1/catalog/categories')
+      .set('X-Tenant', 'empresa-c')
+      .expect(200);
+  });
+
   it('keeps platform and business permissions apart', async () => {
     await http().get('/api/v1/users').set(bearer(platform)).expect(403);
     await http()

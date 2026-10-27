@@ -776,6 +776,8 @@ model Sale {
   @@index([employeeId])
   @@index([branchId, soldAt])
   @@index([tenantId, soldAt])
+  /// Reportes por fecha de confirmacion (F10.3): rango sobre (empresa, estado, fecha).
+  @@index([tenantId, status, confirmedAt])
   @@index([channel, status])
   @@index([status, expiresAt])
   @@index([tenantId])

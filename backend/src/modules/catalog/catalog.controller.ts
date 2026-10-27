@@ -24,6 +24,7 @@ import {
   UpdateSizeDto,
   UpdateSupplierDto,
 } from './dto/catalog-metadata.dto.js';
+import { RequiresFeature } from '../tenancy/plan.decorators.js';
 
 @Controller('catalog')
 export class CatalogController {
@@ -41,12 +42,14 @@ export class CatalogController {
 
   @Post('categories')
   @AdminOnly()
+  @RequiresFeature('products')
   createCategory(@Body() dto: CreateCategoryDto) {
     return this.catalogService.createCategory(dto);
   }
 
   @Patch('categories/:id')
   @AdminOnly()
+  @RequiresFeature('products')
   updateCategory(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCategoryDto,
@@ -56,6 +59,7 @@ export class CatalogController {
 
   @Delete('categories/:id')
   @AdminOnly()
+  @RequiresFeature('products')
   deleteCategory(@Param('id', ParseIntPipe) id: number) {
     return this.catalogService.deleteCategory(id);
   }
@@ -72,12 +76,14 @@ export class CatalogController {
 
   @Post('sizes')
   @AdminOnly()
+  @RequiresFeature('products')
   createSize(@Body() dto: CreateSizeDto) {
     return this.catalogService.createSize(dto);
   }
 
   @Patch('sizes/:id')
   @AdminOnly()
+  @RequiresFeature('products')
   updateSize(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateSizeDto,
@@ -87,6 +93,7 @@ export class CatalogController {
 
   @Delete('sizes/:id')
   @AdminOnly()
+  @RequiresFeature('products')
   deleteSize(@Param('id', ParseIntPipe) id: number) {
     return this.catalogService.deleteSize(id);
   }
@@ -103,12 +110,14 @@ export class CatalogController {
 
   @Post('colors')
   @AdminOnly()
+  @RequiresFeature('products')
   createColor(@Body() dto: CreateColorDto) {
     return this.catalogService.createColor(dto);
   }
 
   @Patch('colors/:id')
   @AdminOnly()
+  @RequiresFeature('products')
   updateColor(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateColorDto,
@@ -118,6 +127,7 @@ export class CatalogController {
 
   @Delete('colors/:id')
   @AdminOnly()
+  @RequiresFeature('products')
   deleteColor(@Param('id', ParseIntPipe) id: number) {
     return this.catalogService.deleteColor(id);
   }
@@ -134,12 +144,14 @@ export class CatalogController {
 
   @Post('seasons')
   @AdminOnly()
+  @RequiresFeature('products')
   createSeason(@Body() dto: CreateSeasonDto) {
     return this.catalogService.createSeason(dto);
   }
 
   @Patch('seasons/:id')
   @AdminOnly()
+  @RequiresFeature('products')
   updateSeason(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateSeasonDto,
@@ -149,6 +161,7 @@ export class CatalogController {
 
   @Delete('seasons/:id')
   @AdminOnly()
+  @RequiresFeature('products')
   deactivateSeason(@Param('id', ParseIntPipe) id: number) {
     return this.catalogService.deactivateSeason(id);
   }
@@ -165,12 +178,14 @@ export class CatalogController {
 
   @Post('collections')
   @AdminOnly()
+  @RequiresFeature('products')
   createCollection(@Body() dto: CreateCollectionDto) {
     return this.catalogService.createCollection(dto);
   }
 
   @Patch('collections/:id')
   @AdminOnly()
+  @RequiresFeature('products')
   updateCollection(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCollectionDto,
@@ -180,30 +195,35 @@ export class CatalogController {
 
   @Delete('collections/:id')
   @AdminOnly()
+  @RequiresFeature('products')
   deactivateCollection(@Param('id', ParseIntPipe) id: number) {
     return this.catalogService.deactivateCollection(id);
   }
 
   @Get('suppliers')
   @AdminOnly()
+  @RequiresFeature('products')
   findSuppliers() {
     return this.catalogService.findSuppliers();
   }
 
   @Get('suppliers/:id')
   @AdminOnly()
+  @RequiresFeature('products')
   findSupplier(@Param('id', ParseIntPipe) id: number) {
     return this.catalogService.findSupplier(id);
   }
 
   @Post('suppliers')
   @AdminOnly()
+  @RequiresFeature('products')
   createSupplier(@Body() dto: CreateSupplierDto) {
     return this.catalogService.createSupplier(dto);
   }
 
   @Patch('suppliers/:id')
   @AdminOnly()
+  @RequiresFeature('products')
   updateSupplier(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateSupplierDto,
@@ -213,6 +233,7 @@ export class CatalogController {
 
   @Delete('suppliers/:id')
   @AdminOnly()
+  @RequiresFeature('products')
   deactivateSupplier(@Param('id', ParseIntPipe) id: number) {
     return this.catalogService.deactivateSupplier(id);
   }

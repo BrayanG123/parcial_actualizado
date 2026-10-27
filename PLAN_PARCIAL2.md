@@ -319,10 +319,10 @@ cierra en F12 con lo realmente implementado.
   - ⏳ Falta construir la imagen en local: el entorno en la nube no tiene demonio de Docker.
 
 ### F10 — Calidad
-- [ ] **F10.1** Pruebas de reglas críticas: aislamiento multitenant, límites de plan, idempotencia, conflictos, integridad de inventario, cambios de prendas.
-- [ ] **F10.2** Pruebas de integración (e2e backend con BD de prueba) de los flujos SaaS y sync.
-- [ ] **F10.3** Revisión de rendimiento (índices por `tenantId`, consultas de catálogo/reportes, sin descargas masivas) — justificar decisiones (RNF09).
-- [ ] **F10.4** Revisión de seguridad (autorización en todos los endpoints nuevos, sin fugas de tenant en errores ni logs).
+- [x] ~~**F10.1** Pruebas de reglas críticas: aislamiento multitenant, límites de plan, idempotencia, conflictos, integridad de inventario, cambios de prendas.~~ — 2026-10-27 (cubiertas en `tenancy`, `sync`, `exchanges`, `ai` y `ml` e2e; nuevas: plan configurado sin reservas/productos/offline bloquea de verdad, y pruebas estáticas de rutas, SQL crudo e índices)
+- [x] ~~**F10.2** Pruebas de integración (e2e backend con BD de prueba) de los flujos SaaS y sync.~~ — 2026-10-27 (18 suites e2e sobre PostgreSQL con esquema descartable por suite; 144 casos)
+- [x] ~~**F10.3** Revisión de rendimiento (índices por `tenantId`, consultas de catálogo/reportes, sin descargas masivas) — justificar decisiones (RNF09).~~ — 2026-10-27 (`EXPLAIN ANALYZE` con 180 000 ventas; índice `(id_empresa, estado, fecha_confirmacion)` + `reportingDateBetween`: empresa chica 9,8 → 1,4 ms; tabla de mediciones en `backend/README.md`)
+- [x] ~~**F10.4** Revisión de seguridad (autorización en todos los endpoints nuevos, sin fugas de tenant en errores ni logs).~~ — 2026-10-27 (auditoría automática de las 151 rutas; hallazgo corregido: banderas `products`/`reservations`/`sales` sin verificar; errores de Prisma sin valores ni tablas en respuesta y log; `npm audit` del backend sin altas/críticas)
 
 ### F11 — Despliegue (hacer con Claude Code local, no desde la web)
 - [ ] **F11.1** Aplicar migraciones en Azure (respaldo previo con `pg_dump`).

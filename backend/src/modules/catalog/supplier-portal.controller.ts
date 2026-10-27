@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { SupplierPortalService } from './supplier-portal.service.js';
 import { SupplierPageDto, SupplierProductDto } from './supplier-portal.dto.js';
+import { RequiresFeature } from '../tenancy/plan.decorators.js';
 
 @Controller('supplier')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -35,6 +36,7 @@ export class SupplierPortalController {
     return this.portal.products(user.id, query);
   }
   @Patch('products/:id')
+  @RequiresFeature('products')
   update(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseIntPipe) id: number,

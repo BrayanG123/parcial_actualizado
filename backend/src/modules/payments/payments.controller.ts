@@ -21,7 +21,10 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { CreateStripeIntentDto } from './dto/create-stripe-intent.dto.js';
 import { PaymentsService } from './payments.service.js';
-import { AllowWhenReadOnly } from '../tenancy/plan.decorators.js';
+import {
+  AllowWhenReadOnly,
+  RequiresFeature,
+} from '../tenancy/plan.decorators.js';
 
 @Controller('payments')
 export class PaymentsController {
@@ -30,6 +33,7 @@ export class PaymentsController {
   @Get('stripe/config')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.CUSTOMER)
+  @RequiresFeature('sales')
   @Header('Cache-Control', 'no-store')
   config() {
     return this.payments.config();
@@ -38,6 +42,7 @@ export class PaymentsController {
   @Post('stripe/intents')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.CUSTOMER)
+  @RequiresFeature('sales')
   @Header('Cache-Control', 'no-store')
   create(
     @Body() dto: CreateStripeIntentDto,
@@ -49,6 +54,7 @@ export class PaymentsController {
   @Get('sales/:saleId')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.CUSTOMER, Role.ADMINISTRATOR, Role.BRANCH_MANAGER, Role.CASHIER)
+  @RequiresFeature('sales')
   @Header('Cache-Control', 'no-store')
   status(
     @Param('saleId', ParseIntPipe) saleId: number,

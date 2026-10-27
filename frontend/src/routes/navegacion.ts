@@ -27,22 +27,22 @@ const ADMIN: GrupoNav[] = [
   {
     titulo: 'Catalogo',
     enlaces: [
-      { a: '/admin/productos', texto: 'Productos' },
-      { a: '/admin/categorias', texto: 'Categorias' },
-      { a: '/admin/tallas', texto: 'Tallas' },
-      { a: '/admin/colores', texto: 'Colores' },
-      { a: '/admin/temporadas', texto: 'Temporadas' },
-      { a: '/admin/colecciones', texto: 'Colecciones' },
+      { a: '/admin/productos', texto: 'Productos', requiere: 'products' },
+      { a: '/admin/categorias', texto: 'Categorias', requiere: 'products' },
+      { a: '/admin/tallas', texto: 'Tallas', requiere: 'products' },
+      { a: '/admin/colores', texto: 'Colores', requiere: 'products' },
+      { a: '/admin/temporadas', texto: 'Temporadas', requiere: 'products' },
+      { a: '/admin/colecciones', texto: 'Colecciones', requiere: 'products' },
     ],
   },
   {
     titulo: 'Operaciones',
     enlaces: [
       { a: '/admin/inventario', texto: 'Inventario' },
-      { a: '/admin/reservas', texto: 'Reservas' },
-      { a: '/admin/ventas', texto: 'Ventas' },
-      { a: '/caja', texto: 'Punto de venta', exacto: true },
-      { a: '/caja/turnos', texto: 'Turnos y arqueos' },
+      { a: '/admin/reservas', texto: 'Reservas', requiere: 'reservations' },
+      { a: '/admin/ventas', texto: 'Ventas', requiere: 'sales' },
+      { a: '/caja', texto: 'Punto de venta', exacto: true, requiere: 'sales' },
+      { a: '/caja/turnos', texto: 'Turnos y arqueos', requiere: 'sales' },
       { a: '/caja/offline', texto: 'Ventas offline', requiere: 'offline' },
       { a: '/caja/pendientes', texto: 'Pendientes offline', requiere: 'offline' },
       { a: '/caja/cambios', texto: 'Cambios de prendas', requiere: 'sales' },
@@ -64,15 +64,15 @@ const SUCURSAL: GrupoNav[] = [
   {
     titulo: 'Mi sucursal',
     enlaces: [
-      { a: '/sucursal/reservas', texto: 'Reservas' },
+      { a: '/sucursal/reservas', texto: 'Reservas', requiere: 'reservations' },
       { a: '/sucursal/inventario', texto: 'Inventario' },
       { a: '/sucursal/movimientos', texto: 'Movimientos' },
-      { a: '/sucursal/ventas', texto: 'Ventas' },
+      { a: '/sucursal/ventas', texto: 'Ventas', requiere: 'sales' },
       { a: '/sucursal/reportes', texto: 'Reportes', requiere: 'conventionalReports' },
       { a: '/sucursal/reportes-ia', texto: 'Reportes con IA', requiere: 'aiReports' },
       { a: '/sucursal/analitica', texto: 'Analitica ML', requiere: 'mlAnalytics' },
-      { a: '/caja', texto: 'Punto de venta', exacto: true },
-      { a: '/caja/turnos', texto: 'Turnos y arqueos' },
+      { a: '/caja', texto: 'Punto de venta', exacto: true, requiere: 'sales' },
+      { a: '/caja/turnos', texto: 'Turnos y arqueos', requiere: 'sales' },
       { a: '/caja/offline', texto: 'Ventas offline', requiere: 'offline' },
       { a: '/caja/pendientes', texto: 'Pendientes offline', requiere: 'offline' },
       { a: '/caja/cambios', texto: 'Cambios de prendas', requiere: 'sales' },
@@ -84,12 +84,12 @@ const CAJA: GrupoNav[] = [
   {
     titulo: 'Caja',
     enlaces: [
-      { a: '/caja', texto: 'Punto de venta', exacto: true },
-      { a: '/caja/turnos', texto: 'Turnos y arqueos' },
+      { a: '/caja', texto: 'Punto de venta', exacto: true, requiere: 'sales' },
+      { a: '/caja/turnos', texto: 'Turnos y arqueos', requiere: 'sales' },
       { a: '/caja/offline', texto: 'Ventas offline', requiere: 'offline' },
       { a: '/caja/pendientes', texto: 'Pendientes offline', requiere: 'offline' },
       { a: '/caja/cambios', texto: 'Cambios de prendas', requiere: 'sales' },
-      { a: '/caja/ventas', texto: 'Historial de ventas' },
+      { a: '/caja/ventas', texto: 'Historial de ventas', requiere: 'sales' },
     ],
   },
 ];
@@ -98,7 +98,7 @@ const PROVEEDOR: GrupoNav[] = [
   {
     titulo: 'Proveedor',
     enlaces: [
-      { a: '/proveedor/productos', texto: 'Mis productos' },
+      { a: '/proveedor/productos', texto: 'Mis productos', requiere: 'products' },
       { a: '/proveedor/entregas', texto: 'Entregas programadas' },
     ],
   },
@@ -106,7 +106,8 @@ const PROVEEDOR: GrupoNav[] = [
 
 /**
  * Un usuario puede tener varios roles: se concatenan sus secciones. Los enlaces de
- * funciones que el plan no incluye se ocultan (el backend las bloquea igualmente).
+ * funciones que el plan no incluye se ocultan (el backend las bloquea igualmente; ver
+ * `backend/src/common/security/route-access.spec.ts`).
  */
 export function navegacionPorRol(
   roles: string[],

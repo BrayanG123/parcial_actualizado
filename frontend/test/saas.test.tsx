@@ -107,6 +107,13 @@ describe('mensajes de reglas SaaS', () => {
     expect(enlaces).not.toContain('/admin/reportes-ia');
     const sinPlan = navegacionPorRol([RolNombre.ADMINISTRADOR]).flatMap((g) => g.enlaces.map((e) => e.a));
     expect(sinPlan).toContain('/admin/reportes-ia');
+    // Un plan configurado sin reservas ni gestion de productos oculta esas secciones.
+    const sinReservas = navegacionPorRol([RolNombre.ADMINISTRADOR], (f) => f !== 'reservations' && f !== 'products').flatMap(
+      (g) => g.enlaces.map((e) => e.a),
+    );
+    expect(sinReservas).not.toContain('/admin/reservas');
+    expect(sinReservas).not.toContain('/admin/productos');
+    expect(sinReservas).toContain('/admin/ventas');
   });
 });
 

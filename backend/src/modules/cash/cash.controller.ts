@@ -22,10 +22,12 @@ import {
   OpenShiftDto,
 } from './cash.dto.js';
 import { CashService } from './cash.service.js';
+import { RequiresFeature } from '../tenancy/plan.decorators.js';
 
 @Controller('cash')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMINISTRATOR, Role.BRANCH_MANAGER, Role.CASHIER)
+@RequiresFeature('sales')
 export class CashController {
   constructor(private readonly cash: CashService) {}
   @Get('registers') registers(

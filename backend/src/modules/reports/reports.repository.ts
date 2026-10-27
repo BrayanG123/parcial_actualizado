@@ -11,6 +11,15 @@ import { reportPeriod } from './report-period.js';
 import { tenantContext } from '../../common/tenant/tenant-context.js';
 
 type Period = ReturnType<typeof reportPeriod>;
+
+/**
+ * `COALESCE(v.fecha_confirmacion, v.fecha)` en [desde, hasta) escrito como dos rangos
+ * equivalentes: asi PostgreSQL usa el indice (id_empresa, estado, fecha_confirmacion) en
+ * lugar de recorrer todas las ventas de la empresa (medido en F10.3).
+ */
+export const reportingDateBetween = (from: Date, to?: Date) =>
+  Prisma.sql`((v.fecha_confirmacion >= ${from}${to ? Prisma.sql` AND v.fecha_confirmacion < ${to}` : Prisma.empty})
+    OR (v.fecha_confirmacion IS NULL AND v.fecha >= ${from}${to ? Prisma.sql` AND v.fecha < ${to}` : Prisma.empty}))`;
 /**
  * Las consultas `$queryRaw` no pasan por la extension de aislamiento de Prisma:
  * cada una filtra `id_empresa` en su tabla raiz (las tablas unidas por FK pertenecen
@@ -34,8 +43,7 @@ export class ReportsRepository {
         FROM ventas v
         WHERE v.id_empresa = ${tenantContext.requireTenantId()}
           AND v.estado = 'COMPLETED'
-          AND COALESCE(v.fecha_confirmacion, v.fecha) >= ${period.start}
-          AND COALESCE(v.fecha_confirmacion, v.fecha) < ${period.endExclusive}
+          AND ${reportingDateBetween(period.start, period.endExclusive)}
           ${query.branchId ? Prisma.sql`AND v.id_sucursal = ${query.branchId}` : Prisma.empty}
           ${query.channel ? Prisma.sql`AND v.canal::text = ${query.channel}` : Prisma.empty}
           ${query.currency ? Prisma.sql`AND v.moneda = ${query.currency}` : Prisma.empty}
@@ -212,8 +220,7 @@ export class ReportsRepository {
         LEFT JOIN sucursales s ON s.id_sucursal = v.id_sucursal
         WHERE v.id_empresa = ${tenantContext.requireTenantId()}
           AND v.estado = 'COMPLETED' AND v.moneda = 'BOB'
-          AND COALESCE(v.fecha_confirmacion, v.fecha) >= ${period.start}
-          AND COALESCE(v.fecha_confirmacion, v.fecha) < ${period.endExclusive}
+          AND ${reportingDateBetween(period.start, period.endExclusive)}
           ${ids(Prisma.sql`v.id_sucursal`, filters.branchIds)}
           ${ids(Prisma.sql`p.id_categoria`, filters.categoryIds)}
           ${ids(Prisma.sql`p.id_producto`, filters.productIds)}

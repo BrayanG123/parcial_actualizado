@@ -40,6 +40,7 @@ import { RequiresFeature } from '../tenancy/plan.decorators.js';
 @Controller('sales')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMINISTRATOR, Role.BRANCH_MANAGER, Role.CASHIER, Role.CUSTOMER)
+@RequiresFeature('sales')
 export class SalesController {
   constructor(
     private readonly salesService: SalesService,
@@ -69,6 +70,7 @@ export class SalesController {
 
   @Post('offline/:id/finish')
   @Roles(Role.ADMINISTRATOR, Role.BRANCH_MANAGER, Role.CASHIER)
+  @RequiresFeature('offline')
   finishOffline(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: FinishOfflineDto,

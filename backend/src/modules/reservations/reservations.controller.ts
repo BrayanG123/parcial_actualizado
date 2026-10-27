@@ -19,10 +19,12 @@ import { CreateReservationDto } from './dto/create-reservation.dto.js';
 import { ListReservationsQueryDto } from './dto/list-reservations-query.dto.js';
 import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto.js';
 import { ReservationsService } from './reservations.service.js';
+import { RequiresFeature } from '../tenancy/plan.decorators.js';
 
 @Controller('reservations')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMINISTRATOR, Role.BRANCH_MANAGER, Role.CUSTOMER)
+@RequiresFeature('reservations')
 export class ReservationsController {
   constructor(private readonly reservationsService: ReservationsService) {}
 

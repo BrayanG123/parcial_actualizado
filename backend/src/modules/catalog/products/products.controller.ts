@@ -26,6 +26,7 @@ import { CreateProductDto } from './dto/create-product.dto.js';
 import { ListProductsQueryDto } from './dto/list-products-query.dto.js';
 import { UpdateProductDto } from './dto/update-product.dto.js';
 import { ProductsService } from './products.service.js';
+import { RequiresFeature } from '../../tenancy/plan.decorators.js';
 
 @Controller('products')
 export class ProductsController {
@@ -37,6 +38,7 @@ export class ProductsController {
   @Post('images/upload')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMINISTRATOR)
+  @RequiresFeature('products')
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: MAX_IMAGE_BYTES, files: 1, fields: 0 },
@@ -59,6 +61,7 @@ export class ProductsController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMINISTRATOR)
+  @RequiresFeature('products')
   create(@Body() dto: CreateProductDto) {
     return this.productsService.create(dto);
   }
@@ -66,6 +69,7 @@ export class ProductsController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMINISTRATOR)
+  @RequiresFeature('products')
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateProductDto) {
     return this.productsService.update(id, dto);
   }
@@ -73,6 +77,7 @@ export class ProductsController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMINISTRATOR)
+  @RequiresFeature('products')
   deactivate(@Param('id', ParseIntPipe) id: number) {
     return this.productsService.deactivate(id);
   }
