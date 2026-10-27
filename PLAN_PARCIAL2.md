@@ -220,10 +220,10 @@ cierra en F12 con lo realmente implementado.
 ## 5. Lista de tareas
 
 ### F0 — Preparación
-- [x] ~~**F0.1** Crear rama `parcial2` desde `main` y verificar que todas las pruebas actuales pasan (línea base).~~ — 2026-10-27
+- [x] ~~**F0.1** Crear rama `parcial2` desde `main` y verificar que todas las pruebas actuales pasan (línea base).~~ — 2026-10-27, commit `477f3fd`
   - Línea base: backend 212 unit + **108 e2e** (con `TEST_DATABASE_URL` sobre PostgreSQL 16 local), web 167, móvil 11; `tsc` OK; oxlint solo advertencias.
 - [x] ~~**F0.2** Copiar el enunciado del parcial 2 a `recursos_contexto/Examen2.md` (lo provee el usuario).~~ — 2026-10-27
-- [x] ~~**F0.3** Inventario rápido de deuda que afecte al parcial (anotarla aquí como subtareas, no en archivos nuevos).~~ — 2026-10-27
+- [x] ~~**F0.3** Inventario rápido de deuda que afecte al parcial (anotarla aquí como subtareas, no en archivos nuevos).~~ — 2026-10-27, commit `477f3fd`
   - D1: uniques globales que deben ser por tenant: `usuarios.email`, nombre de categoría/temporada/proveedor/talla/color, `codigo_hex`, sucursal `[ciudad, nombre]` (→ F2.2).
   - D2: `saleItem.groupBy` / `findMany` en `ai.repository.ts` y `offline-sales.service.ts` agregan sobre **todas** las filas (fuga entre empresas si no se filtra) (→ F2.5).
   - D3: 13 consultas `$queryRaw` en `reports.repository.ts`: la extensión de Prisma no las cubre; requieren `tenant_id` explícito (→ F2.11).
@@ -233,10 +233,10 @@ cierra en F12 con lo realmente implementado.
   - D7: entorno: Node local 22.22.0 por debajo de `engines` de la CLI de Nest (solo advertencia); los e2e se saltan sin `TEST_DATABASE_URL` (documentado en `backend/docs/instalacion-y-seed.md`).
 
 ### F1 — ICONIX: análisis inicial (antes de codificar F2)
-- [ ] **F1.1** Modelo de dominio actualizado (Tenant, Plan, Subscription, SyncOperation, SyncLog, Exchange, ReportRequest, MLModel…).
-- [ ] **F1.2** Modelo de casos de uso nuevos/modificados (actores: Admin plataforma, Admin empresa, Encargado, Cajero, Cliente, Servicio ML).
-- [ ] **F1.3** Descripción textual (flujo básico/alternativo) de los casos de uso críticos: registrar empresa, cambiar plan, venta offline, reserva offline, sincronizar, resolver conflicto, cambio de prenda, reporte generativo, dashboard ML.
-- [ ] **F1.4** Diagramas de robustez de los casos críticos.
+- [x] ~~**F1.1** Modelo de dominio actualizado (Tenant, Plan, Subscription, SyncOperation, SyncLog, Exchange, ReportRequest, MLModel…).~~ — 2026-10-27 (`docs/ICONIX_Parcial2.md` §1–4)
+- [x] ~~**F1.2** Modelo de casos de uso nuevos/modificados (actores: Admin plataforma, Admin empresa, Encargado, Cajero, Cliente, Servicio ML).~~ — 2026-10-27 (`docs/ICONIX_Parcial2.md` §1–4)
+- [x] ~~**F1.3** Descripción textual (flujo básico/alternativo) de los casos de uso críticos: registrar empresa, cambiar plan, venta offline, reserva offline, sincronizar, resolver conflicto, cambio de prenda, reporte generativo, dashboard ML.~~ — 2026-10-27 (`docs/ICONIX_Parcial2.md` §1–4)
+- [x] ~~**F1.4** Diagramas de robustez de los casos críticos.~~ — 2026-10-27 (`docs/ICONIX_Parcial2.md` §1–4)
 
 ### F2 — Backend multitenant + planes
 - [ ] **F2.1** Modelos Prisma `Tenant`, `Plan`, `Subscription` (+ historial) y rol `PLATFORM_ADMIN`.
