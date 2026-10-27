@@ -11,11 +11,14 @@ export interface JwtPayload {
   sub: number;
   email: string;
   roles: Role[];
+  /** Ausente en tokens emitidos antes del parcial 2. */
+  tenantId?: number | null;
 }
 
 interface TokenUser {
   id: number;
   email: string;
+  tenantId: number | null;
   roles: Array<{ role: { name: string } }>;
 }
 
@@ -61,6 +64,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       roles,
+      tenantId: user.tenantId,
     };
 
     return {

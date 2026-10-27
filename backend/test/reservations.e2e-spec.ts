@@ -7,6 +7,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { Client as PgClient } from 'pg';
 import { hash } from 'bcrypt';
 import request from 'supertest';
+import { isolatedTestClient } from './helpers/tenant-test-client.js';
 import { AppModule } from '../src/app.module.js';
 import { PrismaService } from '../src/database/prisma/prisma.service.js';
 import { PrismaClient, RoleName } from '../src/generated/prisma/client.js';
@@ -85,12 +86,14 @@ describe.skipIf(!databaseUrl)('Reservations (HTTP + PostgreSQL)', () => {
         migration.replace('CREATE SCHEMA IF NOT EXISTS "public";', ''),
       );
     }
-    prisma = new PrismaClient({
-      adapter: new PrismaPg(
-        { connectionString: databaseUrl, options: '-c timezone=UTC' },
-        { schema },
-      ),
-    });
+    prisma = await isolatedTestClient(
+      new PrismaClient({
+        adapter: new PrismaPg(
+          { connectionString: databaseUrl, options: '-c timezone=UTC' },
+          { schema },
+        ),
+      }),
+    );
     const branch = await prisma.branch.create({
       data: { name: 'Test Central', city: 'La Paz', address: 'Test' },
     });

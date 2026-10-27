@@ -2,22 +2,34 @@ import {
   ArgumentsHost,
   Catch,
   ExceptionFilter,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { MissingTenantContextError } from '../tenant/tenant-context.js';
 
 interface ExceptionBody {
   message?: string | string[];
   error?: string;
+  /** Codigo estable para la UI (p. ej. SUBSCRIPTION_READ_ONLY, PLAN_FEATURE_REQUIRED). */
+  code?: string;
 }
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
 
-  catch(exception: unknown, host: ArgumentsHost): void {
+  catch(rawException: unknown, host: ArgumentsHost): void {
+    // Una consulta de negocio sin empresa (p. ej. PLATFORM_ADMIN) no es un error interno.
+    const exception =
+      rawException instanceof MissingTenantContextError
+        ? new ForbiddenException({
+            code: 'TENANT_REQUIRED',
+            message: 'La operacion requiere una empresa',
+          })
+        : rawException;
     const httpContext = host.switchToHttp();
     const response = httpContext.getResponse<Response>();
     const request = httpContext.getRequest<Request>();
@@ -46,6 +58,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       statusCode: status,
       error: body.error ?? HttpStatus[status] ?? 'Error',
       message,
+      ...(body.code ? { code: body.code } : {}),
       path: request.originalUrl,
       timestamp: new Date().toISOString(),
     });

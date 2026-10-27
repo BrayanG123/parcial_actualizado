@@ -5,6 +5,7 @@ import { PrismaService } from '../src/database/prisma/prisma.service.js';
 import { Role } from '../src/common/enums/role.enum.js';
 import { ReservationsRepository } from '../src/modules/reservations/reservations.repository.js';
 import { ReservationsService } from '../src/modules/reservations/reservations.service.js';
+import { DEFAULT_SEED_TENANT, inTenant } from './seeds/tenant.js';
 
 // Opt-in fixture using the same transaction and stock rules as the API.
 const config = new ConfigService({
@@ -29,7 +30,7 @@ async function main() {
   const role = await prisma.role.findUniqueOrThrow({
     where: { name: 'CUSTOMER' },
   });
-  let user = await prisma.user.findUnique({
+  let user = await prisma.user.findFirst({
     where: { email },
     include: { client: true, roles: { include: { role: true } } },
   });
@@ -99,7 +100,7 @@ async function main() {
   );
 }
 
-main()
+inTenant(prisma, DEFAULT_SEED_TENANT, () => main())
   .catch((error: unknown) => {
     console.error(
       error instanceof Error ? error.message : 'Reservation seed failed',

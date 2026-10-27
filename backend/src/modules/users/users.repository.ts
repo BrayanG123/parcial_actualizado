@@ -5,6 +5,7 @@ import { PrismaService } from '../../database/prisma/prisma.service.js';
 export const userPublicSelect = {
   supplier: { select: { id: true, name: true, active: true } },
   supplierId: true,
+  tenantId: true,
   id: true,
   name: true,
   email: true,
@@ -85,7 +86,8 @@ export class UsersRepository {
   }
 
   findByEmailForAuthentication(email: string) {
-    return this.prisma.user.findUnique({
+    // Email unico por empresa: la extension de Prisma agrega la empresa actual.
+    return this.prisma.user.findFirst({
       where: { email },
       select: userAuthenticationSelect,
     });

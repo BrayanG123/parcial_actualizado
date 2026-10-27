@@ -341,6 +341,12 @@ describe.skipIf(!databaseUrl)(
             'utf8',
           ),
         );
+        // Paso posterior de la migracion de multitenancy: la tabla recreada pasa a la Empresa A.
+        await sql.query(
+          `ALTER TABLE "notificaciones" ADD COLUMN "id_empresa" INTEGER;
+           UPDATE "notificaciones" SET "id_empresa" = (SELECT "id_empresa" FROM "empresas" WHERE "slug" = 'fashionstore');
+           ALTER TABLE "notificaciones" ALTER COLUMN "id_empresa" SET NOT NULL;`,
+        );
       } finally {
         await sql.end();
       }

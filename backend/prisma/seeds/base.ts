@@ -1,5 +1,6 @@
 import { hash } from 'bcrypt';
 import { PrismaClient, RoleName } from '../../src/generated/prisma/client.js';
+import { seedTenantId } from './tenant.js';
 
 export interface SeedOptions {
   adminEmail: string;
@@ -29,7 +30,7 @@ export async function seedBase(client: PrismaClient, options: SeedOptions) {
           prisma.role.upsert({ where: { name }, update: {}, create: { name } }),
         ),
       );
-      const existing = await prisma.user.findUnique({
+      const existing = await prisma.user.findFirst({
         where: { email },
         include: { roles: { include: { role: true } } },
       });
@@ -56,7 +57,8 @@ export async function seedBase(client: PrismaClient, options: SeedOptions) {
         }));
       const branch = await prisma.branch.upsert({
         where: {
-          city_name: {
+          tenantId_city_name: {
+            tenantId: seedTenantId(),
             city: 'Santa Cruz de la Sierra',
             name: 'Sucursal Central',
           },
@@ -70,12 +72,17 @@ export async function seedBase(client: PrismaClient, options: SeedOptions) {
         },
       });
       const category = await prisma.category.upsert({
-        where: { name: 'Camisas' },
+        where: { tenantId_name: { tenantId: seedTenantId(), name: 'Camisas' } },
         update: {},
         create: { name: 'Camisas', description: 'Camisas casuales y formales' },
       });
       const season = await prisma.season.upsert({
-        where: { name: 'Primavera-Verano 2026' },
+        where: {
+          tenantId_name: {
+            tenantId: seedTenantId(),
+            name: 'Primavera-Verano 2026',
+          },
+        },
         update: {},
         create: {
           name: 'Primavera-Verano 2026',
@@ -95,7 +102,9 @@ export async function seedBase(client: PrismaClient, options: SeedOptions) {
         },
       });
       const supplier = await prisma.supplier.upsert({
-        where: { name: 'Textiles Andinos' },
+        where: {
+          tenantId_name: { tenantId: seedTenantId(), name: 'Textiles Andinos' },
+        },
         update: {},
         create: {
           name: 'Textiles Andinos',
@@ -104,11 +113,15 @@ export async function seedBase(client: PrismaClient, options: SeedOptions) {
       });
       const sizes = await Promise.all(
         ['M', 'L'].map((name) =>
-          prisma.size.upsert({ where: { name }, update: {}, create: { name } }),
+          prisma.size.upsert({
+            where: { tenantId_name: { tenantId: seedTenantId(), name } },
+            update: {},
+            create: { name },
+          }),
         ),
       );
       const color = await prisma.color.upsert({
-        where: { name: 'Azul' },
+        where: { tenantId_name: { tenantId: seedTenantId(), name: 'Azul' } },
         update: {},
         create: { name: 'Azul', hexCode: '#2563EB' },
       });

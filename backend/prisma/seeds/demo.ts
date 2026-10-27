@@ -8,6 +8,7 @@ import {
 } from '../../src/generated/prisma/client.js';
 import { seedBase, SeedOptions, validateSeedPassword } from './base.js';
 import { createReservationNotification } from '../../src/modules/notifications/reservation-notification.js';
+import { seedTenantId } from './tenant.js';
 
 async function ensureDemoNotifications(prisma: Prisma.TransactionClient) {
   const reservations = await prisma.reservation.findMany({
@@ -127,7 +128,11 @@ export async function seedDemo(client: PrismaClient, options: DemoSeedOptions) {
       }
       const sizes = await Promise.all(
         ['S', 'M', 'L'].map((name) =>
-          prisma.size.upsert({ where: { name }, update: {}, create: { name } }),
+          prisma.size.upsert({
+            where: { tenantId_name: { tenantId: seedTenantId(), name } },
+            update: {},
+            create: { name },
+          }),
         ),
       );
       const colors: Color[] = [];
@@ -137,7 +142,7 @@ export async function seedDemo(client: PrismaClient, options: DemoSeedOptions) {
       ])
         colors.push(
           await prisma.color.upsert({
-            where: { name },
+            where: { tenantId_name: { tenantId: seedTenantId(), name } },
             update: {},
             create: { name, hexCode },
           }),
@@ -166,7 +171,9 @@ export async function seedDemo(client: PrismaClient, options: DemoSeedOptions) {
         'Vestidos',
       ].entries()) {
         const category = await prisma.category.upsert({
-          where: { name: categoryName },
+          where: {
+            tenantId_name: { tenantId: seedTenantId(), name: categoryName },
+          },
           update: {},
           create: { name: categoryName },
         });

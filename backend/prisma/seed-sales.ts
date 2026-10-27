@@ -5,6 +5,7 @@ import { Role } from '../src/common/enums/role.enum.js';
 import { productPrice } from '../src/common/utils/product-price.js';
 import { SalesRepository } from '../src/modules/sales/sales.repository.js';
 import { SalesService } from '../src/modules/sales/sales.service.js';
+import { DEFAULT_SEED_TENANT, inTenant } from './seeds/tenant.js';
 
 const config = new ConfigService({
   database: { url: process.env.DATABASE_URL },
@@ -17,7 +18,7 @@ async function main() {
   const email = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
   if (!email)
     throw new Error('Set SEED_ADMIN_EMAIL and run the base seed first');
-  const user = await prisma.user.findUnique({
+  const user = await prisma.user.findFirst({
     where: { email },
     include: { roles: { include: { role: true } } },
   });
@@ -71,7 +72,7 @@ async function main() {
   );
 }
 
-main()
+inTenant(prisma, DEFAULT_SEED_TENANT, () => main())
   .catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : 'Sales seed failed');
     process.exitCode = 1;

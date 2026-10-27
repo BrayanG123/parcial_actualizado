@@ -15,6 +15,7 @@ import {
 } from './payment-gateway.service.js';
 import { PaymentsRepository } from './payments.repository.js';
 import type { StripePayment } from './payments.repository.js';
+import { tenantContext } from '../../common/tenant/tenant-context.js';
 
 @Injectable()
 export class PaymentsService {
@@ -114,14 +115,17 @@ export class PaymentsService {
           : refund.payment_intent?.id;
     }
     if (!intentId) return { received: true, ignored: true };
-    const payment = await this.repository.byIntent(intentId);
+    // El webhook no trae usuario: la empresa sale del pago local (busqueda de sistema).
+    const payment = await tenantContext.runAsSystem(() =>
+      this.repository.byIntent(intentId),
+    );
     // Other applications' events cannot mutate our sales. The worker recovers
     // deliveries that arrive before an intent is bound to the local payment.
     if (!payment) return { received: true, ignored: true };
     // Always read current provider state, even for duplicate/out-of-order events.
-    await this.synchronize(
-      payment,
-      await this.gateway.retrieveIntent(intentId),
+    const intent = await this.gateway.retrieveIntent(intentId);
+    await tenantContext.runInTenant(payment.tenantId, () =>
+      this.synchronize(payment, intent),
     );
     return { received: true };
   }

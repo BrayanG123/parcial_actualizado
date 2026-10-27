@@ -1,6 +1,9 @@
 import 'dotenv/config';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../src/generated/prisma/client.js';
+import {
+  DEFAULT_SEED_TENANT,
+  createSeedClient,
+  inTenant,
+} from './seeds/tenant.js';
 import { seedMassive } from './seeds/massive.js';
 
 if (process.env.NODE_ENV === 'production')
@@ -8,17 +11,14 @@ if (process.env.NODE_ENV === 'production')
 if (!process.env.DATABASE_URL)
   throw new Error('Set DATABASE_URL before running the massive seed');
 
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({
-    connectionString: process.env.DATABASE_URL,
-    options: '-c timezone=UTC',
-  }),
-});
+const prisma = createSeedClient(process.env.DATABASE_URL);
 
-seedMassive(prisma, {
-  referenceDate: process.env.SEED_MASSIVE_DATE,
-  saltRounds: Number(process.env.PASSWORD_SALT_ROUNDS ?? 12),
-})
+inTenant(prisma, DEFAULT_SEED_TENANT, () =>
+  seedMassive(prisma, {
+    referenceDate: process.env.SEED_MASSIVE_DATE,
+    saltRounds: Number(process.env.PASSWORD_SALT_ROUNDS ?? 12),
+  }),
+)
   .then((result) => console.log(JSON.stringify(result, null, 2)))
   .catch((error: unknown) => {
     console.error(

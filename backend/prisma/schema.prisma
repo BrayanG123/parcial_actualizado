@@ -8,6 +8,8 @@ datasource db {
 }
 
 enum RoleName {
+  /// Administrador de la plataforma SaaS: no pertenece a ninguna empresa.
+  PLATFORM_ADMIN
   ADMINISTRATOR
   BRANCH_MANAGER
   CASHIER
@@ -93,29 +95,163 @@ enum PaymentStatus {
   REFUNDED
 }
 
-model User {
-  supplierId Int? @map("id_proveedor")
-  supplier Supplier? @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  id           Int        @id @default(autoincrement()) @map("id_usuario")
-  name         String     @map("nombre") @db.VarChar(120)
-  email        String     @unique @db.VarChar(180)
-  passwordHash String     @map("password_hash")
-  active       Boolean    @default(true) @map("activo")
-  registeredAt DateTime   @default(now()) @map("fecha_registro") @db.Timestamptz(3)
-  updatedAt    DateTime   @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
-  client       Client?
-  employee     Employee?
-  roles        UserRole[]
-  createdSales Sale[] @relation("SaleCreator")
-  cashShifts CashShift[]
-  notificationReads NotificationRead[]
-  pushTokens PushToken[]
+enum TenantStatus {
+  ACTIVE
+  INACTIVE
+}
 
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+  CANCELLED
+}
+
+enum SubscriptionAction {
+  ASSIGN
+  CHANGE_PLAN
+  RENEW
+  SUSPEND
+  REACTIVATE
+  CANCEL
+  EXPIRE
+}
+
+/// Empresa contratante (tenant). Una sucursal NO es un tenant.
+model Tenant {
+  id                 Int                 @id @default(autoincrement()) @map("id_empresa")
+  name               String              @map("nombre") @db.VarChar(150)
+  /// Codigo publico de la empresa en URLs y en el header X-Tenant.
+  slug               String              @unique @db.VarChar(60)
+  status             TenantStatus        @default(ACTIVE) @map("estado")
+  createdAt          DateTime            @default(now()) @map("fecha_creacion") @db.Timestamptz(3)
+  updatedAt          DateTime            @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
+  subscription       Subscription?
+  users              User[]
+  clients            Client[]
+  employees          Employee[]
+  branches           Branch[]
+  categories         Category[]
+  seasons            Season[]
+  collections        Collection[]
+  suppliers          Supplier[]
+  sizes              Size[]
+  colors             Color[]
+  products           Product[]
+  productSizes       ProductSize[]
+  productColors      ProductColor[]
+  inventory          Inventory[]
+  inventoryMovements InventoryMovement[]
+  reservations       Reservation[]
+  reservationItems   ReservationItem[]
+  carts              Cart[]
+  cartItems          CartItem[]
+  cashRegisters      CashRegister[]
+  cashShifts         CashShift[]
+  offlineBatches     OfflineBatch[]
+  sales              Sale[]
+  saleItems          SaleItem[]
+  payments           Payment[]
+  arResources        ArResource[]
+  aiRecommendations  AiRecommendation[]
+  notifications      Notification[]
+  pushTokens         PushToken[]
+
+  @@map("empresas")
+}
+
+/// Plan configurable desde la base: limites y funcionalidades no estan en el codigo.
+model Plan {
+  id                Int                   @id @default(autoincrement()) @map("id_plan")
+  code              String                @unique @map("codigo") @db.VarChar(40)
+  name              String                @map("nombre") @db.VarChar(80)
+  description       String?               @map("descripcion") @db.VarChar(250)
+  maxActiveBranches Int                   @map("max_sucursales_activas")
+  /// Banderas de funcionalidad, p. ej. { "aiReports": true, "offline": true }.
+  features          Json                  @default("{}") @map("funcionalidades")
+  monthlyPrice      Decimal               @default(0) @map("precio_mensual") @db.Decimal(12, 2)
+  active            Boolean               @default(true) @map("activo")
+  createdAt         DateTime              @default(now()) @map("fecha_creacion") @db.Timestamptz(3)
+  updatedAt         DateTime              @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
+  subscriptions     Subscription[]
+  historyFrom       SubscriptionHistory[] @relation("HistoryFromPlan")
+  historyTo         SubscriptionHistory[] @relation("HistoryToPlan")
+
+  @@map("planes")
+}
+
+/// Suscripcion vigente de una empresa (una por empresa); los cambios quedan en el historial.
+model Subscription {
+  id        Int                   @id @default(autoincrement()) @map("id_suscripcion")
+  tenantId  Int                   @unique @map("id_empresa")
+  planId    Int                   @map("id_plan")
+  startsAt  DateTime              @map("fecha_inicio") @db.Timestamptz(3)
+  endsAt    DateTime              @map("fecha_vencimiento") @db.Timestamptz(3)
+  status    SubscriptionStatus    @default(ACTIVE) @map("estado")
+  createdAt DateTime              @default(now()) @map("fecha_creacion") @db.Timestamptz(3)
+  updatedAt DateTime              @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
+  tenant    Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  plan      Plan                  @relation(fields: [planId], references: [id], onDelete: Restrict)
+  history   SubscriptionHistory[]
+
+  @@index([planId])
+  @@index([status, endsAt])
+  @@map("suscripciones")
+}
+
+model SubscriptionHistory {
+  id             Int                @id @default(autoincrement()) @map("id_historial")
+  subscriptionId Int                @map("id_suscripcion")
+  action         SubscriptionAction @map("accion")
+  fromPlanId     Int?               @map("id_plan_anterior")
+  toPlanId       Int                @map("id_plan_nuevo")
+  status         SubscriptionStatus @map("estado")
+  startsAt       DateTime           @map("fecha_inicio") @db.Timestamptz(3)
+  endsAt         DateTime           @map("fecha_vencimiento") @db.Timestamptz(3)
+  note           String?            @map("observacion") @db.VarChar(250)
+  performedById  Int?               @map("id_usuario")
+  createdAt      DateTime           @default(now()) @map("fecha") @db.Timestamptz(3)
+  subscription   Subscription       @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  fromPlan       Plan?              @relation("HistoryFromPlan", fields: [fromPlanId], references: [id], onDelete: Restrict)
+  toPlan         Plan               @relation("HistoryToPlan", fields: [toPlanId], references: [id], onDelete: Restrict)
+
+  @@index([subscriptionId, createdAt])
+  @@map("historial_suscripciones")
+}
+
+model User {
+  /// Empresa (tenant) propietaria; null solo para PLATFORM_ADMIN.
+  tenantId          Int?               @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant            Tenant?            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  supplierId        Int?               @map("id_proveedor")
+  supplier          Supplier?          @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  id                Int                @id @default(autoincrement()) @map("id_usuario")
+  name              String             @map("nombre") @db.VarChar(120)
+  email             String             @db.VarChar(180)
+  passwordHash      String             @map("password_hash")
+  active            Boolean            @default(true) @map("activo")
+  registeredAt      DateTime           @default(now()) @map("fecha_registro") @db.Timestamptz(3)
+  updatedAt         DateTime           @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
+  client            Client?
+  employee          Employee?
+  roles             UserRole[]
+  createdSales      Sale[]             @relation("SaleCreator")
+  cashShifts        CashShift[]
+  notificationReads NotificationRead[]
+  pushTokens        PushToken[]
+
+  // Email unico por empresa. Para PLATFORM_ADMIN (sin empresa) un indice parcial
+  // de la migracion 20261027000000_multitenancy evita emails repetidos.
+  @@unique([tenantId, email])
   @@index([supplierId])
+  @@index([tenantId])
   @@map("usuarios")
 }
 
 model Client {
+  /// Empresa (tenant) propietaria.
+  tenantId        Int                @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   wholesale       Boolean            @default(false) @map("mayorista")
   id              Int                @id @default(autoincrement()) @map("id_cliente")
   userId          Int                @unique @map("id_usuario")
@@ -127,10 +263,14 @@ model Client {
   sales           Sale[]
   recommendations AiRecommendation[]
 
+  @@index([tenantId])
   @@map("clientes")
 }
 
 model Employee {
+  /// Empresa (tenant) propietaria.
+  tenantId           Int                 @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   id                 Int                 @id @default(autoincrement()) @map("id_empleado")
   userId             Int                 @unique @map("id_usuario")
   branchId           Int                 @map("id_sucursal")
@@ -142,6 +282,7 @@ model Employee {
   sales              Sale[]
 
   @@index([branchId])
+  @@index([tenantId])
   @@map("empleados")
 }
 
@@ -167,49 +308,66 @@ model UserRole {
 }
 
 model Branch {
+  /// Empresa (tenant) propietaria.
+  tenantId      Int            @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   /// MVP: un solo almacen por sucursal; comparte su identificador y existencias.
-  warehouseName String        @default("Almacen principal") @map("nombre_almacen") @db.VarChar(120)
-  id           Int           @id @default(autoincrement()) @map("id_sucursal")
-  name         String        @map("nombre") @db.VarChar(120)
-  city         String        @map("ciudad") @db.VarChar(100)
-  address      String        @map("direccion") @db.VarChar(250)
-  phone        String?       @map("telefono") @db.VarChar(30)
-  active       Boolean       @default(true) @map("activa")
-  employees    Employee[]
-  inventory    Inventory[]
-  reservations Reservation[]
-  sales        Sale[]
+  warehouseName String         @default("Almacen principal") @map("nombre_almacen") @db.VarChar(120)
+  id            Int            @id @default(autoincrement()) @map("id_sucursal")
+  name          String         @map("nombre") @db.VarChar(120)
+  city          String         @map("ciudad") @db.VarChar(100)
+  address       String         @map("direccion") @db.VarChar(250)
+  phone         String?        @map("telefono") @db.VarChar(30)
+  active        Boolean        @default(true) @map("activa")
+  employees     Employee[]
+  inventory     Inventory[]
+  reservations  Reservation[]
+  sales         Sale[]
   notifications Notification[]
   cashRegisters CashRegister[]
 
-  @@unique([city, name])
+  @@unique([tenantId, city, name])
   @@index([city, active])
+  @@index([tenantId])
   @@map("sucursales")
 }
 
 model Category {
+  /// Empresa (tenant) propietaria.
+  tenantId    Int       @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   id          Int       @id @default(autoincrement()) @map("id_categoria")
-  name        String    @unique @map("nombre") @db.VarChar(100)
+  name        String    @map("nombre") @db.VarChar(100)
   description String?   @map("descripcion") @db.VarChar(250)
   products    Product[]
 
+  @@unique([tenantId, name])
+  @@index([tenantId])
   @@map("categorias")
 }
 
 model Season {
+  /// Empresa (tenant) propietaria.
+  tenantId    Int          @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   id          Int          @id @default(autoincrement()) @map("id_temporada")
-  name        String       @unique @map("nombre") @db.VarChar(120)
+  name        String       @map("nombre") @db.VarChar(120)
   startDate   DateTime     @map("fecha_inicio") @db.Date
   endDate     DateTime     @map("fecha_fin") @db.Date
   active      Boolean      @default(true) @map("activa")
   collections Collection[]
   products    Product[]
 
+  @@unique([tenantId, name])
   @@index([active, startDate, endDate])
+  @@index([tenantId])
   @@map("temporadas")
 }
 
 model Collection {
+  /// Empresa (tenant) propietaria.
+  tenantId    Int       @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   id          Int       @id @default(autoincrement()) @map("id_coleccion")
   seasonId    Int       @map("id_temporada")
   name        String    @map("nombre") @db.VarChar(120)
@@ -220,88 +378,113 @@ model Collection {
 
   @@unique([seasonId, name])
   @@index([active])
+  @@index([tenantId])
   @@map("colecciones")
 }
 
 model Supplier {
+  /// Empresa (tenant) propietaria.
+  tenantId Int       @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   accounts User[]
   id       Int       @id @default(autoincrement()) @map("id_proveedor")
-  name     String    @unique @map("nombre") @db.VarChar(150)
+  name     String    @map("nombre") @db.VarChar(150)
   contact  String?   @map("contacto") @db.VarChar(120)
   phone    String?   @map("telefono") @db.VarChar(30)
   email    String?   @db.VarChar(180)
   active   Boolean   @default(true) @map("activo")
   products Product[]
 
+  @@unique([tenantId, name])
+  @@index([tenantId])
   @@map("proveedores")
 }
 
 model Size {
+  /// Empresa (tenant) propietaria.
+  tenantId         Int               @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   id               Int               @id @default(autoincrement()) @map("id_talla")
-  name             String            @unique @map("nombre") @db.VarChar(30)
+  name             String            @map("nombre") @db.VarChar(30)
   products         ProductSize[]
   inventory        Inventory[]
   reservationItems ReservationItem[]
   cartItems        CartItem[]
   saleItems        SaleItem[]
 
+  @@unique([tenantId, name])
+  @@index([tenantId])
   @@map("tallas")
 }
 
 model Color {
+  /// Empresa (tenant) propietaria.
+  tenantId         Int               @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   id               Int               @id @default(autoincrement()) @map("id_color")
-  name             String            @unique @map("nombre") @db.VarChar(60)
-  hexCode          String            @unique @map("codigo_hex") @db.VarChar(7)
+  name             String            @map("nombre") @db.VarChar(60)
+  hexCode          String            @map("codigo_hex") @db.VarChar(7)
   products         ProductColor[]
   inventory        Inventory[]
   reservationItems ReservationItem[]
   cartItems        CartItem[]
   saleItems        SaleItem[]
 
+  @@unique([tenantId, name])
+  @@unique([tenantId, hexCode])
+  @@index([tenantId])
   @@map("colores")
 }
 
 model Product {
-  supplierAvailability String? @map("disponibilidad_proveedor") @db.VarChar(500)
-  wholesalePrice   Decimal?           @map("precio_mayorista") @db.Decimal(12, 2)
-  imageUrls        String[]           @default([]) @map("imagenes")
-  id               Int                @id @default(autoincrement()) @map("id_producto")
-  categoryId       Int                @map("id_categoria")
-  seasonId         Int                @map("id_temporada")
-  collectionId     Int                @map("id_coleccion")
-  supplierId       Int                @map("id_proveedor")
-  name             String             @map("nombre") @db.VarChar(160)
-  description      String?            @map("descripcion") @db.Text
-  price            Decimal            @map("precio") @db.Decimal(12, 2)
-  imageUrl         String?            @map("imagen_url") @db.Text
-  discountPercent  Decimal            @default(0) @map("descuento_pct") @db.Decimal(5, 2)
-  promotionStart   DateTime?          @map("promo_inicio") @db.Date
-  promotionEnd     DateTime?          @map("promo_fin") @db.Date
-  active           Boolean            @default(true) @map("activo")
-  createdAt        DateTime           @default(now()) @map("fecha_creacion") @db.Timestamptz(3)
-  updatedAt        DateTime           @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
-  category         Category           @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  season           Season             @relation(fields: [seasonId], references: [id], onDelete: Restrict)
-  collection       Collection         @relation(fields: [collectionId], references: [id], onDelete: Restrict)
-  supplier         Supplier           @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  sizes            ProductSize[]
-  colors           ProductColor[]
-  inventory        Inventory[]
-  reservationItems ReservationItem[]
-  cartItems        CartItem[]
-  saleItems        SaleItem[]
-  arResources      ArResource[]
-  recommendations  AiRecommendation[]
+  /// Empresa (tenant) propietaria.
+  tenantId             Int                @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant               Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  supplierAvailability String?            @map("disponibilidad_proveedor") @db.VarChar(500)
+  wholesalePrice       Decimal?           @map("precio_mayorista") @db.Decimal(12, 2)
+  imageUrls            String[]           @default([]) @map("imagenes")
+  id                   Int                @id @default(autoincrement()) @map("id_producto")
+  categoryId           Int                @map("id_categoria")
+  seasonId             Int                @map("id_temporada")
+  collectionId         Int                @map("id_coleccion")
+  supplierId           Int                @map("id_proveedor")
+  name                 String             @map("nombre") @db.VarChar(160)
+  description          String?            @map("descripcion") @db.Text
+  price                Decimal            @map("precio") @db.Decimal(12, 2)
+  imageUrl             String?            @map("imagen_url") @db.Text
+  discountPercent      Decimal            @default(0) @map("descuento_pct") @db.Decimal(5, 2)
+  promotionStart       DateTime?          @map("promo_inicio") @db.Date
+  promotionEnd         DateTime?          @map("promo_fin") @db.Date
+  active               Boolean            @default(true) @map("activo")
+  createdAt            DateTime           @default(now()) @map("fecha_creacion") @db.Timestamptz(3)
+  updatedAt            DateTime           @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
+  category             Category           @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  season               Season             @relation(fields: [seasonId], references: [id], onDelete: Restrict)
+  collection           Collection         @relation(fields: [collectionId], references: [id], onDelete: Restrict)
+  supplier             Supplier           @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  sizes                ProductSize[]
+  colors               ProductColor[]
+  inventory            Inventory[]
+  reservationItems     ReservationItem[]
+  cartItems            CartItem[]
+  saleItems            SaleItem[]
+  arResources          ArResource[]
+  recommendations      AiRecommendation[]
 
   @@unique([supplierId, name])
   @@index([categoryId, active])
+  @@index([tenantId, active])
   @@index([seasonId, collectionId])
   @@index([supplierId])
   @@index([name])
+  @@index([tenantId])
   @@map("productos")
 }
 
 model ProductSize {
+  /// Empresa (tenant) propietaria.
+  tenantId  Int     @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   productId Int     @map("id_producto")
   sizeId    Int     @map("id_talla")
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -309,10 +492,14 @@ model ProductSize {
 
   @@id([productId, sizeId])
   @@index([sizeId])
+  @@index([tenantId])
   @@map("productos_tallas")
 }
 
 model ProductColor {
+  /// Empresa (tenant) propietaria.
+  tenantId  Int     @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   productId Int     @map("id_producto")
   colorId   Int     @map("id_color")
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -320,10 +507,14 @@ model ProductColor {
 
   @@id([productId, colorId])
   @@index([colorId])
+  @@index([tenantId])
   @@map("productos_colores")
 }
 
 model Inventory {
+  /// Empresa (tenant) propietaria.
+  tenantId         Int                 @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant           Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   id               Int                 @id @default(autoincrement()) @map("id_inventario")
   branchId         Int                 @map("id_sucursal")
   productId        Int                 @map("id_producto")
@@ -340,10 +531,14 @@ model Inventory {
 
   @@unique([branchId, productId, sizeId, colorId])
   @@index([productId, sizeId, colorId])
+  @@index([tenantId])
   @@map("inventarios")
 }
 
 model InventoryMovement {
+  /// Empresa (tenant) propietaria.
+  tenantId    Int                     @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant      Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   id          Int                     @id @default(autoincrement()) @map("id_movimiento")
   inventoryId Int                     @map("id_inventario")
   employeeId  Int?                    @map("id_empleado")
@@ -360,10 +555,14 @@ model InventoryMovement {
   @@index([inventoryId, occurredAt])
   @@index([employeeId])
   @@index([type, status])
+  @@index([tenantId])
   @@map("movimientos_inventario")
 }
 
 model Reservation {
+  /// Empresa (tenant) propietaria.
+  tenantId        Int               @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   id              Int               @id @default(autoincrement()) @map("id_reserva")
   clientId        Int               @map("id_cliente")
   branchId        Int               @map("id_sucursal")
@@ -382,29 +581,37 @@ model Reservation {
   @@index([clientId, status])
   @@index([branchId, approximateTime, status])
   @@index([status, expiresAt])
+  @@index([tenantId])
   @@map("reservas")
 }
 
 model ReservationItem {
-  id            Int                   @id @default(autoincrement()) @map("id_detalle_reserva")
-  reservationId Int                   @map("id_reserva")
-  productId     Int                   @map("id_producto")
-  sizeId        Int                   @map("id_talla")
-  colorId       Int                   @map("id_color")
-  quantity      Int                   @map("cantidad")
-  purchasedQuantity Int @default(0) @map("cantidad_comprada")
-  status        ReservationItemStatus @default(PENDING) @map("estado")
-  reservation   Reservation           @relation(fields: [reservationId], references: [id], onDelete: Cascade)
-  product       Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
-  size          Size                  @relation(fields: [sizeId], references: [id], onDelete: Restrict)
-  color         Color                 @relation(fields: [colorId], references: [id], onDelete: Restrict)
+  /// Empresa (tenant) propietaria.
+  tenantId          Int                   @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant            Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  id                Int                   @id @default(autoincrement()) @map("id_detalle_reserva")
+  reservationId     Int                   @map("id_reserva")
+  productId         Int                   @map("id_producto")
+  sizeId            Int                   @map("id_talla")
+  colorId           Int                   @map("id_color")
+  quantity          Int                   @map("cantidad")
+  purchasedQuantity Int                   @default(0) @map("cantidad_comprada")
+  status            ReservationItemStatus @default(PENDING) @map("estado")
+  reservation       Reservation           @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  product           Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
+  size              Size                  @relation(fields: [sizeId], references: [id], onDelete: Restrict)
+  color             Color                 @relation(fields: [colorId], references: [id], onDelete: Restrict)
 
   @@unique([reservationId, productId, sizeId, colorId])
   @@index([productId, sizeId, colorId])
+  @@index([tenantId])
   @@map("detalles_reserva")
 }
 
 model Cart {
+  /// Empresa (tenant) propietaria.
+  tenantId  Int        @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   // One ACTIVE cart per client is enforced by a partial unique index in migration
   // 20260912010000_active_cart_unique; historical carts remain unrestricted.
   id        Int        @id @default(autoincrement()) @map("id_carrito")
@@ -417,10 +624,14 @@ model Cart {
   sale      Sale?
 
   @@index([clientId, status])
+  @@index([tenantId])
   @@map("carritos")
 }
 
 model CartItem {
+  /// Empresa (tenant) propietaria.
+  tenantId  Int     @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   id        Int     @id @default(autoincrement()) @map("id_detalle_carrito")
   cartId    Int     @map("id_carrito")
   productId Int     @map("id_producto")
@@ -435,155 +646,187 @@ model CartItem {
 
   @@unique([cartId, productId, sizeId, colorId])
   @@index([productId, sizeId, colorId])
+  @@index([tenantId])
   @@map("detalles_carrito")
 }
 
 model CashRegister {
-  id Int @id @default(autoincrement()) @map("id_caja")
-  branchId Int @map("id_sucursal")
-  name String @map("nombre") @db.VarChar(80)
-  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  shifts CashShift[]
+  /// Empresa (tenant) propietaria.
+  tenantId Int         @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  id       Int         @id @default(autoincrement()) @map("id_caja")
+  branchId Int         @map("id_sucursal")
+  name     String      @map("nombre") @db.VarChar(80)
+  branch   Branch      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  shifts   CashShift[]
+
   @@unique([branchId, name])
+  @@index([tenantId])
   @@map("cajas")
 }
 
 model CashShift {
+  /// Empresa (tenant) propietaria.
+  tenantId       Int            @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   // Partial unique indexes enforce one open shift per user and register.
-  id Int @id @default(autoincrement()) @map("id_turno")
-  registerId Int @map("id_caja")
-  userId Int @map("id_usuario")
-  openingKey String @map("clave_apertura") @db.Uuid
-  openedAt DateTime @default(now()) @map("fecha_apertura") @db.Timestamptz(3)
-  closedAt DateTime? @map("fecha_cierre") @db.Timestamptz(3)
-  currency String @map("moneda") @db.VarChar(3)
-  openingCash Decimal @map("saldo_inicial") @db.Decimal(14, 2)
-  cashTotal Decimal @default(0) @map("ventas_efectivo") @db.Decimal(14, 2)
-  cardTotal Decimal @default(0) @map("ventas_tarjeta") @db.Decimal(14, 2)
-  qrTotal Decimal @default(0) @map("ventas_qr") @db.Decimal(14, 2)
-  transferTotal Decimal @default(0) @map("ventas_transferencia") @db.Decimal(14, 2)
-  saleCount Int @default(0) @map("cantidad_ventas")
-  countedCash Decimal? @map("efectivo_contado") @db.Decimal(14, 2)
-  closingNote String? @map("observacion_cierre") @db.VarChar(500)
-  register CashRegister @relation(fields: [registerId], references: [id], onDelete: Restrict)
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
-  sales Sale[]
+  id             Int            @id @default(autoincrement()) @map("id_turno")
+  registerId     Int            @map("id_caja")
+  userId         Int            @map("id_usuario")
+  openingKey     String         @map("clave_apertura") @db.Uuid
+  openedAt       DateTime       @default(now()) @map("fecha_apertura") @db.Timestamptz(3)
+  closedAt       DateTime?      @map("fecha_cierre") @db.Timestamptz(3)
+  currency       String         @map("moneda") @db.VarChar(3)
+  openingCash    Decimal        @map("saldo_inicial") @db.Decimal(14, 2)
+  cashTotal      Decimal        @default(0) @map("ventas_efectivo") @db.Decimal(14, 2)
+  cardTotal      Decimal        @default(0) @map("ventas_tarjeta") @db.Decimal(14, 2)
+  qrTotal        Decimal        @default(0) @map("ventas_qr") @db.Decimal(14, 2)
+  transferTotal  Decimal        @default(0) @map("ventas_transferencia") @db.Decimal(14, 2)
+  saleCount      Int            @default(0) @map("cantidad_ventas")
+  countedCash    Decimal?       @map("efectivo_contado") @db.Decimal(14, 2)
+  closingNote    String?        @map("observacion_cierre") @db.VarChar(500)
+  register       CashRegister   @relation(fields: [registerId], references: [id], onDelete: Restrict)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  sales          Sale[]
   offlineBatches OfflineBatch[]
+
   @@unique([userId, openingKey])
   @@index([registerId, openedAt])
   @@index([userId, openedAt])
+  @@index([tenantId])
   @@map("turnos_caja")
 }
 
 model OfflineBatch {
-  id String @id @db.Uuid
-  shiftId Int @map("id_turno")
-  deviceId String @map("id_dispositivo") @db.Uuid
-  preparedAt DateTime @default(now()) @map("fecha_preparacion") @db.Timestamptz(3)
+  /// Empresa (tenant) propietaria.
+  tenantId   Int       @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  id         String    @id @db.Uuid
+  shiftId    Int       @map("id_turno")
+  deviceId   String    @map("id_dispositivo") @db.Uuid
+  preparedAt DateTime  @default(now()) @map("fecha_preparacion") @db.Timestamptz(3)
   finishedAt DateTime? @map("fecha_finalizacion") @db.Timestamptz(3)
-  snapshot Json @map("catalogo")
-  revision Int @default(0)
-  shift CashShift @relation(fields: [shiftId], references: [id], onDelete: Restrict)
-  sales Sale[]
+  snapshot   Json      @map("catalogo")
+  revision   Int       @default(0)
+  shift      CashShift @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  sales      Sale[]
+
   @@index([shiftId])
+  @@index([tenantId])
   @@map("lotes_offline")
 }
 
 model Sale {
-  cashOnDelivery Boolean @default(false) @map("contra_entrega")
-  deliveryName String? @map("destinatario") @db.VarChar(120)
-  deliveryPhone String? @map("telefono_entrega") @db.VarChar(30)
-  deliveryAddress String? @map("direccion_entrega") @db.VarChar(250)
-  deliveredAt DateTime? @map("fecha_entrega") @db.Timestamptz(3)
-  offlineBatchId String? @map("id_lote_offline") @db.Uuid
-  offlineBatch OfflineBatch? @relation(fields: [offlineBatchId], references: [id], onDelete: Restrict)
-  shiftId Int? @map("id_turno")
-  shift CashShift? @relation(fields: [shiftId], references: [id], onDelete: Restrict)
-  id            Int          @id @default(autoincrement()) @map("id_venta")
-  clientId      Int?         @map("id_cliente")
-  employeeId    Int?         @map("id_empleado")
-  branchId      Int?         @map("id_sucursal")
-  reservationId Int?         @unique @map("id_reserva")
-  cartId        Int?         @unique @map("id_carrito")
-  createdById   Int?         @map("id_usuario_creador")
-  idempotencyKey String?     @map("clave_idempotencia") @db.Uuid
-  requestHash   String?      @map("hash_solicitud") @db.VarChar(64)
-  currency      String       @default("BOB") @map("moneda") @db.VarChar(3)
-  stockReserved Boolean     @default(false) @map("stock_apartado")
-  expiresAt     DateTime?    @map("fecha_vencimiento") @db.Timestamptz(3)
-  confirmedAt   DateTime?    @map("fecha_confirmacion") @db.Timestamptz(3)
-  cancellationReason String? @map("motivo_cancelacion") @db.VarChar(100)
-  soldAt        DateTime     @default(now()) @map("fecha") @db.Timestamptz(3)
-  channel       SaleChannel  @map("canal")
-  status        SaleStatus   @default(DRAFT) @map("estado")
-  total         Decimal      @db.Decimal(12, 2)
-  updatedAt     DateTime     @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
-  client        Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  employee      Employee?    @relation(fields: [employeeId], references: [id], onDelete: SetNull)
-  branch        Branch?      @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  reservation   Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
-  cart          Cart?        @relation(fields: [cartId], references: [id], onDelete: SetNull)
-  createdBy     User?        @relation("SaleCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  items         SaleItem[]
-  payments      Payment[]
+  /// Empresa (tenant) propietaria.
+  tenantId           Int           @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant             Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  cashOnDelivery     Boolean       @default(false) @map("contra_entrega")
+  deliveryName       String?       @map("destinatario") @db.VarChar(120)
+  deliveryPhone      String?       @map("telefono_entrega") @db.VarChar(30)
+  deliveryAddress    String?       @map("direccion_entrega") @db.VarChar(250)
+  deliveredAt        DateTime?     @map("fecha_entrega") @db.Timestamptz(3)
+  offlineBatchId     String?       @map("id_lote_offline") @db.Uuid
+  offlineBatch       OfflineBatch? @relation(fields: [offlineBatchId], references: [id], onDelete: Restrict)
+  shiftId            Int?          @map("id_turno")
+  shift              CashShift?    @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  id                 Int           @id @default(autoincrement()) @map("id_venta")
+  clientId           Int?          @map("id_cliente")
+  employeeId         Int?          @map("id_empleado")
+  branchId           Int?          @map("id_sucursal")
+  reservationId      Int?          @unique @map("id_reserva")
+  cartId             Int?          @unique @map("id_carrito")
+  createdById        Int?          @map("id_usuario_creador")
+  idempotencyKey     String?       @map("clave_idempotencia") @db.Uuid
+  requestHash        String?       @map("hash_solicitud") @db.VarChar(64)
+  currency           String        @default("BOB") @map("moneda") @db.VarChar(3)
+  stockReserved      Boolean       @default(false) @map("stock_apartado")
+  expiresAt          DateTime?     @map("fecha_vencimiento") @db.Timestamptz(3)
+  confirmedAt        DateTime?     @map("fecha_confirmacion") @db.Timestamptz(3)
+  cancellationReason String?       @map("motivo_cancelacion") @db.VarChar(100)
+  soldAt             DateTime      @default(now()) @map("fecha") @db.Timestamptz(3)
+  channel            SaleChannel   @map("canal")
+  status             SaleStatus    @default(DRAFT) @map("estado")
+  total              Decimal       @db.Decimal(12, 2)
+  updatedAt          DateTime      @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
+  client             Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  employee           Employee?     @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  branch             Branch?       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  reservation        Reservation?  @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  cart               Cart?         @relation(fields: [cartId], references: [id], onDelete: SetNull)
+  createdBy          User?         @relation("SaleCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  items              SaleItem[]
+  payments           Payment[]
 
+  @@unique([createdById, idempotencyKey])
   @@index([offlineBatchId])
   @@index([shiftId])
   @@index([clientId, soldAt])
   @@index([employeeId])
   @@index([branchId, soldAt])
+  @@index([tenantId, soldAt])
   @@index([channel, status])
-  @@unique([createdById, idempotencyKey])
   @@index([status, expiresAt])
+  @@index([tenantId])
   @@map("ventas")
 }
 
 model SaleItem {
-  id        Int     @id @default(autoincrement()) @map("id_detalle_venta")
-  saleId    Int     @map("id_venta")
-  productId Int     @map("id_producto")
-  sizeId    Int     @map("id_talla")
-  colorId   Int     @map("id_color")
-  quantity  Int     @map("cantidad")
-  unitPrice Decimal @map("precio_unitario") @db.Decimal(12, 2)
-  discount  Decimal @default(0) @map("descuento") @db.Decimal(12, 2)
+  /// Empresa (tenant) propietaria.
+  tenantId    Int     @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  id          Int     @id @default(autoincrement()) @map("id_detalle_venta")
+  saleId      Int     @map("id_venta")
+  productId   Int     @map("id_producto")
+  sizeId      Int     @map("id_talla")
+  colorId     Int     @map("id_color")
+  quantity    Int     @map("cantidad")
+  unitPrice   Decimal @map("precio_unitario") @db.Decimal(12, 2)
+  discount    Decimal @default(0) @map("descuento") @db.Decimal(12, 2)
   productName String? @map("nombre_producto") @db.VarChar(160)
-  sizeName String? @map("nombre_talla") @db.VarChar(30)
-  colorName String? @map("nombre_color") @db.VarChar(60)
-  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
-  size      Size    @relation(fields: [sizeId], references: [id], onDelete: Restrict)
-  color     Color   @relation(fields: [colorId], references: [id], onDelete: Restrict)
+  sizeName    String? @map("nombre_talla") @db.VarChar(30)
+  colorName   String? @map("nombre_color") @db.VarChar(60)
+  sale        Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product     Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  size        Size    @relation(fields: [sizeId], references: [id], onDelete: Restrict)
+  color       Color   @relation(fields: [colorId], references: [id], onDelete: Restrict)
 
   @@index([saleId])
   @@index([productId, sizeId, colorId])
+  @@index([tenantId])
   @@map("detalles_venta")
 }
 
 model Payment {
-  id                Int           @id @default(autoincrement()) @map("id_pago")
-  saleId            Int           @map("id_venta")
-  method            PaymentMethod @map("metodo")
-  type              PaymentType   @map("tipo")
-  amount            Decimal       @map("monto") @db.Decimal(12, 2)
-  status            PaymentStatus @default(PENDING) @map("estado")
-  externalReference String?       @unique @map("referencia_externa") @db.VarChar(200)
-  stripeRequestKey  String        @unique @default(uuid()) @map("stripe_request_key") @db.Uuid
-  stripeIntentId    String?       @unique @map("stripe_intent_id") @db.VarChar(200)
-  stripeStatus      String?       @map("stripe_status") @db.VarChar(40)
-  stripeRefundId    String?       @unique @map("stripe_refund_id") @db.VarChar(200)
-  stripeRefundStatus String?      @map("stripe_refund_status") @db.VarChar(40)
-  refundRequestedAt DateTime?     @map("reembolso_solicitado_en") @db.Timestamptz(3)
-  lastStripeSyncAt  DateTime?     @map("stripe_sincronizado_en") @db.Timestamptz(3)
-  paidAt            DateTime      @default(now()) @map("fecha") @db.Timestamptz(3)
-  sale              Sale          @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  /// Empresa (tenant) propietaria.
+  tenantId           Int           @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant             Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  id                 Int           @id @default(autoincrement()) @map("id_pago")
+  saleId             Int           @map("id_venta")
+  method             PaymentMethod @map("metodo")
+  type               PaymentType   @map("tipo")
+  amount             Decimal       @map("monto") @db.Decimal(12, 2)
+  status             PaymentStatus @default(PENDING) @map("estado")
+  externalReference  String?       @unique @map("referencia_externa") @db.VarChar(200)
+  stripeRequestKey   String        @unique @default(uuid()) @map("stripe_request_key") @db.Uuid
+  stripeIntentId     String?       @unique @map("stripe_intent_id") @db.VarChar(200)
+  stripeStatus       String?       @map("stripe_status") @db.VarChar(40)
+  stripeRefundId     String?       @unique @map("stripe_refund_id") @db.VarChar(200)
+  stripeRefundStatus String?       @map("stripe_refund_status") @db.VarChar(40)
+  refundRequestedAt  DateTime?     @map("reembolso_solicitado_en") @db.Timestamptz(3)
+  lastStripeSyncAt   DateTime?     @map("stripe_sincronizado_en") @db.Timestamptz(3)
+  paidAt             DateTime      @default(now()) @map("fecha") @db.Timestamptz(3)
+  sale               Sale          @relation(fields: [saleId], references: [id], onDelete: Restrict)
 
   @@index([saleId, status])
   @@index([status, lastStripeSyncAt])
+  @@index([tenantId])
   @@map("pagos")
 }
 
 model ArResource {
+  /// Empresa (tenant) propietaria.
+  tenantId  Int     @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   id        Int     @id @default(autoincrement()) @map("id_recurso_ra")
   productId Int     @map("id_producto")
   type      String  @map("tipo") @db.VarChar(50)
@@ -593,10 +836,14 @@ model ArResource {
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId, active])
+  @@index([tenantId])
   @@map("recursos_ra")
 }
 
 model AiRecommendation {
+  /// Empresa (tenant) propietaria.
+  tenantId  Int      @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   id        Int      @id @default(autoincrement()) @map("id_recomendacion")
   clientId  Int      @map("id_cliente")
   productId Int      @map("id_producto")
@@ -609,28 +856,36 @@ model AiRecommendation {
 
   @@index([clientId, createdAt])
   @@index([productId])
+  @@index([tenantId])
   @@map("recomendaciones_ia")
 }
 
 // One branch-wide event per reservation; read state belongs to each staff user.
 model Notification {
-  id              Int       @id @default(autoincrement()) @map("id_notificacion")
-  branchId        Int       @map("id_sucursal")
-  reservationId   Int       @unique @map("id_reserva")
-  unitCount       Int       @map("cantidad_prendas")
-  approximateTime DateTime  @map("horario_aproximado") @db.Timestamptz(3)
-  createdAt       DateTime  @default(now()) @map("fecha_creacion") @db.Timestamptz(3)
-  branch          Branch    @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  reservation     Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  /// Empresa (tenant) propietaria.
+  tenantId        Int                @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  id              Int                @id @default(autoincrement()) @map("id_notificacion")
+  branchId        Int                @map("id_sucursal")
+  reservationId   Int                @unique @map("id_reserva")
+  unitCount       Int                @map("cantidad_prendas")
+  approximateTime DateTime           @map("horario_aproximado") @db.Timestamptz(3)
+  createdAt       DateTime           @default(now()) @map("fecha_creacion") @db.Timestamptz(3)
+  branch          Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  reservation     Reservation        @relation(fields: [reservationId], references: [id], onDelete: Cascade)
   reads           NotificationRead[]
 
   @@index([branchId, createdAt, id])
   @@index([createdAt, id])
+  @@index([tenantId])
   @@map("notificaciones")
 }
 
 // Dispositivos del personal y clientes que reciben push mediante Firebase Cloud Messaging.
 model PushToken {
+  /// Empresa (tenant) propietaria.
+  tenantId  Int      @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   id        Int      @id @default(autoincrement()) @map("id_token_push")
   userId    Int      @map("id_usuario")
   token     String   @unique
@@ -640,6 +895,7 @@ model PushToken {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([tenantId])
   @@map("tokens_push")
 }
 
