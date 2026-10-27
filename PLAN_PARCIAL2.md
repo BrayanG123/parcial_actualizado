@@ -50,7 +50,7 @@
 | IA | Gemini por API (`AI_PROVIDER=gemini\|ollama\|none`), Ollama local opcional | `backend/src/modules/ai` |
 | Infra | Docker; Azure Container Apps (entorno `fashionstore-env`, eastus2), PostgreSQL Flexible (centralus), ACR `fashionstoreacr` | `docs/despliegue-azure.md` |
 
-> ⚠️ **Supuesto aprobado por el equipo:** el enunciado menciona *Angular* (PWA) y *Flutter + SQLite*
+> ✅ **Decisión confirmada por el equipo (2026-10-27): no se cambian lenguajes ni frameworks.** El enunciado menciona *Angular* (PWA) y *Flutter + SQLite*
 > (móvil). Se mantienen **React (PWA)** y **React Native/Expo con `expo-sqlite`**, que cumplen las
 > mismas capacidades (instalable, offline, SQLite). Justificarlo en la documentación (RNF08).
 
@@ -145,7 +145,7 @@ cd ml-service && pytest -q
 - Valores del enunciado como **seed configurable en BD** (no constantes en código): Básico (hasta 2
   sucursales activas, sin reportes IA) y Profesional (hasta 10, con reportes IA).
 - `PlanGuard` / decorador `@RequiresFeature('aiReports')` + validación de límites
-  (crear/activar sucursal). Suscripción vencida o suspendida → solo lectura (definir y documentar).
+  (crear/activar sucursal). Suscripción vencida o suspendida → **solo lectura** (confirmado, ver sección 8).
 - Contratación/renovación **simulada** administrativamente (sin cobro real).
 
 ### 3.3 Sincronización offline (contrato común web y móvil)
@@ -220,9 +220,17 @@ cierra en F12 con lo realmente implementado.
 ## 5. Lista de tareas
 
 ### F0 — Preparación
-- [ ] **F0.1** Crear rama `parcial2` desde `main` y verificar que todas las pruebas actuales pasan (línea base).
+- [x] ~~**F0.1** Crear rama `parcial2` desde `main` y verificar que todas las pruebas actuales pasan (línea base).~~ — 2026-10-27
+  - Línea base: backend 212 unit + **108 e2e** (con `TEST_DATABASE_URL` sobre PostgreSQL 16 local), web 167, móvil 11; `tsc` OK; oxlint solo advertencias.
 - [x] ~~**F0.2** Copiar el enunciado del parcial 2 a `recursos_contexto/Examen2.md` (lo provee el usuario).~~ — 2026-10-27
-- [ ] **F0.3** Inventario rápido de deuda que afecte al parcial (anotarla aquí como subtareas, no en archivos nuevos).
+- [x] ~~**F0.3** Inventario rápido de deuda que afecte al parcial (anotarla aquí como subtareas, no en archivos nuevos).~~ — 2026-10-27
+  - D1: uniques globales que deben ser por tenant: `usuarios.email`, nombre de categoría/temporada/proveedor/talla/color, `codigo_hex`, sucursal `[ciudad, nombre]` (→ F2.2).
+  - D2: `saleItem.groupBy` / `findMany` en `ai.repository.ts` y `offline-sales.service.ts` agregan sobre **todas** las filas (fuga entre empresas si no se filtra) (→ F2.5).
+  - D3: 13 consultas `$queryRaw` en `reports.repository.ts`: la extensión de Prisma no las cubre; requieren `tenant_id` explícito (→ F2.11).
+  - D4: jobs sin usuario (vencimiento de reservas y checkout, conciliación Stripe) y webhook de Stripe recorren todos los registros: necesitan contexto "sistema" explícito (→ F2.4/F2.11).
+  - D5: el JWT no lleva tenant y las apps instaladas no envían `X-Tenant` → slug por defecto `fashionstore` (→ F2.4/F2.6).
+  - D6: ventas offline web en `localStorage` (ya conocido, → F5.1).
+  - D7: entorno: Node local 22.22.0 por debajo de `engines` de la CLI de Nest (solo advertencia); los e2e se saltan sin `TEST_DATABASE_URL` (documentado en `backend/docs/instalacion-y-seed.md`).
 
 ### F1 — ICONIX: análisis inicial (antes de codificar F2)
 - [ ] **F1.1** Modelo de dominio actualizado (Tenant, Plan, Subscription, SyncOperation, SyncLog, Exchange, ReportRequest, MLModel…).
@@ -349,12 +357,12 @@ cierra en F12 con lo realmente implementado.
 
 ## 8. Decisiones abiertas / riesgos
 
-- ⚠️ Confirmar con la docente que React/Expo es aceptable frente a Angular/Flutter (sección 1.1).
+- ✅ Lenguajes/frameworks: se mantienen React (PWA) y React Native/Expo (decidido por el equipo, 2026-10-27). Justificar en RNF08.
 - ⚠️ Gemini (clave actual, plan gratuito) **no tiene cuota para imágenes**; texto sí. Para reportes
   generativos alcanza; si se agota, usar reglas de respaldo u Ollama local.
 - ⚠️ Suscripción Azure: **1 solo entorno de Container Apps** y sin `az acr build` (compilar
   imágenes con Docker local). El ml-service va como otra app en el mismo entorno.
-- Definir comportamiento exacto de suscripción vencida (solo lectura vs. bloqueo total) en F2.9.
+- ✅ Suscripción vencida o suspendida → **solo lectura** (decidido por el equipo, 2026-10-27): se permiten consultas (GET) y el inicio de sesión; toda escritura de negocio responde 403 `SUBSCRIPTION_READ_ONLY` y la sincronización marca las operaciones como conflicto `SUBSCRIPTION_INVALID`.
 - Apps instaladas actuales (APK/PWA del parcial 1) no conocen el tenant: tras F2 la Empresa A debe
   seguir funcionando para clientes antiguos (slug por defecto) hasta actualizar la APK.
 
