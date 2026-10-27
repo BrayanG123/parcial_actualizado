@@ -121,3 +121,90 @@ El portal de proveedor tambien esta conectado: [cuentas, fichas propias y entreg
 La aplicacion movil y el probador RA requieren su propia revision; no fueron
 inspeccionados en esta etapa. La carga Cloudinary requiere las credenciales de
 la cuenta si aun no se configuraron en el backend.
+
+## Contrato unificado de sincronización (parcial 2)
+
+Desde el parcial 2, la PWA y la app móvil comparten `POST /sync/operations` (módulo
+`src/modules/sync`). El flujo por lote de esta guía (`/sales/offline/*`) se conserva
+por compatibilidad; las pantallas nuevas usan este contrato. Requiere la
+funcionalidad `offline` del plan y roles `ADMINISTRATOR`, `BRANCH_MANAGER`,
+`CASHIER` o `CUSTOMER`.
+
+### Descarga para operar offline
+
+`GET /sync/snapshot?branchId=N` devuelve la empresa, la sucursal (el personal solo
+la suya), las sucursales activas autorizadas, el turno abierto del usuario, hasta
+2000 variantes con precio vigente (`unitPrice`, `discount`, `netUnitPrice`) y
+existencia conocida (`available`), y clientes mínimos (id, nombre) solo para el
+personal. `generatedAt` permite mostrar la antigüedad de los datos y `version`
+cambia cuando cambian productos o existencias de la sucursal.
+
+### Envío de operaciones
+
+```json
+{
+  "deviceId": "uuid del navegador o teléfono",
+  "operations": [
+    {
+      "operationId": "uuid generado en el dispositivo",
+      "type": "SALE_CASH | RESERVATION | EXCHANGE",
+      "branchId": 2,
+      "createdAtLocal": "2026-10-28T10:15:00-04:00",
+      "payload": { "...": "según el tipo" },
+      "payloadHash": "opcional: sha256 hex del payload con claves ordenadas"
+    }
+  ]
+}
+```
+
+- `SALE_CASH`: `{ shiftId, clientId?, items: [{ productId, sizeId, colorId, quantity, unitPrice }], total, paymentMethod: "CASH", cashReceived? }`.
+  `unitPrice` es el precio neto usado en el dispositivo. Se confirma con el mismo
+  repositorio del POS (venta, detalle, pago, turno, inventario y kardex en una
+  transacción serializable).
+- `RESERVATION` (clientes): `{ approximateTime, observation?, items: [{ productId, sizeId, colorId, quantity }] }`.
+  Se confirma con `ReservationsService.create`.
+- `EXCHANGE`: se implementa en F7 (hoy responde `REJECTED UNSUPPORTED_TYPE`).
+- Máximo 50 operaciones por lote; se procesan en orden y cada una es independiente.
+
+La respuesta trae un resultado por operación:
+`{ operationId, status, code, message, detail, resourceType, resourceId, attempts, processedAt }`.
+
+| Estado | Significado | Qué hace el cliente |
+|---|---|---|
+| `CONFIRMED` | Registrada (`resourceType`/`resourceId` = venta o reserva) | Marcarla confirmada; nunca reenviar otra |
+| `CONFLICT` | Los datos locales ya no coinciden con el servidor | Mostrar detalle; reintentar o descartar |
+| `REJECTED` | Operación inválida; reenviarla igual no cambia el resultado | Mostrar el motivo |
+| `ERROR` | Falla transitoria del servidor (queda pendiente) | Pasar a `RETRY` con espera creciente |
+
+Los estados `LOCAL`, `SENDING` y `RETRY` existen solo en los clientes. Nunca se borra
+una operación local por haber intentado enviarla.
+
+Códigos: `STOCK_INSUFFICIENT`, `PRICE_CHANGED`, `PRODUCT_INACTIVE`,
+`BRANCH_NOT_AUTHORIZED`, `BRANCH_INACTIVE`, `SHIFT_CLOSED`, `SUBSCRIPTION_INVALID`,
+`RESERVATION_TIME_PASSED`, `CONCURRENT_UPDATE` (conflictos) y `INVALID_DATA`,
+`TOTAL_MISMATCH`, `SHIFT_NOT_FOUND`, `CLIENT_NOT_FOUND`, `ROLE_NOT_ALLOWED`,
+`TENANT_MISMATCH`, `USER_MISMATCH`, `OPERATION_ID_REUSED`, `PAYLOAD_HASH_MISMATCH`,
+`UNSUPPORTED_TYPE` (rechazos). `detail` indica, por variante, lo solicitado y lo
+disponible o el precio local y el vigente.
+
+### Idempotencia y recuperación
+
+- `operationId` es único por empresa (`operaciones_sync`). Reenviar una operación
+  confirmada o rechazada devuelve el resultado guardado sin repetir nada; además la
+  venta usa `operationId` como clave de idempotencia y la reserva lo guarda en
+  `clave_operacion` (único por empresa).
+- Un conflicto se vuelve a evaluar al reenviarlo (p. ej. después de corregir stock o
+  renovar la suscripción). El mismo `operationId` con otros datos se rechaza
+  (`OPERATION_ID_REUSED`) sin modificar la operación original.
+- Con la suscripción vencida o suspendida no hay 403: cada operación vuelve como
+  `CONFLICT SUBSCRIPTION_INVALID` y queda para reintentar.
+- `GET /sync/operations/:deviceId?ids=a,b` consulta el estado de las operaciones
+  propias de un dispositivo.
+
+### Observabilidad
+
+Cada intento queda en `sync_log` (operación, intento, estado, código de error y
+latencia), sin payload ni datos personales. `GET /sync/logs?status=&errorCode=`
+(administrador; el encargado solo ve su sucursal) devuelve la bitácora paginada y un
+resumen por estado y código. Pruebas: `test/sync.e2e-spec.ts` y
+`src/modules/sync/sync-outcome.spec.ts`.

@@ -253,20 +253,20 @@ cierra en F12 con lo realmente implementado.
 - [x] ~~**F2.12** Pruebas de aislamiento: usuario de A no puede leer/modificar/borrar recursos de B (por id, listados, reportes, sync), límites de plan, feature gating.~~ — 2026-10-27, commit `e186f93` (`test/tenancy.e2e-spec.ts`, 10 casos; el caso *sync* queda en F4.8)
 
 ### F3 — Web: SaaS
-- [x] ~~**F3.1** Rutas de tienda pública por empresa `/t/:slug/...`; selector/landing de empresas; envío de `X-Tenant`.~~ — 2026-10-27 (`/t/:slug/...` fija la tienda activa y continúa en la ruta normal de la tienda —no se duplicaron las rutas—; `/empresas`; `X-Tenant` solo sin sesión)
-- [x] ~~**F3.2** Login de personal y clientes por empresa; panel de **plataforma** (empresas, planes, suscripciones).~~ — 2026-10-27 (login muestra/cambia la tienda; `/plataforma` con sesión propia)
-- [x] ~~**F3.3** Panel de empresa: plan actual, límites/uso, vencimiento; ocultar/deshabilitar funciones no incluidas (además del bloqueo en backend).~~ — 2026-10-27 (`/admin/plan`, menú según `features`, empresa y plan en el panel)
-- [x] ~~**F3.4** Mensajes claros cuando una acción es bloqueada por plan o suscripción.~~ — 2026-10-27 (`MENSAJES_CODIGO` + `AvisoSuscripcion`; verificado con Playwright contra la API real)
+- [x] ~~**F3.1** Rutas de tienda pública por empresa `/t/:slug/...`; selector/landing de empresas; envío de `X-Tenant`.~~ — 2026-10-27, commit `0d8ee17` (`/t/:slug/...` fija la tienda activa y continúa en la ruta normal de la tienda —no se duplicaron las rutas—; `/empresas`; `X-Tenant` solo sin sesión)
+- [x] ~~**F3.2** Login de personal y clientes por empresa; panel de **plataforma** (empresas, planes, suscripciones).~~ — 2026-10-27, commit `0d8ee17` (login muestra/cambia la tienda; `/plataforma` con sesión propia)
+- [x] ~~**F3.3** Panel de empresa: plan actual, límites/uso, vencimiento; ocultar/deshabilitar funciones no incluidas (además del bloqueo en backend).~~ — 2026-10-27, commit `0d8ee17` (`/admin/plan`, menú según `features`, empresa y plan en el panel)
+- [x] ~~**F3.4** Mensajes claros cuando una acción es bloqueada por plan o suscripción.~~ — 2026-10-27, commit `0d8ee17` (`MENSAJES_CODIGO` + `AvisoSuscripcion`; verificado con Playwright contra la API real)
 
 ### F4 — Backend: sincronización unificada
-- [ ] **F4.1** Modelos `SyncOperation` (operationId único por tenant, tipo, estado, hash, resultado) y `SyncLog`.
-- [ ] **F4.2** `POST /sync/operations` (lote) y `GET` de estado; idempotencia por `operationId`.
-- [ ] **F4.3** Confirmación de `SALE_CASH` reutilizando ventas/turnos; integridad transaccional con inventario y kardex.
-- [ ] **F4.4** Confirmación de `RESERVATION` offline reutilizando reservas.
-- [ ] **F4.5** Detección y códigos de conflicto (stock, precio, inactivo, sucursal, turno, suscripción) con detalle útil para la UI.
-- [ ] **F4.6** Endpoint de **descarga de datos para offline** por sucursal (catálogo + variantes + precios + stock + clientes mínimos) con versión/marca de tiempo; compatible con el lote offline actual.
-- [ ] **F4.7** Observabilidad: registro en `SyncLog` sin datos sensibles; consulta para el administrador.
-- [ ] **F4.8** Pruebas: idempotencia (reenvío no duplica), conflictos, rechazo cross-tenant, recuperación tras error.
+- [x] ~~**F4.1** Modelos `SyncOperation` (operationId único por tenant, tipo, estado, hash, resultado) y `SyncLog`.~~ — 2026-10-28 (`operaciones_sync`, `sync_log`; migración `20261028000000_sync_operations`)
+- [x] ~~**F4.2** `POST /sync/operations` (lote) y `GET` de estado; idempotencia por `operationId`.~~ — 2026-10-28 (`POST /sync/operations`, `GET /sync/operations/:deviceId`; resultados guardados; `ERROR` transitorio queda pendiente)
+- [x] ~~**F4.3** Confirmación de `SALE_CASH` reutilizando ventas/turnos; integridad transaccional con inventario y kardex.~~ — 2026-10-28 (`SyncSalesService` sobre `SalesRepository`: venta+pago+turno+stock+kardex en transacción serializable)
+- [x] ~~**F4.4** Confirmación de `RESERVATION` offline reutilizando reservas.~~ — 2026-10-28 (`ReservationsService.create` con `operationKey` único por empresa)
+- [x] ~~**F4.5** Detección y códigos de conflicto (stock, precio, inactivo, sucursal, turno, suscripción) con detalle útil para la UI.~~ — 2026-10-28 (códigos y `detail` documentados en `backend/docs/ventas-offline.md`)
+- [x] ~~**F4.6** Endpoint de **descarga de datos para offline** por sucursal (catálogo + variantes + precios + stock + clientes mínimos) con versión/marca de tiempo; compatible con el lote offline actual.~~ — 2026-10-28 (`GET /sync/snapshot`; el flujo de lote `/sales/offline/*` se conserva)
+- [x] ~~**F4.7** Observabilidad: registro en `SyncLog` sin datos sensibles; consulta para el administrador.~~ — 2026-10-28 (`GET /sync/logs` con resumen por estado/código; sin payload)
+- [x] ~~**F4.8** Pruebas: idempotencia (reenvío no duplica), conflictos, rechazo cross-tenant, recuperación tras error.~~ — 2026-10-28 (`test/sync.e2e-spec.ts`, 9 casos + `sync-outcome.spec.ts`)
 
 ### F5 — Web PWA offline
 - [ ] **F5.1** Migrar persistencia offline de `localStorage` a **IndexedDB** (capas: repositorio local / cola / sincronizador / UI), migrando tickets existentes.

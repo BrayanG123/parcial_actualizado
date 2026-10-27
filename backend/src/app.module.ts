@@ -23,6 +23,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { AiModule } from './modules/ai/ai.module.js';
 import { VirtualFittingModule } from './modules/virtual-fitting/virtual-fitting.module.js';
 import { PushModule } from './modules/push/push.module.js';
+import { SyncModule } from './modules/sync/sync.module.js';
 import { PlatformModule } from './modules/platform/platform.module.js';
 import { TenancyModule } from './modules/tenancy/tenancy.module.js';
 import { TenantMiddleware } from './modules/tenancy/tenant.middleware.js';
@@ -55,6 +56,7 @@ import { TenantMiddleware } from './modules/tenancy/tenant.middleware.js';
     VirtualFittingModule,
     PushModule,
     PlatformModule,
+    SyncModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -156,6 +156,8 @@ model Tenant {
   aiRecommendations  AiRecommendation[]
   notifications      Notification[]
   pushTokens         PushToken[]
+  syncOperations     SyncOperation[]
+  syncLogs           SyncLog[]
 
   @@map("empresas")
 }
@@ -570,6 +572,8 @@ model Reservation {
   approximateTime DateTime          @map("horario_aproximado") @db.Timestamptz(3)
   expiresAt       DateTime          @map("fecha_vencimiento") @db.Timestamptz(3)
   status          ReservationStatus @default(PENDING) @map("estado")
+  /// operationId de la reserva registrada offline (idempotencia de /sync/operations).
+  operationKey    String?           @map("clave_operacion") @db.Uuid
   observation     String?           @map("observacion") @db.VarChar(500)
   updatedAt       DateTime          @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
   client          Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
@@ -578,6 +582,7 @@ model Reservation {
   sale            Sale?
   notification    Notification?
 
+  @@unique([tenantId, operationKey])
   @@index([clientId, status])
   @@index([branchId, approximateTime, status])
   @@index([status, expiresAt])
@@ -909,4 +914,67 @@ model NotificationRead {
   @@id([notificationId, userId])
   @@index([userId, notificationId])
   @@map("lecturas_notificacion")
+}
+
+enum SyncOperationType {
+  SALE_CASH
+  RESERVATION
+  EXCHANGE
+}
+
+/// Estado en el servidor. LOCAL, SENDING y RETRY existen solo en los clientes.
+enum SyncOperationStatus {
+  PROCESSING
+  CONFIRMED
+  REJECTED
+  CONFLICT
+}
+
+/// Operacion registrada offline (web o movil) y su resultado; operationId es la clave
+/// de idempotencia por empresa (RNF05).
+model SyncOperation {
+  id             Int                 @id @default(autoincrement()) @map("id_operacion_sync")
+  tenantId       Int                 @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  operationId    String              @map("id_operacion") @db.Uuid
+  deviceId       String              @map("id_dispositivo") @db.Uuid
+  userId         Int                 @map("id_usuario")
+  branchId       Int?                @map("id_sucursal")
+  type           SyncOperationType   @map("tipo")
+  status         SyncOperationStatus @map("estado")
+  payload        Json                @map("datos")
+  payloadHash    String              @map("hash_datos") @db.VarChar(64)
+  createdAtLocal DateTime            @map("fecha_local") @db.Timestamptz(3)
+  receivedAt     DateTime            @default(now()) @map("fecha_recepcion") @db.Timestamptz(3)
+  processedAt    DateTime?           @map("fecha_proceso") @db.Timestamptz(3)
+  attempts       Int                 @default(0) @map("intentos")
+  resultCode     String?             @map("codigo_resultado") @db.VarChar(60)
+  resultMessage  String?             @map("mensaje_resultado") @db.VarChar(500)
+  resultDetail   Json?               @map("detalle_resultado")
+  resourceType   String?             @map("tipo_recurso") @db.VarChar(30)
+  resourceId     Int?                @map("id_recurso")
+  logs           SyncLog[]
+
+  @@unique([tenantId, operationId])
+  @@index([tenantId, userId, deviceId])
+  @@index([tenantId, status, receivedAt])
+  @@map("operaciones_sync")
+}
+
+/// Bitacora de cada intento de sincronizacion (RNF10): sin datos personales ni payload.
+model SyncLog {
+  id              Int                 @id @default(autoincrement()) @map("id_log_sync")
+  tenantId        Int                 @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  syncOperationId Int                 @map("id_operacion_sync")
+  syncOperation   SyncOperation       @relation(fields: [syncOperationId], references: [id], onDelete: Cascade)
+  attempt         Int                 @map("intento")
+  status          SyncOperationStatus @map("estado")
+  errorCode       String?             @map("codigo_error") @db.VarChar(60)
+  latencyMs       Int                 @map("latencia_ms")
+  createdAt       DateTime            @default(now()) @map("fecha") @db.Timestamptz(3)
+
+  @@index([tenantId, createdAt])
+  @@index([syncOperationId])
+  @@map("sync_log")
 }

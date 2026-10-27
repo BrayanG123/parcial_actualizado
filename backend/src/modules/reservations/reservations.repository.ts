@@ -122,6 +122,7 @@ export class ReservationsRepository {
       approximateTime: Date;
       expiresAt: Date;
       observation?: string;
+      operationKey?: string;
       items: ReservationItemDto[];
     },
     tx: Prisma.TransactionClient,
@@ -132,6 +133,13 @@ export class ReservationsRepository {
     });
     await createReservationNotification(tx, reservation);
     return reservation;
+  }
+
+  findByOperationKey(operationKey: string) {
+    return this.prisma.reservation.findFirst({
+      where: { operationKey },
+      include: reservationInclude,
+    });
   }
 
   async requireAvailableStock(
