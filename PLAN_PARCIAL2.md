@@ -279,17 +279,17 @@ cierra en F12 con lo realmente implementado.
 - [x] ~~**F5.8** Pruebas (cola, reintentos, no-borrado, estados, idempotencia del lado cliente).~~ — 2026-10-28, commit `751134b` (`test/offline-sync.test.ts` 9 casos + `offline-ui.test.tsx` reescrita; detectaron doble registro por doble clic y orden inestable, corregidos)
 
 ### F6 — Móvil SQLite + modo vendedor
-- [x] ~~**F6.1** Integrar `expo-sqlite` (según docs SDK 57) con esquema y migraciones versionadas (sección 3.5).~~ — 2026-10-28 (`expo-sqlite@~57.0.4`, etiqueta `sdk-57` del registro npm; esquema normalizado + migraciones `user_version` en `src/offline/nucleo.ts`)
+- [x] ~~**F6.1** Integrar `expo-sqlite` (según docs SDK 57) con esquema y migraciones versionadas (sección 3.5).~~ — 2026-10-28, commit `24394ab` (`expo-sqlite@~57.0.4`, etiqueta `sdk-57` del registro npm; esquema normalizado + migraciones `user_version` en `src/offline/nucleo.ts`)
   - ⚠️ `docs.expo.dev` no es accesible desde la nube (DNS bloqueado) y `expo install` falla por proxy: la API se verificó con los tipos `.d.ts` y el CHANGELOG del paquete instalado. Revisar contra la doc versionada en local.
-- [x] ~~**F6.2** Descarga y almacenamiento del subconjunto del catálogo y sucursales autorizadas.~~ — 2026-10-28 (`GET /sync/snapshot` → tablas sucursales/productos/variantes/clientes/descargas)
-- [x] ~~**F6.3** Consulta offline de productos, precios y existencias conocidas (con antigüedad de datos).~~ — 2026-10-28 (catálogo local con stock conocido y antigüedad)
-- [x] ~~**F6.4** Selección de tienda (tenant) para clientes y envío de `X-Tenant`.~~ — 2026-10-28 (`PantallaTiendas`, `X-Tenant` sin sesión; verificado en la vista web exportada)
-- [x] ~~**F6.5** Reserva offline (cliente).~~ — 2026-10-28 (`PantallaTiendaOffline`)
-- [x] ~~**F6.6** **Modo vendedor**: POS de contado offline para personal (turno abierto con conexión, cobro, ticket).~~ — 2026-10-28 (`TabsVendedor`: Vender, Pendientes, Cuenta)
-- [x] ~~**F6.7** Cola de sincronización (reintentos con backoff, no-borrado, estados) y pantalla de pendientes/resultados.~~ — 2026-10-28 (`PantallaPendientes`; backoff 5 s–5 min; resultados en `sync_resultados`)
+- [x] ~~**F6.2** Descarga y almacenamiento del subconjunto del catálogo y sucursales autorizadas.~~ — 2026-10-28, commit `24394ab` (`GET /sync/snapshot` → tablas sucursales/productos/variantes/clientes/descargas)
+- [x] ~~**F6.3** Consulta offline de productos, precios y existencias conocidas (con antigüedad de datos).~~ — 2026-10-28, commit `24394ab` (catálogo local con stock conocido y antigüedad)
+- [x] ~~**F6.4** Selección de tienda (tenant) para clientes y envío de `X-Tenant`.~~ — 2026-10-28, commit `24394ab` (`PantallaTiendas`, `X-Tenant` sin sesión; verificado en la vista web exportada)
+- [x] ~~**F6.5** Reserva offline (cliente).~~ — 2026-10-28, commit `24394ab` (`PantallaTiendaOffline`)
+- [x] ~~**F6.6** **Modo vendedor**: POS de contado offline para personal (turno abierto con conexión, cobro, ticket).~~ — 2026-10-28, commit `24394ab` (`TabsVendedor`: Vender, Pendientes, Cuenta)
+- [x] ~~**F6.7** Cola de sincronización (reintentos con backoff, no-borrado, estados) y pantalla de pendientes/resultados.~~ — 2026-10-28, commit `24394ab` (`PantallaPendientes`; backoff 5 s–5 min; resultados en `sync_resultados`)
 - [ ] **F6.8** Persistencia tras cerrar/reiniciar la app (verificación manual + prueba).
   - ⏳ Falta: verificación manual en el teléfono con la APK nueva (F11.4). Cubierto por prueba (reapertura del archivo SQLite) y la sesión ya no se descarta al abrir sin red.
-- [x] ~~**F6.9** Pruebas (`node:test`, como `test/push.test.mjs`) de la cola y el mapeo SQLite.~~ — 2026-10-28 (`test/offline-movil.test.mjs`, 7 casos sobre `node:sqlite`)
+- [x] ~~**F6.9** Pruebas (`node:test`, como `test/push.test.mjs`) de la cola y el mapeo SQLite.~~ — 2026-10-28, commit `24394ab` (`test/offline-movil.test.mjs`, 7 casos sobre `node:sqlite`)
 
 ### F7 — Ventas offline y cambios de prendas
 - [ ] **F7.1** Registro completo de venta offline (todos los campos del enunciado 7.2) en web y móvil.
@@ -375,4 +375,4 @@ cierra en F12 con lo realmente implementado.
 | Fecha | Quién / dónde | Hecho | Pendiente / próximo paso |
 |---|---|---|---|
 | 2026-10-27 | Claude Code (local) | Plan creado a partir del enunciado y del estado real del repo. | Empezar F0 en Claude web. |
-| 2026-10-27/28 | Claude Code (web) | F0, F1 (ICONIX §1–4), F2 (multitenancy backend), F3 (web SaaS), F4 (sync unificado) y F5 (PWA offline con IndexedDB, verificada con Playwright) completas. Backend unit 225, e2e 128; web 185; móvil 11. Decisiones confirmadas: se mantienen React/Expo; suscripción vencida = solo lectura. | Push a GitHub bloqueado (403, falta acceso de la app de Claude) → commits solo locales en `parcial2`, PRs sin abrir. Bóveda wiki (`D:/…`) no disponible: actualizar notas de multitenancy, sync y PWA offline. Siguiente: F6 (móvil con `expo-sqlite` y modo vendedor; requiere APK nueva). |
+| 2026-10-27/28 | Claude Code (web) | F0, F1 (ICONIX §1–4), F2 (multitenancy backend), F3 (web SaaS), F4 (sync unificado), F5 (PWA offline con IndexedDB, verificada con Playwright) y F6 (móvil con expo-sqlite y modo vendedor; F6.8 pendiente de prueba en teléfono) completas. Backend unit 225, e2e 128; web 185; móvil 18. Decisiones confirmadas: se mantienen React/Expo; suscripción vencida = solo lectura. | Push a GitHub bloqueado (403, falta acceso de la app de Claude) → commits solo locales en `parcial2`, PRs sin abrir. Bóveda wiki (`D:/…`) no disponible: actualizar notas de multitenancy, sync y PWA offline. `docs.expo.dev` inaccesible: API de expo-sqlite verificada con los tipos del paquete. Siguiente: F7 (cambios de prendas, operación `EXCHANGE`); generar APK nueva en F11.4. |
