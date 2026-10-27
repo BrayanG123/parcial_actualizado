@@ -7,11 +7,13 @@ import { RolNombre } from '../types/domain';
 import { rutaInicialPorRol } from '../routes/permisos';
 import { AsistenteIA } from '../features/ia/AsistenteIA';
 import { useEmpresaActiva } from '../hooks/useEmpresaActiva';
+import { IndicadorConexion } from '../features/offline/IndicadorConexion';
 
 const ENLACES = [
   { a: '/catalogo', texto: 'Catalogo' },
   { a: '/catalogo?solo_promocion=true', texto: 'Promociones' },
   { a: '/reservas/nueva', texto: 'Reservar en tienda' },
+  { a: '/offline', texto: 'Tienda offline' },
 ];
 
 export function LayoutTienda() {
@@ -84,6 +86,7 @@ export function LayoutTienda() {
           </nav>
 
           <div className="fs-header__acciones">
+            {autenticado && <IndicadorConexion rutaPendientes="/pendientes" />}
             <button
               type="button"
               className="fs-btn fs-btn--fantasma"

@@ -372,7 +372,40 @@ describe.skipIf(!databaseUrl)('Offline sync (HTTP + PostgreSQL)', () => {
     });
   });
 
+  it('confirms tickets of a parcial 1 offline batch through /sync and lets the batch finish', async () => {
+    const batchDevice = randomUUID();
+    const batch = (
+      await http()
+        .post('/api/v1/sales/offline/prepare')
+        .set(auth(cashier))
+        .send({ id: randomUUID(), deviceId: batchDevice, shiftId })
+        .expect(201)
+    ).body.data;
+    const net = batch.snapshot.variants[0].netUnitPrice as number;
+    const ticket = sale(1, net);
+    (ticket.payload as Record<string, unknown>).offlineBatchId = batch.id;
+    const first = (await send([ticket])).body.data.results[0];
+    expect(first).toMatchObject({ status: 'CONFIRMED', resourceType: 'SALE' });
+    expect((await send([ticket])).body.data.results[0].resourceId).toBe(
+      first.resourceId,
+    );
+    const created = await ctx.prisma.sale.findUniqueOrThrow({
+      where: { id: first.resourceId },
+    });
+    expect(created.offlineBatchId).toBe(batch.id);
+    await http()
+      .post(`/api/v1/sales/offline/${batch.id}/finish`)
+      .set(auth(cashier))
+      .send({ deviceId: batchDevice, keys: [ticket.operationId] })
+      .expect(201);
+  });
+
   it('keeps an operation pending after a server error and confirms it on retry', async () => {
+    const current = await stock();
+    await ctx.prisma.inventory.update({
+      where: { id: current.id },
+      data: { physicalQuantity: current.reservedQuantity + 10 },
+    });
     const service = ctx.app.get(SyncSalesService);
     const spy = vi
       .spyOn(service, 'confirm')
@@ -389,7 +422,8 @@ describe.skipIf(!databaseUrl)('Offline sync (HTTP + PostgreSQL)', () => {
     });
     expect(stored.status).toBe('PROCESSING');
     spy.mockRestore();
-    expect((await send([operation])).body.data.results[0]).toMatchObject({
+    const retry = (await send([operation])).body.data.results[0];
+    expect(retry).toMatchObject({
       status: 'CONFIRMED',
       attempts: 2,
     });

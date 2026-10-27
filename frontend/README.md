@@ -287,6 +287,14 @@ Reglas de negocio implementadas en `src/lib/domain.ts`:
 | Tiendas (SaaS) | `/empresas`, `/t/:slug/...`                                                 | publico            |
 | Plan empresa   | `/admin/plan`                                                               | ADMINISTRADOR      |
 | Plataforma     | `/plataforma/login`, `/plataforma`                                          | PLATFORM_ADMIN (sesion propia) |
+| Offline        | `/offline`, `/pendientes`, `/caja/offline`, `/caja/pendientes`              | cliente / personal |
+
+### PWA offline (parcial 2)
+
+Datos offline en **IndexedDB** (`src/offline/`), operaciones con UUID y estados
+`LOCAL/SENDING/CONFIRMED/REJECTED/CONFLICT/RETRY` (+ `DESCARTADA`, nunca se borran) y
+contrato `/sync/operations`. Detalle y recorrido de demostracion en
+[ventas offline y PWA](../backend/docs/ventas-offline.md#pwa-offline-parcial-2).
 
 ### SaaS multitenant (parcial 2)
 

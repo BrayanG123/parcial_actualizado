@@ -3,6 +3,7 @@ import type { AuthenticatedUser } from '../../common/decorators/current-user.dec
 import { Role } from '../../common/enums/role.enum.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { SalesRepository } from '../sales/sales.repository.js';
+import { OfflineSalesService } from '../sales/offline-sales.service.js';
 import {
   fingerprint,
   priceLine,
@@ -29,7 +30,10 @@ export interface SaleCashContext {
  */
 @Injectable()
 export class SyncSalesService {
-  constructor(private readonly repository: SalesRepository) {}
+  constructor(
+    private readonly repository: SalesRepository,
+    private readonly legacy: OfflineSalesService,
+  ) {}
 
   confirm(context: SaleCashContext, user: AuthenticatedUser): Promise<number> {
     if (!user.roles.some((role) => STAFF.includes(role)))
@@ -44,6 +48,7 @@ export class SyncSalesService {
     } catch (error) {
       throw rejected('INVALID_DATA', (error as Error).message);
     }
+    if (payload.offlineBatchId) return this.confirmLegacy(context, user, items);
     const hash = fingerprint({ type: 'SALE_CASH', branchId, payload });
     return this.repository.transaction(async (tx) => {
       const replay = await this.repository.findRequest(
@@ -242,5 +247,46 @@ export class SyncSalesService {
       }
       return sale.id;
     });
+  }
+
+  /** Ticket de un lote del parcial 1: mismas reglas e idempotencia que /sales/offline. */
+  private async confirmLegacy(
+    { payload, branchId, operationId, recordedAt }: SaleCashContext,
+    user: AuthenticatedUser,
+    items: SaleCashPayloadDto['items'],
+  ): Promise<number> {
+    const batch = await this.repository.transaction((tx) =>
+      tx.offlineBatch.findUnique({
+        where: { id: payload.offlineBatchId },
+        include: { shift: { include: { register: true } } },
+      }),
+    );
+    if (!batch || batch.shiftId !== payload.shiftId)
+      throw rejected(
+        'BATCH_NOT_FOUND',
+        'Lote offline no encontrado para el turno',
+      );
+    if (batch.shift.register.branchId !== branchId)
+      throw conflict(
+        'BRANCH_NOT_AUTHORIZED',
+        'El lote pertenece a otra sucursal',
+      );
+    const sale = await this.legacy.sync(
+      batch.id,
+      {
+        deviceId: batch.deviceId,
+        idempotencyKey: operationId,
+        recordedAt: recordedAt.toISOString(),
+        expectedTotal: payload.total,
+        items: items.map(({ productId, sizeId, colorId, quantity }) => ({
+          productId,
+          sizeId,
+          colorId,
+          quantity,
+        })),
+      },
+      user,
+    );
+    return sale.id;
   }
 }

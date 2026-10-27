@@ -1,5 +1,10 @@
 # Ventas offline y PWA para la presentacion
 
+> **Parcial 2:** la PWA usa IndexedDB y el contrato `/sync/operations` (ver
+> "Contrato unificado de sincronización" y "PWA offline (parcial 2)" al final).
+> Las secciones siguientes describen el flujo por lote del parcial 1, que se conserva
+> por compatibilidad: sus tickets pendientes se migran automáticamente.
+
 ## Preparacion
 
 La migracion `20260917000000_offline_sales` agrega los lotes de descarga y su
@@ -208,3 +213,40 @@ latencia), sin payload ni datos personales. `GET /sync/logs?status=&errorCode=`
 (administrador; el encargado solo ve su sucursal) devuelve la bitácora paginada y un
 resumen por estado y código. Pruebas: `test/sync.e2e-spec.ts` y
 `src/modules/sync/sync-outcome.spec.ts`.
+
+## PWA offline (parcial 2)
+
+Capas en `frontend/src/offline/` (RNF07): `db.ts` (IndexedDB con esquema versionado),
+`repositorio.ts` (snapshot por sucursal, operaciones y stock local, aislados por
+API + empresa + usuario), `cola.ts` (valida contra lo descargado, genera el
+`operationId` y guarda **antes** de confirmar al usuario), `sincronizador.ts`
+(envío por lotes, estados, reintentos con espera creciente de 5 s a 5 min, bloqueo
+entre pestañas) y `migracion.ts`. La UI está en `features/offline/` y
+`features/pos/PaginaOffline.tsx`.
+
+| Pantalla | Quién | Qué hace |
+|---|---|---|
+| `/caja/offline` | cajero, encargado, admin | Descarga la sucursal con el turno abierto, vende en efectivo sin red |
+| `/offline` | cliente | Descarga el catálogo de una sucursal, lo consulta sin red y reserva |
+| `/pendientes`, `/caja/pendientes` | todos | Estados, detalle de conflictos, reintentar, descartar (no borra) |
+
+El indicador de la cabecera muestra *Sin conexión* y la cantidad de pendientes o
+conflictos; la sincronización es automática al recuperar la conexión y cada 30 s
+mientras haya pendientes, y manual desde *Pendientes*. Los datos muestran su
+antigüedad y se marcan como posiblemente desactualizados después de 12 horas. Con
+una sesión verificada al descargar, la app abre sin red hasta 3 días en las
+pantallas offline.
+
+**Migración (F5.1):** al abrir la app, los tickets del lote del parcial 1 guardados
+en `localStorage` pasan a IndexedDB con su mismo identificador; la copia antigua
+queda como respaldo (`…:migrado`). Se envían con `offlineBatchId`, así el servidor
+respeta los precios de esa descarga; cuando todos quedan confirmados, el lote se
+finaliza solo y se libera la caja normal.
+
+**Recorrido de demostración:** compilar (`npm run build` y
+`npm run preview -- --port 5173 --strictPort`), abrir turno, `/caja/offline` →
+*Descargar datos de mi sucursal* → desconectar → recargar → vender → cerrar el
+navegador → abrirlo sin red en `/caja/pendientes` (la venta sigue *Guardada
+localmente*) → conectar → pasa a *Confirmada* con su número de venta. Verificado con
+Playwright sobre la build de producción (perfil persistente). Pruebas automáticas:
+`frontend/test/offline-sync.test.ts` y `frontend/test/offline-ui.test.tsx`.

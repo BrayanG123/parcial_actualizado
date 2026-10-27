@@ -50,6 +50,16 @@ const RULES: Array<[RegExp, 'CONFLICT' | 'REJECTED', string]> = [
     'ROLE_NOT_ALLOWED',
   ],
   [/^Duplicate variants/, 'REJECTED', 'INVALID_DATA'],
+  // Mensajes del flujo de lote del parcial 1 (/sales/offline).
+  [/excede las existencias descargadas/, 'CONFLICT', 'STOCK_INSUFFICIENT'],
+  [
+    /total no coincide con los precios descargados/,
+    'REJECTED',
+    'TOTAL_MISMATCH',
+  ],
+  [/lote o turno ya esta cerrado/, 'CONFLICT', 'SHIFT_CLOSED'],
+  [/ya se registro con otros datos/, 'REJECTED', 'OPERATION_ID_REUSED'],
+  [/no corresponde a la preparacion offline/, 'REJECTED', 'INVALID_DATE'],
 ];
 
 export interface ClassifiedOutcome {

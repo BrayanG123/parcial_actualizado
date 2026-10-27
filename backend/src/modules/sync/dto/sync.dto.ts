@@ -80,6 +80,12 @@ export class SaleCashPayloadDto {
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) clientId?: number;
 
+  /**
+   * Compatibilidad con el lote offline del parcial 1 (`/sales/offline/prepare`): la
+   * venta se confirma con los precios descargados en ese lote.
+   */
+  @IsOptional() @IsUUID('4') offlineBatchId?: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(50)

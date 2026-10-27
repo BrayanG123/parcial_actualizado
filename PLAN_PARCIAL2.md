@@ -259,24 +259,24 @@ cierra en F12 con lo realmente implementado.
 - [x] ~~**F3.4** Mensajes claros cuando una acción es bloqueada por plan o suscripción.~~ — 2026-10-27, commit `0d8ee17` (`MENSAJES_CODIGO` + `AvisoSuscripcion`; verificado con Playwright contra la API real)
 
 ### F4 — Backend: sincronización unificada
-- [x] ~~**F4.1** Modelos `SyncOperation` (operationId único por tenant, tipo, estado, hash, resultado) y `SyncLog`.~~ — 2026-10-28 (`operaciones_sync`, `sync_log`; migración `20261028000000_sync_operations`)
-- [x] ~~**F4.2** `POST /sync/operations` (lote) y `GET` de estado; idempotencia por `operationId`.~~ — 2026-10-28 (`POST /sync/operations`, `GET /sync/operations/:deviceId`; resultados guardados; `ERROR` transitorio queda pendiente)
-- [x] ~~**F4.3** Confirmación de `SALE_CASH` reutilizando ventas/turnos; integridad transaccional con inventario y kardex.~~ — 2026-10-28 (`SyncSalesService` sobre `SalesRepository`: venta+pago+turno+stock+kardex en transacción serializable)
-- [x] ~~**F4.4** Confirmación de `RESERVATION` offline reutilizando reservas.~~ — 2026-10-28 (`ReservationsService.create` con `operationKey` único por empresa)
-- [x] ~~**F4.5** Detección y códigos de conflicto (stock, precio, inactivo, sucursal, turno, suscripción) con detalle útil para la UI.~~ — 2026-10-28 (códigos y `detail` documentados en `backend/docs/ventas-offline.md`)
-- [x] ~~**F4.6** Endpoint de **descarga de datos para offline** por sucursal (catálogo + variantes + precios + stock + clientes mínimos) con versión/marca de tiempo; compatible con el lote offline actual.~~ — 2026-10-28 (`GET /sync/snapshot`; el flujo de lote `/sales/offline/*` se conserva)
-- [x] ~~**F4.7** Observabilidad: registro en `SyncLog` sin datos sensibles; consulta para el administrador.~~ — 2026-10-28 (`GET /sync/logs` con resumen por estado/código; sin payload)
-- [x] ~~**F4.8** Pruebas: idempotencia (reenvío no duplica), conflictos, rechazo cross-tenant, recuperación tras error.~~ — 2026-10-28 (`test/sync.e2e-spec.ts`, 9 casos + `sync-outcome.spec.ts`)
+- [x] ~~**F4.1** Modelos `SyncOperation` (operationId único por tenant, tipo, estado, hash, resultado) y `SyncLog`.~~ — 2026-10-28, commit `6f2e63c` (`operaciones_sync`, `sync_log`; migración `20261028000000_sync_operations`)
+- [x] ~~**F4.2** `POST /sync/operations` (lote) y `GET` de estado; idempotencia por `operationId`.~~ — 2026-10-28, commit `6f2e63c` (`POST /sync/operations`, `GET /sync/operations/:deviceId`; resultados guardados; `ERROR` transitorio queda pendiente)
+- [x] ~~**F4.3** Confirmación de `SALE_CASH` reutilizando ventas/turnos; integridad transaccional con inventario y kardex.~~ — 2026-10-28, commit `6f2e63c` (`SyncSalesService` sobre `SalesRepository`: venta+pago+turno+stock+kardex en transacción serializable)
+- [x] ~~**F4.4** Confirmación de `RESERVATION` offline reutilizando reservas.~~ — 2026-10-28, commit `6f2e63c` (`ReservationsService.create` con `operationKey` único por empresa)
+- [x] ~~**F4.5** Detección y códigos de conflicto (stock, precio, inactivo, sucursal, turno, suscripción) con detalle útil para la UI.~~ — 2026-10-28, commit `6f2e63c` (códigos y `detail` documentados en `backend/docs/ventas-offline.md`)
+- [x] ~~**F4.6** Endpoint de **descarga de datos para offline** por sucursal (catálogo + variantes + precios + stock + clientes mínimos) con versión/marca de tiempo; compatible con el lote offline actual.~~ — 2026-10-28, commit `6f2e63c` (`GET /sync/snapshot`; el flujo de lote `/sales/offline/*` se conserva)
+- [x] ~~**F4.7** Observabilidad: registro en `SyncLog` sin datos sensibles; consulta para el administrador.~~ — 2026-10-28, commit `6f2e63c` (`GET /sync/logs` con resumen por estado/código; sin payload)
+- [x] ~~**F4.8** Pruebas: idempotencia (reenvío no duplica), conflictos, rechazo cross-tenant, recuperación tras error.~~ — 2026-10-28, commit `6f2e63c` (`test/sync.e2e-spec.ts`, 9 casos + `sync-outcome.spec.ts`)
 
 ### F5 — Web PWA offline
-- [ ] **F5.1** Migrar persistencia offline de `localStorage` a **IndexedDB** (capas: repositorio local / cola / sincronizador / UI), migrando tickets existentes.
-- [ ] **F5.2** Catálogo offline consultable (productos, precios, tallas, colores, stock conocido) con indicador de antigüedad de datos.
-- [ ] **F5.3** Venta de contado offline usando el contrato `/sync/operations`.
-- [ ] **F5.4** Reserva offline.
-- [ ] **F5.5** Pantalla de operaciones pendientes con estados (`LOCAL/SENDING/CONFIRMED/REJECTED/CONFLICT`), detalle de conflictos, reintento y resolución.
-- [ ] **F5.6** Sincronización automática al recuperar conexión + manual; indicador global online/offline.
-- [ ] **F5.7** Verificar instalación PWA, recarga sin red y persistencia tras cerrar el navegador.
-- [ ] **F5.8** Pruebas (cola, reintentos, no-borrado, estados, idempotencia del lado cliente).
+- [x] ~~**F5.1** Migrar persistencia offline de `localStorage` a **IndexedDB** (capas: repositorio local / cola / sincronizador / UI), migrando tickets existentes.~~ — 2026-10-28 (`src/offline/{db,repositorio,cola,sincronizador,migracion}.ts`; tickets antiguos migrados con su id y su lote; backend acepta `offlineBatchId` en `SALE_CASH`)
+- [x] ~~**F5.2** Catálogo offline consultable (productos, precios, tallas, colores, stock conocido) con indicador de antigüedad de datos.~~ — 2026-10-28 (`/offline`: búsqueda, categorías, precios, tallas, colores, stock conocido y aviso de antigüedad >12 h)
+- [x] ~~**F5.3** Venta de contado offline usando el contrato `/sync/operations`.~~ — 2026-10-28 (`/caja/offline` reescrita sobre `/sync/operations`)
+- [x] ~~**F5.4** Reserva offline.~~ — 2026-10-28 (reserva offline del cliente en `/offline`)
+- [x] ~~**F5.5** Pantalla de operaciones pendientes con estados (`LOCAL/SENDING/CONFIRMED/REJECTED/CONFLICT`), detalle de conflictos, reintento y resolución.~~ — 2026-10-28 (`/pendientes` y `/caja/pendientes`: filtros por estado, detalle de conflicto, reintentar y descartar sin borrar)
+- [x] ~~**F5.6** Sincronización automática al recuperar conexión + manual; indicador global online/offline.~~ — 2026-10-28 (`IndicadorConexion` en ambos layouts; auto-sync al reconectar y cada 30 s)
+- [x] ~~**F5.7** Verificar instalación PWA, recarga sin red y persistencia tras cerrar el navegador.~~ — 2026-10-28 (Playwright sobre build de producción con perfil persistente: SW activo + manifest, recarga sin red, cierre/reapertura del navegador, confirmación al reconectar — venta #40 y reserva #10)
+- [x] ~~**F5.8** Pruebas (cola, reintentos, no-borrado, estados, idempotencia del lado cliente).~~ — 2026-10-28 (`test/offline-sync.test.ts` 9 casos + `offline-ui.test.tsx` reescrita; detectaron doble registro por doble clic y orden inestable, corregidos)
 
 ### F6 — Móvil SQLite + modo vendedor
 - [ ] **F6.1** Integrar `expo-sqlite` (según docs SDK 57) con esquema y migraciones versionadas (sección 3.5).

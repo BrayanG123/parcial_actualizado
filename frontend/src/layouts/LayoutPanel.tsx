@@ -9,6 +9,7 @@ import { iniciales } from '../lib/format';
 import { navegacionPorRol } from '../routes/navegacion';
 import { usePlanEmpresa } from '../hooks/usePlanEmpresa';
 import { AvisoSuscripcion } from '../features/saas/AvisoSuscripcion';
+import { IndicadorConexion } from '../features/offline/IndicadorConexion';
 
 export function LayoutPanel() {
   const { usuario, roles, cerrarSesion, tieneRol } = useAuth();
@@ -78,6 +79,7 @@ export function LayoutPanel() {
           )}
           <div className="fs-crecer" />
           <div className="fs-fila">
+            <IndicadorConexion rutaPendientes={recibeCompras ? '/caja/pendientes' : '/pendientes'} />
             {recibeCompras && <AvisosPush />}
             {rutaReservas && <CampanaNotificaciones rutaReservas={rutaReservas} />}
             <div style={{ textAlign: 'right' }}>

@@ -49,6 +49,10 @@ const PaginaPlanEmpresa = lazy(() => import('./features/saas/PaginaPlanEmpresa')
 const PaginaPlataforma = lazy(() => import('./features/saas/PaginaPlataforma'));
 const PaginaPlataformaLogin = lazy(() => import('./features/saas/PaginaPlataformaLogin'));
 
+/* Operacion offline (PWA) */
+const PaginaTiendaOffline = lazy(() => import('./features/offline/PaginaTiendaOffline'));
+const PaginaPendientes = lazy(() => import('./features/offline/PaginaPendientes'));
+
 /* Caja y proveedor */
 const PaginaOffline = lazy(() => import('./features/pos/PaginaOffline'));
 const PaginaTurnos = lazy(() => import('./features/pos/PaginaTurnos'));
@@ -143,6 +147,15 @@ export default function App() {
               </RutaProtegida>
             }
           />
+          <Route path="offline" element={<PaginaTiendaOffline />} />
+          <Route
+            path="pendientes"
+            element={
+              <RutaProtegida>
+                <PaginaPendientes />
+              </RutaProtegida>
+            }
+          />
           <Route path="sin-permisos" element={<SinPermisos />} />
           <Route path="*" element={<NoEncontrada />} />
         </Route>
@@ -216,6 +229,7 @@ export default function App() {
           <Route index element={<PaginaPuntoVenta />} />
           <Route path="turnos" element={<PaginaTurnos />} />
           <Route path="offline" element={<PaginaOffline />} />
+          <Route path="pendientes" element={<PaginaPendientes />} />
           <Route path="ventas" element={<PaginaVentasOperacion />} />
         </Route>
 
