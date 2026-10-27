@@ -77,6 +77,8 @@ export function sincronizar(alcance: string, incluir: string[] = []): Promise<Re
             type: op.tipo,
             branchId: op.branchId,
             createdAtLocal: op.createdAtLocal,
+            ...(op.tenantId ? { tenantId: op.tenantId } : {}),
+            ...(op.userId ? { userId: op.userId } : {}),
             payload: op.payload,
             payloadHash: op.payloadHash,
           })),

@@ -57,6 +57,7 @@ const PaginaPendientes = lazy(() => import('./features/offline/PaginaPendientes'
 const PaginaOffline = lazy(() => import('./features/pos/PaginaOffline'));
 const PaginaTurnos = lazy(() => import('./features/pos/PaginaTurnos'));
 const PaginaPuntoVenta = lazy(() => import('./features/pos/PaginaPuntoVenta'));
+const PaginaCambios = lazy(() => import('./features/pos/PaginaCambios'));
 const PaginaProductosProveedor = lazy(() => import('./features/supplier/PaginaProductosProveedor'));
 const PaginaEntregasProveedor = lazy(() => import('./features/supplier/PaginaEntregas'));
 
@@ -230,6 +231,7 @@ export default function App() {
           <Route path="turnos" element={<PaginaTurnos />} />
           <Route path="offline" element={<PaginaOffline />} />
           <Route path="pendientes" element={<PaginaPendientes />} />
+          <Route path="cambios" element={<PaginaCambios />} />
           <Route path="ventas" element={<PaginaVentasOperacion />} />
         </Route>
 

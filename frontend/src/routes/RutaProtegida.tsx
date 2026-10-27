@@ -14,7 +14,7 @@ interface Props {
 }
 
 /** Pantallas disponibles con una sesion offline (datos en IndexedDB). */
-const RUTAS_OFFLINE = new Set(['/caja/offline', '/caja/pendientes', '/pendientes', '/offline']);
+const RUTAS_OFFLINE = new Set(['/caja/offline', '/caja/pendientes', '/caja/cambios', '/pendientes', '/offline']);
 
 export function RutaProtegida({ roles, children }: Props) {
   const { autenticado, cargando, errorSesion, reintentarSesion, tieneRol, sesionOffline } =

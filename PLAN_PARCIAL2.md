@@ -292,10 +292,10 @@ cierra en F12 con lo realmente implementado.
 - [x] ~~**F6.9** Pruebas (`node:test`, como `test/push.test.mjs`) de la cola y el mapeo SQLite.~~ — 2026-10-28, commit `24394ab` (`test/offline-movil.test.mjs`, 7 casos sobre `node:sqlite`)
 
 ### F7 — Ventas offline y cambios de prendas
-- [ ] **F7.1** Registro completo de venta offline (todos los campos del enunciado 7.2) en web y móvil.
-- [ ] **F7.2** **Cambios de prendas**: plazo configurable por empresa (p. ej. 7 días), misma o distinta variante, diferencia de precio, devolución al stock y kardex; online y como operación `EXCHANGE` sincronizable.
-- [ ] **F7.3** Aporte propio adicional (proponer y anotar aquí; p. ej. devoluciones con nota de crédito o cupones).
-- [ ] **F7.4** Pruebas de consistencia de inventario (venta offline + venta online concurrente, cambio de prenda).
+- [x] ~~**F7.1** Registro completo de venta offline (todos los campos del enunciado 7.2) en web y móvil.~~ — 2026-10-29 (web y móvil guardan UUID, empresa, sucursal, usuario, cliente, fecha local, variantes, cantidades, precios, total, pago y estado; `tenantId`/`userId` verificados por el servidor; migración SQLite v2)
+- [x] ~~**F7.2** **Cambios de prendas**: plazo configurable por empresa (p. ej. 7 días), misma o distinta variante, diferencia de precio, devolución al stock y kardex; online y como operación `EXCHANGE` sincronizable.~~ — 2026-10-29 (modelo `cambios`, migración `20261029000000_exchanges`, `POST /exchanges`, `EXCHANGE` en `/sync`, `/caja/cambios` online y offline; plazo en `PATCH /tenant/settings`)
+- [x] ~~**F7.3** Aporte propio adicional (proponer y anotar aquí; p. ej. devoluciones con nota de crédito o cupones).~~ — 2026-10-29 (aporte propio: **nota de crédito** por diferencia a favor del cliente, consulta y canje parcial con saldo)
+- [x] ~~**F7.4** Pruebas de consistencia de inventario (venta offline + venta online concurrente, cambio de prenda).~~ — 2026-10-29 (`test/exchanges.e2e-spec.ts`: venta offline vs. online por la última unidad, dos cambios simultáneos de la misma línea, kardex y stock)
 
 ### F8 — Reportes generativos con IA
 - [ ] **F8.1** Catálogo de reportes ampliado (≥6 tipos, sección 3.6) con consultas parametrizadas multi-tabla y filtros (fechas, sucursales, categorías, productos, canal).
@@ -375,4 +375,4 @@ cierra en F12 con lo realmente implementado.
 | Fecha | Quién / dónde | Hecho | Pendiente / próximo paso |
 |---|---|---|---|
 | 2026-10-27 | Claude Code (local) | Plan creado a partir del enunciado y del estado real del repo. | Empezar F0 en Claude web. |
-| 2026-10-27/28 | Claude Code (web) | F0, F1 (ICONIX §1–4), F2 (multitenancy backend), F3 (web SaaS), F4 (sync unificado), F5 (PWA offline con IndexedDB, verificada con Playwright) y F6 (móvil con expo-sqlite y modo vendedor; F6.8 pendiente de prueba en teléfono) completas. Backend unit 225, e2e 128; web 185; móvil 18. Decisiones confirmadas: se mantienen React/Expo; suscripción vencida = solo lectura. | Push a GitHub bloqueado (403, falta acceso de la app de Claude) → commits solo locales en `parcial2`, PRs sin abrir. Bóveda wiki (`D:/…`) no disponible: actualizar notas de multitenancy, sync y PWA offline. `docs.expo.dev` inaccesible: API de expo-sqlite verificada con los tipos del paquete. Siguiente: F7 (cambios de prendas, operación `EXCHANGE`); generar APK nueva en F11.4. |
+| 2026-10-27/28 | Claude Code (web) | F0, F1 (ICONIX §1–4), F2 (multitenancy backend), F3 (web SaaS), F4 (sync unificado), F5 (PWA offline con IndexedDB, verificada con Playwright) y F6 (móvil con expo-sqlite y modo vendedor; F6.8 pendiente de prueba en teléfono) completas. Backend unit 225, e2e 133; web 187; móvil 19. Decisiones confirmadas: se mantienen React/Expo; suscripción vencida = solo lectura. | Push a GitHub bloqueado (403, falta acceso de la app de Claude) → commits solo locales en `parcial2`, PRs sin abrir. Bóveda wiki (`D:/…`) no disponible: actualizar notas de multitenancy, sync y PWA offline. `docs.expo.dev` inaccesible: API de expo-sqlite verificada con los tipos del paquete. F7 (cambios de prendas + notas de crédito) completa. Siguiente: F8 (reportes generativos); generar APK nueva en F11.4. |

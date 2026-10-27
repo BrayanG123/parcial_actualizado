@@ -5,6 +5,7 @@ import { Campo } from '../../components/Campo';
 import { Pantalla } from '../../components/Pantalla';
 import { Vacio } from '../../components/Estados';
 import { useAvisos } from '../../context/AvisosContext';
+import { useSesion } from '../../context/SesionContext';
 import { useAlcanceOffline, useDatosOffline, useSincronizacion } from '../../hooks/useOffline';
 import { moneda } from '../../lib/format';
 import { offlineService } from '../../offline/servicio';
@@ -18,6 +19,7 @@ import { AvisoDescarga, CatalogoLocal } from './componentes';
  */
 export function PantallaVender() {
   const alcance = useAlcanceOffline();
+  const { usuario } = useSesion();
   const [busqueda, setBusqueda] = useState('');
   const { descarga, catalogo, clientes, pendientes } = useDatosOffline(alcance, undefined, busqueda);
   const { sinConexion } = useSincronizacion(alcance, pendientes.length > 0);
@@ -116,6 +118,7 @@ export function PantallaVender() {
                     items: seleccion,
                     recibido: efectivo,
                     clienteId,
+                    usuarioId: usuario?.id_usuario,
                   });
                   setSeleccion([]);
                   setRecibido('');

@@ -34,6 +34,9 @@ export interface OperacionLocal {
   /** API + empresa + usuario: aisla los datos de cada cuenta en el navegador. */
   alcance: string;
   tipo: TipoOperacion;
+  /** Empresa y usuario responsables (registro completo de la venta, enunciado 7.2). */
+  tenantId?: number;
+  userId?: number;
   branchId: number;
   createdAtLocal: string;
   /** Orden de registro en el dispositivo (desempata operaciones del mismo milisegundo). */

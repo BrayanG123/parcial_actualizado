@@ -69,6 +69,18 @@ Login de personal/clientes: `POST /auth/login` con `X-Tenant` (sin header usa la
 empresa por defecto). El email es único **por empresa**. Pruebas:
 `test/tenancy.e2e-spec.ts` y `src/database/prisma/tenant-isolation.extension.spec.ts`.
 
+## Cambios de prendas y notas de crédito (parcial 2)
+
+`src/modules/exchanges`. Plazo configurable por empresa (`PATCH /tenant/settings`
+`{ exchangeWindowDays }`, administrador; 7 días por defecto). `GET /exchanges/sales/:saleId`
+muestra las líneas cambiables, el plazo y las prendas candidatas de la sucursal;
+`POST /exchanges` registra el cambio en una transacción serializable: la prenda devuelta
+vuelve al stock (kardex `RETURN`), la nueva se descuenta (kardex `SALE`) y la diferencia se
+cobra en efectivo al turno (`CHARGED`) o queda como **nota de crédito** (`CREDIT_NOTE`,
+aporte propio): `GET /credit-notes/:code` y `POST /credit-notes/:code/redeem`. Una línea no
+puede cambiarse más veces que su cantidad (control optimista + `CHECK` en la base). Offline
+se envía como operación `EXCHANGE` de `/sync/operations`. Pruebas: `test/exchanges.e2e-spec.ts`.
+
 ## Reservas
 
 El módulo permite reservar varias prendas por sucursal, gestionar su atención y

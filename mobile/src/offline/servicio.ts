@@ -43,12 +43,18 @@ export const offlineService = {
     ]);
     return { descarga, operaciones, sucursales, clientes, catalogo };
   },
-  async vender(alcance: string, datos: { sucursalId: number; items: ItemSeleccion[]; recibido: number; clienteId?: number }) {
+  async vender(
+    alcance: string,
+    datos: { sucursalId: number; items: ItemSeleccion[]; recibido: number; clienteId?: number; usuarioId?: number },
+  ) {
     const r = await nucleo.registrar(await abrirBase(), alcance, { tipo: 'SALE_CASH', ...datos });
     notificar();
     return r;
   },
-  async reservar(alcance: string, datos: { sucursalId: number; items: ItemSeleccion[]; horario: string; observacion?: string }) {
+  async reservar(
+    alcance: string,
+    datos: { sucursalId: number; items: ItemSeleccion[]; horario: string; observacion?: string; usuarioId?: number },
+  ) {
     const r = await nucleo.registrar(await abrirBase(), alcance, { tipo: 'RESERVATION', ...datos });
     notificar();
     return r;

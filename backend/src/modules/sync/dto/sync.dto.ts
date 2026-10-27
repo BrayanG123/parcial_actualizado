@@ -125,6 +125,9 @@ export class ReservationPayloadDto {
   items: ReservationItemDto[];
 }
 
+/** payload de EXCHANGE: cambio de prenda registrado offline (mismos campos que POST /exchanges). */
+export { CreateExchangeDto as ExchangePayloadDto } from '../../exchanges/dto/exchange.dto.js';
+
 export class SyncLogsQueryDto {
   @IsOptional()
   @IsIn(['PROCESSING', 'CONFIRMED', 'REJECTED', 'CONFLICT'])

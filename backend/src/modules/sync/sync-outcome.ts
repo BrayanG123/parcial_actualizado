@@ -90,11 +90,23 @@ export function classify(error: unknown): ClassifiedOutcome {
       : (raw ?? error.message);
     const code =
       typeof body === 'object' ? (body as { code?: string }).code : undefined;
+    const detail =
+      typeof body === 'object'
+        ? (body as { detail?: unknown }).detail
+        : undefined;
     if (status >= 500)
       return {
         status: 'ERROR',
         code: 'SERVER_ERROR',
         message: 'Error del servidor; reintentar',
+      };
+    // Un codigo explicito del servicio (p. ej. cambios de prendas) manda sobre los patrones.
+    if (code && code !== 'SUBSCRIPTION_READ_ONLY')
+      return {
+        status: status === 409 ? 'CONFLICT' : 'REJECTED',
+        code,
+        message,
+        ...(detail !== undefined ? { detail } : {}),
       };
     for (const [pattern, outcome, ruleCode] of RULES)
       if (pattern.test(message))

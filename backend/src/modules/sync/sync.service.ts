@@ -8,8 +8,10 @@ import { tenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../database/prisma/prisma.service.js';
 import { Prisma, SyncOperation } from '../../generated/prisma/client.js';
 import { ReservationsService } from '../reservations/reservations.service.js';
+import { ExchangesService } from '../exchanges/exchanges.service.js';
 import { SubscriptionAccessService } from '../tenancy/subscription-access.service.js';
 import {
+  ExchangePayloadDto,
   ReservationPayloadDto,
   SaleCashPayloadDto,
   SyncBatchDto,
@@ -66,6 +68,7 @@ export class SyncService {
     private readonly sales: SyncSalesService,
     private readonly reservations: ReservationsService,
     private readonly access: SubscriptionAccessService,
+    private readonly exchanges: ExchangesService,
   ) {}
 
   /** POST /sync/operations: procesa el lote en orden; cada operacion es independiente. */
@@ -236,6 +239,18 @@ export class SyncService {
           { operationKey: dto.operationId },
         );
         return { resourceType: 'RESERVATION', resourceId: reservation.id };
+      }
+      case 'EXCHANGE': {
+        const payload = await this.payload(ExchangePayloadDto, dto.payload);
+        const exchange = await this.exchanges.create(
+          { ...payload, branchId: dto.branchId },
+          user,
+          {
+            operationKey: dto.operationId,
+            exchangedAt: new Date(dto.createdAtLocal),
+          },
+        );
+        return { resourceType: 'EXCHANGE', resourceId: exchange.id };
       }
       default:
         throw rejected('UNSUPPORTED_TYPE', `Tipo ${dto.type} aun no soportado`);

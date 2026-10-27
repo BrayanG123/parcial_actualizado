@@ -168,7 +168,13 @@ cambia cuando cambian productos o existencias de la sucursal.
   transacción serializable).
 - `RESERVATION` (clientes): `{ approximateTime, observation?, items: [{ productId, sizeId, colorId, quantity }] }`.
   Se confirma con `ReservationsService.create`.
-- `EXCHANGE`: se implementa en F7 (hoy responde `REJECTED UNSUPPORTED_TYPE`).
+- `EXCHANGE` (personal): mismos campos que `POST /exchanges` (`saleId`, `saleItemId` o
+  la variante devuelta `returnedProductId/SizeId/ColorId`, `quantity`, `newProductId/SizeId/ColorId`,
+  `shiftId?`, `reason?`, `expectedDifference?`). El plazo se evalúa con `createdAtLocal`.
+  Conflictos propios: `EXCHANGE_WINDOW_EXPIRED`, `ALREADY_EXCHANGED`, `SALE_NOT_COMPLETED`;
+  rechazos: `SALE_NOT_FOUND`, `SHIFT_REQUIRED`.
+- Opcionales `tenantId` y `userId` (registro completo de la venta): si vienen, deben coincidir
+  con el token (`TENANT_MISMATCH` / `USER_MISMATCH`).
 - Máximo 50 operaciones por lote; se procesan en orden y cada una es independiente.
 
 La respuesta trae un resultado por operación:

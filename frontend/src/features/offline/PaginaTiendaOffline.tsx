@@ -138,7 +138,12 @@ export default function PaginaTiendaOffline() {
                   disabled={ocupado || !seleccion.length || !horario}
                   onClick={() =>
                     accion(async () => {
-                      await registrarReserva(alcance!, snapshot, { items: seleccion, horario, observacion: nota });
+                      await registrarReserva(alcance!, snapshot, {
+                        items: seleccion,
+                        horario,
+                        observacion: nota,
+                        usuarioId: usuario?.id_usuario,
+                      });
                       setSeleccion([]);
                       setHorario('');
                       setNota('');

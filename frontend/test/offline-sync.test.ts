@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { instancia } from '../src/api/http';
 import { BASE_URL } from '../src/api/config';
 import { guardarToken } from '../src/api/sesion';
-import { registrarReserva, registrarVenta } from '../src/offline/cola';
+import { registrarCambio, registrarReserva, registrarVenta } from '../src/offline/cola';
 import { canonico, hashPayload } from '../src/offline/hash';
 import { migrarLegado } from '../src/offline/migracion';
 import { guardarOperaciones, guardarSnapshot, leerSnapshot, listarOperaciones, stockLocal } from '../src/offline/repositorio';
@@ -238,3 +238,44 @@ async function limpiarDbSinBorrar() {
   const { cerrarDb } = await import('../src/offline/db');
   await cerrarDb();
 }
+
+describe('registro completo y cambios de prendas offline (F7)', () => {
+  it('guarda empresa y usuario en la venta y los envia para que el servidor los verifique', async () => {
+    const op = await registrarVenta(ALCANCE, snapshot(), { items: [item()], recibido: 80, usuarioId: 12 });
+    expect(op).toMatchObject({ tenantId: 1, userId: 12, branchId: 2, createdAtLocal: expect.any(String) });
+    servidor(() => ({ status: 'CONFIRMED', resourceType: 'SALE', resourceId: 1 }));
+    await sincronizar(ALCANCE);
+    expect(enviados[0]).toMatchObject({ tenantId: 1, userId: 12, type: 'SALE_CASH' });
+  });
+
+  it('registra un cambio de prenda como operacion EXCHANGE identificando la linea por variante', async () => {
+    const otra = { ...snapshot().variants[0]!, sizeId: 2, sizeName: 'L', netUnitPrice: 90 };
+    const snap = snapshot({ variants: [...snapshot().variants, otra] });
+    await expect(
+      registrarCambio(ALCANCE, snap, { ventaId: 0, devuelta: item(), nueva: { ...item(), sizeId: 2 }, cantidad: 1 }),
+    ).rejects.toThrow('numero de la venta');
+    const op = await registrarCambio(ALCANCE, snap, {
+      ventaId: 40,
+      devuelta: item(),
+      nueva: { ...item(), sizeId: 2 },
+      cantidad: 1,
+      motivo: 'Talla',
+      usuarioId: 12,
+    });
+    expect(op).toMatchObject({
+      tipo: 'EXCHANGE',
+      estado: 'LOCAL',
+      payload: {
+        saleId: 40,
+        returnedProductId: 1,
+        returnedSizeId: 1,
+        returnedColorId: 1,
+        newSizeId: 2,
+        quantity: 1,
+        shiftId: 7,
+        reason: 'Talla',
+      },
+    });
+    expect(op.resumen.lineas.map((l) => l.nombre)).toEqual(['Devuelve Camisa (M / Azul)', 'Lleva Camisa (L / Azul)']);
+  });
+});

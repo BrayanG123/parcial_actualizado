@@ -124,6 +124,8 @@ model Tenant {
   /// Codigo publico de la empresa en URLs y en el header X-Tenant.
   slug               String              @unique @db.VarChar(60)
   status             TenantStatus        @default(ACTIVE) @map("estado")
+  /// Plazo para cambiar prendas desde la venta (configurable por la empresa).
+  exchangeWindowDays Int                 @default(7) @map("plazo_cambio_dias")
   createdAt          DateTime            @default(now()) @map("fecha_creacion") @db.Timestamptz(3)
   updatedAt          DateTime            @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
   subscription       Subscription?
@@ -158,6 +160,8 @@ model Tenant {
   pushTokens         PushToken[]
   syncOperations     SyncOperation[]
   syncLogs           SyncLog[]
+  exchanges          Exchange[]
+  creditNotes        CreditNote[]
 
   @@map("empresas")
 }
@@ -264,6 +268,7 @@ model Client {
   carts           Cart[]
   sales           Sale[]
   recommendations AiRecommendation[]
+  creditNotes     CreditNote[]
 
   @@index([tenantId])
   @@map("clientes")
@@ -327,6 +332,7 @@ model Branch {
   sales         Sale[]
   notifications Notification[]
   cashRegisters CashRegister[]
+  exchanges     Exchange[]
 
   @@unique([tenantId, city, name])
   @@index([city, active])
@@ -761,6 +767,7 @@ model Sale {
   createdBy          User?         @relation("SaleCreator", fields: [createdById], references: [id], onDelete: SetNull)
   items              SaleItem[]
   payments           Payment[]
+  exchanges          Exchange[]
 
   @@unique([createdById, idempotencyKey])
   @@index([offlineBatchId])
@@ -777,23 +784,26 @@ model Sale {
 
 model SaleItem {
   /// Empresa (tenant) propietaria.
-  tenantId    Int     @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
-  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  id          Int     @id @default(autoincrement()) @map("id_detalle_venta")
-  saleId      Int     @map("id_venta")
-  productId   Int     @map("id_producto")
-  sizeId      Int     @map("id_talla")
-  colorId     Int     @map("id_color")
-  quantity    Int     @map("cantidad")
-  unitPrice   Decimal @map("precio_unitario") @db.Decimal(12, 2)
-  discount    Decimal @default(0) @map("descuento") @db.Decimal(12, 2)
-  productName String? @map("nombre_producto") @db.VarChar(160)
-  sizeName    String? @map("nombre_talla") @db.VarChar(30)
-  colorName   String? @map("nombre_color") @db.VarChar(60)
-  sale        Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  product     Product @relation(fields: [productId], references: [id], onDelete: Restrict)
-  size        Size    @relation(fields: [sizeId], references: [id], onDelete: Restrict)
-  color       Color   @relation(fields: [colorId], references: [id], onDelete: Restrict)
+  tenantId          Int        @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant            Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  id                Int        @id @default(autoincrement()) @map("id_detalle_venta")
+  saleId            Int        @map("id_venta")
+  productId         Int        @map("id_producto")
+  sizeId            Int        @map("id_talla")
+  colorId           Int        @map("id_color")
+  quantity          Int        @map("cantidad")
+  /// Unidades de esta linea ya cambiadas por otra prenda.
+  exchangedQuantity Int        @default(0) @map("cantidad_cambiada")
+  unitPrice         Decimal    @map("precio_unitario") @db.Decimal(12, 2)
+  discount          Decimal    @default(0) @map("descuento") @db.Decimal(12, 2)
+  productName       String?    @map("nombre_producto") @db.VarChar(160)
+  sizeName          String?    @map("nombre_talla") @db.VarChar(30)
+  colorName         String?    @map("nombre_color") @db.VarChar(60)
+  sale              Sale       @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product           Product    @relation(fields: [productId], references: [id], onDelete: Restrict)
+  size              Size       @relation(fields: [sizeId], references: [id], onDelete: Restrict)
+  color             Color      @relation(fields: [colorId], references: [id], onDelete: Restrict)
+  exchanges         Exchange[]
 
   @@index([saleId])
   @@index([productId, sizeId, colorId])
@@ -977,4 +987,84 @@ model SyncLog {
   @@index([tenantId, createdAt])
   @@index([syncOperationId])
   @@map("sync_log")
+}
+
+enum ExchangeSettlement {
+  /// Mismo importe.
+  EVEN
+  /// El cliente pago la diferencia en efectivo.
+  CHARGED
+  /// La diferencia a favor del cliente quedo como nota de credito.
+  CREDIT_NOTE
+}
+
+enum CreditNoteStatus {
+  ACTIVE
+  USED
+  VOID
+}
+
+/// Cambio de prenda dentro del plazo de la empresa (F7.2): devuelve una linea de venta
+/// (total o parcialmente) y entrega otra variante, en la misma o distinta talla/color/prenda.
+model Exchange {
+  id                Int                @id @default(autoincrement()) @map("id_cambio")
+  tenantId          Int                @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  saleId            Int                @map("id_venta")
+  sale              Sale               @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  saleItemId        Int                @map("id_detalle_venta")
+  saleItem          SaleItem           @relation(fields: [saleItemId], references: [id], onDelete: Restrict)
+  branchId          Int                @map("id_sucursal")
+  branch            Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  shiftId           Int?               @map("id_turno")
+  createdById       Int                @map("id_usuario_creador")
+  employeeId        Int?               @map("id_empleado")
+  /// operationId de un cambio registrado offline (idempotencia de /sync/operations).
+  operationKey      String?            @map("clave_operacion") @db.Uuid
+  quantity          Int                @map("cantidad")
+  returnedProductId Int                @map("id_producto_devuelto")
+  returnedSizeId    Int                @map("id_talla_devuelta")
+  returnedColorId   Int                @map("id_color_devuelto")
+  /// Precio neto unitario que el cliente pago por la prenda devuelta.
+  returnedUnitPrice Decimal            @map("precio_devuelto") @db.Decimal(12, 2)
+  newProductId      Int                @map("id_producto_nuevo")
+  newSizeId         Int                @map("id_talla_nueva")
+  newColorId        Int                @map("id_color_nuevo")
+  newProductName    String             @map("nombre_producto_nuevo") @db.VarChar(160)
+  /// Precio neto vigente de la prenda entregada.
+  newUnitPrice      Decimal            @map("precio_nuevo") @db.Decimal(12, 2)
+  /// (precio nuevo - precio devuelto) x cantidad: positivo cobra, negativo acredita.
+  difference        Decimal            @map("diferencia") @db.Decimal(12, 2)
+  settlement        ExchangeSettlement @map("liquidacion")
+  reason            String?            @map("motivo") @db.VarChar(250)
+  exchangedAt       DateTime           @map("fecha_cambio") @db.Timestamptz(3)
+  createdAt         DateTime           @default(now()) @map("fecha_registro") @db.Timestamptz(3)
+  creditNote        CreditNote?
+
+  @@unique([tenantId, operationKey])
+  @@index([tenantId, saleId])
+  @@index([saleItemId])
+  @@index([branchId, exchangedAt])
+  @@map("cambios")
+}
+
+/// Aporte propio (F7.3): saldo a favor del cliente por un cambio a una prenda mas barata.
+model CreditNote {
+  id         Int              @id @default(autoincrement()) @map("id_nota_credito")
+  tenantId   Int              @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  code       String           @map("codigo") @db.VarChar(20)
+  clientId   Int?             @map("id_cliente")
+  client     Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  exchangeId Int?             @unique @map("id_cambio")
+  exchange   Exchange?        @relation(fields: [exchangeId], references: [id], onDelete: Restrict)
+  amount     Decimal          @map("monto") @db.Decimal(12, 2)
+  balance    Decimal          @map("saldo") @db.Decimal(12, 2)
+  status     CreditNoteStatus @default(ACTIVE) @map("estado")
+  createdAt  DateTime         @default(now()) @map("fecha_emision") @db.Timestamptz(3)
+  updatedAt  DateTime         @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
+
+  @@unique([tenantId, code])
+  @@index([tenantId, clientId])
+  @@map("notas_credito")
 }

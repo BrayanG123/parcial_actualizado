@@ -288,6 +288,7 @@ Reglas de negocio implementadas en `src/lib/domain.ts`:
 | Plan empresa   | `/admin/plan`                                                               | ADMINISTRADOR      |
 | Plataforma     | `/plataforma/login`, `/plataforma`                                          | PLATFORM_ADMIN (sesion propia) |
 | Offline        | `/offline`, `/pendientes`, `/caja/offline`, `/caja/pendientes`              | cliente / personal |
+| Cambios        | `/caja/cambios` (online y offline, notas de credito)                        | CAJERO, ENCARGADO_SUCURSAL, ADMINISTRADOR |
 
 ### PWA offline (parcial 2)
 

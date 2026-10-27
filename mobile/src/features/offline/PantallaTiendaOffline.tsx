@@ -29,7 +29,7 @@ const manana = (hora: number) => {
 
 /** F6.2/F6.3/F6.5: catalogo descargado en SQLite y reserva offline del cliente. */
 export function PantallaTiendaOffline({ navigation }: PropsStack<'TiendaOffline'>) {
-  const { cliente } = useSesion();
+  const { cliente, usuario } = useSesion();
   const alcance = useAlcanceOffline();
   const [sucursal, setSucursal] = useState<number | undefined>();
   const [busqueda, setBusqueda] = useState('');
@@ -134,6 +134,7 @@ export function PantallaTiendaOffline({ navigation }: PropsStack<'TiendaOffline'
                     sucursalId: descarga.sucursal_id,
                     items: seleccion,
                     horario: iso,
+                    usuarioId: usuario?.id_usuario,
                   });
                   setSeleccion([]);
                   avisar('Reserva guardada en el telefono; se enviara a la tienda al sincronizar.');

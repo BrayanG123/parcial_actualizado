@@ -7,6 +7,9 @@ export interface OperacionEnvio {
   type: string;
   branchId: number;
   createdAtLocal: string;
+  /** El servidor verifica que coincidan con el token (TENANT_MISMATCH / USER_MISMATCH). */
+  tenantId?: number;
+  userId?: number;
   payload: Record<string, unknown>;
   payloadHash: string;
 }

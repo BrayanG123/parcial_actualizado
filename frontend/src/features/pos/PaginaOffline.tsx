@@ -157,6 +157,7 @@ function CajaOffline() {
                     items: seleccion,
                     recibido: efectivo,
                     clienteId: clienteId ? Number(clienteId) : undefined,
+                    usuarioId: usuario?.id_usuario,
                   });
                   setTicket(op);
                   setSeleccion([]);

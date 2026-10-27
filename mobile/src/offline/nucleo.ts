@@ -66,6 +66,10 @@ export const MIGRACIONES: string[] = [
      operation_id TEXT NOT NULL REFERENCES operaciones (operation_id),
      intento INTEGER NOT NULL, estado TEXT NOT NULL, codigo TEXT, fecha TEXT NOT NULL);
    CREATE INDEX sync_resultados_operacion ON sync_resultados (operation_id);`,
+  // v2 (F7.1): empresa y usuario responsables en cada operacion (registro completo de la venta).
+  `ALTER TABLE descargas ADD COLUMN empresa_id INTEGER;
+   ALTER TABLE operaciones ADD COLUMN empresa_id INTEGER;
+   ALTER TABLE operaciones ADD COLUMN usuario_id INTEGER;`,
 ];
 
 export async function migrar(db: BaseDatos): Promise<number> {
@@ -153,6 +157,9 @@ export async function guardarSnapshot(db: BaseDatos, alcance: string, s: Snapsho
       [alcance, s.branch.id, s.version, s.generatedAt, ahora.toISOString(), s.currency,
         s.openShift?.id ?? null, s.openShift?.register.name ?? null, s.tenant?.slug ?? null],
     );
+    await tx.correr('UPDATE descargas SET empresa_id = ? WHERE alcance = ? AND sucursal_id = ?', [
+      s.tenant?.id ?? null, alcance, s.branch.id,
+    ]);
     await tx.correr(
       `INSERT INTO meta (clave, valor) VALUES (?, ?) ON CONFLICT (clave) DO UPDATE SET valor = excluded.valor`,
       [`ultima-sucursal:${alcance}`, String(s.branch.id)],
@@ -165,7 +172,8 @@ export async function descarga(db: BaseDatos, alcance: string, sucursalId?: numb
     sucursalId ??
     Number((await db.primero<{ valor: string }>('SELECT valor FROM meta WHERE clave = ?', [`ultima-sucursal:${alcance}`]))?.valor ?? 0);
   return db.primero<Descarga>(
-    `SELECT d.sucursal_id, s.nombre AS sucursal, d.version, d.generado_en, d.descargado_en, d.moneda, d.turno_id, d.caja
+    `SELECT d.sucursal_id, s.nombre AS sucursal, d.version, d.generado_en, d.descargado_en, d.moneda, d.turno_id, d.caja,
+       d.empresa_id
      FROM descargas d JOIN sucursales s ON s.alcance = d.alcance AND s.id = d.sucursal_id
      WHERE d.alcance = ? AND d.sucursal_id = ?`,
     [alcance, id],
@@ -227,6 +235,7 @@ interface NuevaOperacion {
   recibido?: number;
   horario?: string;
   observacion?: string;
+  usuarioId?: number;
 }
 
 /**
@@ -268,10 +277,11 @@ export async function registrar(db: BaseDatos, alcance: string, datos: NuevaOper
     const operationId = crearId();
     const ahora = new Date().toISOString();
     await tx.correr(
-      `INSERT INTO operaciones (operation_id, alcance, tipo, sucursal_id, cliente_id, turno_id, creada_local, orden,
-         estado, titulo, total, moneda, recibido, horario, observacion, actualizada)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'LOCAL', ?, ?, ?, ?, ?, ?, ?)`,
-      [operationId, alcance, datos.tipo, datos.sucursalId, datos.clienteId ?? null,
+      `INSERT INTO operaciones (operation_id, alcance, tipo, empresa_id, usuario_id, sucursal_id, cliente_id, turno_id,
+         creada_local, orden, estado, titulo, total, moneda, recibido, horario, observacion, actualizada)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'LOCAL', ?, ?, ?, ?, ?, ?, ?)`,
+      [operationId, alcance, datos.tipo, info.empresa_id ?? null, datos.usuarioId ?? null, datos.sucursalId,
+        datos.clienteId ?? null,
         datos.tipo === 'SALE_CASH' ? datos.turnoId : null, ahora, siguienteOrden(),
         `${datos.tipo === 'SALE_CASH' ? 'Venta en efectivo' : 'Reserva'} · ${info.sucursal}`,
         total, info.moneda, datos.recibido ?? null, datos.horario ?? null, datos.observacion?.trim() || null, ahora],
@@ -301,7 +311,16 @@ export function aEnvio(op: OperacionLocal): OperacionEnvio {
           ...(op.recibido !== null ? { cashReceived: op.recibido } : {}),
         }
       : { approximateTime: op.horario, items, ...(op.observacion ? { observation: op.observacion } : {}) };
-  return { operationId: op.operation_id, type: op.tipo, branchId: op.sucursal_id, createdAtLocal: op.creada_local, payload };
+  return {
+    operationId: op.operation_id,
+    type: op.tipo,
+    branchId: op.sucursal_id,
+    createdAtLocal: op.creada_local,
+    // El servidor verifica que empresa y usuario coincidan con el token.
+    ...(op.empresa_id ? { tenantId: op.empresa_id } : {}),
+    ...(op.usuario_id ? { userId: op.usuario_id } : {}),
+    payload,
+  };
 }
 
 /* ------------------------------ sincronizador ------------------------------ */

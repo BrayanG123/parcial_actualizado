@@ -44,6 +44,7 @@ const ADMIN: GrupoNav[] = [
       { a: '/caja/turnos', texto: 'Turnos y arqueos' },
       { a: '/caja/offline', texto: 'Ventas offline', requiere: 'offline' },
       { a: '/caja/pendientes', texto: 'Pendientes offline', requiere: 'offline' },
+      { a: '/caja/cambios', texto: 'Cambios de prendas', requiere: 'sales' },
     ],
   },
   {
@@ -72,6 +73,7 @@ const SUCURSAL: GrupoNav[] = [
       { a: '/caja/turnos', texto: 'Turnos y arqueos' },
       { a: '/caja/offline', texto: 'Ventas offline', requiere: 'offline' },
       { a: '/caja/pendientes', texto: 'Pendientes offline', requiere: 'offline' },
+      { a: '/caja/cambios', texto: 'Cambios de prendas', requiere: 'sales' },
     ],
   },
 ];
@@ -84,6 +86,7 @@ const CAJA: GrupoNav[] = [
       { a: '/caja/turnos', texto: 'Turnos y arqueos' },
       { a: '/caja/offline', texto: 'Ventas offline', requiere: 'offline' },
       { a: '/caja/pendientes', texto: 'Pendientes offline', requiere: 'offline' },
+      { a: '/caja/cambios', texto: 'Cambios de prendas', requiere: 'sales' },
       { a: '/caja/ventas', texto: 'Historial de ventas' },
     ],
   },

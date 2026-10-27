@@ -88,7 +88,7 @@ test('registra una venta con su detalle, descuenta stock local y valida reglas',
   assert.equal(op.estado, 'LOCAL');
   assert.equal(op.lineas.length, 1);
   assert.deepEqual(aEnvio(op), {
-    operationId, type: 'SALE_CASH', branchId: 2, createdAtLocal: op.creada_local,
+    operationId, type: 'SALE_CASH', branchId: 2, createdAtLocal: op.creada_local, tenantId: 1,
     payload: { shiftId: 7, items: [{ ...item(2), unitPrice: 80 }], total: 160, paymentMethod: 'CASH', cashReceived: 200 },
   });
   await assert.rejects(registrar(db, A, { tipo: 'SALE_CASH', sucursalId: 2, items: [item(2)], recibido: 200 }), /stock local/);
@@ -184,4 +184,25 @@ test('descartar conserva la operacion y no aplica a confirmadas', async () => {
   assert.equal((await listarOperaciones(db, A))[0].estado, 'DESCARTADA');
   await assert.rejects(descartar(db, { ...op, estado: 'CONFIRMED' }));
   assert.equal((await catalogo(db, A, 2))[0].stock_local, 3);
+});
+
+test('migracion v2: una base v1 con datos conserva sus operaciones y agrega empresa/usuario', async () => {
+  const db = abrir();
+  await db.ejecutar(MIGRACIONES[0]);
+  await db.ejecutar('PRAGMA user_version = 1');
+  await db.correr(
+    `INSERT INTO operaciones (operation_id, alcance, tipo, sucursal_id, creada_local, orden, estado, titulo, actualizada)
+     VALUES ('op-v1', ?, 'SALE_CASH', 2, '2026-10-01T10:00:00Z', 1, 'LOCAL', 'Venta antigua', '2026-10-01T10:00:00Z')`,
+    [A],
+  );
+  await migrar(db);
+  assert.equal((await db.primero('PRAGMA user_version')).user_version, MIGRACIONES.length);
+  const [op] = await listarOperaciones(db, A);
+  assert.equal(op.operation_id, 'op-v1');
+  assert.equal(op.empresa_id, null);
+  await guardarSnapshot(db, A, snapshot());
+  const nueva = await registrar(db, A, { tipo: 'SALE_CASH', sucursalId: 2, items: [item()], recibido: 80, usuarioId: 12 });
+  const envio = aEnvio((await listarOperaciones(db, A)).find((o) => o.operation_id === nueva.operationId));
+  assert.equal(envio.tenantId, 1);
+  assert.equal(envio.userId, 12);
 });

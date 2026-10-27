@@ -52,6 +52,7 @@ export interface Descarga {
   moneda: string;
   turno_id: number | null;
   caja: string | null;
+  empresa_id?: number | null;
 }
 
 export interface VarianteLocal {
@@ -92,6 +93,8 @@ export interface OperacionLocal {
   operation_id: string;
   alcance: string;
   tipo: TipoOperacion;
+  empresa_id?: number | null;
+  usuario_id?: number | null;
   sucursal_id: number;
   cliente_id: number | null;
   turno_id: number | null;
@@ -132,6 +135,8 @@ export interface OperacionEnvio {
   type: TipoOperacion;
   branchId: number;
   createdAtLocal: string;
+  tenantId?: number;
+  userId?: number;
   payload: Record<string, unknown>;
 }
 
