@@ -23,7 +23,10 @@ import {
   RecommendationsQueryDto,
 } from './dto/ai.dto.js';
 import { RecommendationService } from './recommendation.service.js';
-import { RequiresFeature } from '../tenancy/plan.decorators.js';
+import {
+  AllowWhenReadOnly,
+  RequiresFeature,
+} from '../tenancy/plan.decorators.js';
 
 @Controller('ai')
 export class AiController {
@@ -61,6 +64,8 @@ export class AiController {
   @UseGuards(JwtAuthGuard, RolesGuard, AiRateLimitGuard)
   @Roles(Role.ADMINISTRATOR, Role.BRANCH_MANAGER)
   @RequiresFeature('aiReports')
+  // Solo consulta: sigue disponible con la suscripcion vencida (solo lectura).
+  @AllowWhenReadOnly()
   report(
     @Body() dto: AiReportQueryDto,
     @CurrentUser() user: AuthenticatedUser,

@@ -8,12 +8,16 @@ import { etiqueta, moneda } from '../../lib/format';
 import type { ReporteIA } from '../../types/ia';
 import { TablaInventario } from '../admin/PaginaDashboard';
 import { BarraComparativa, GraficoHoras, GraficoSucursales, GraficoVentas, TarjetaKPI } from './componentes';
+import { GraficoDinamico, TablaDinamica } from './GraficoDinamico';
 
 const EJEMPLOS = [
   'Ventas web de la ultima semana',
+  'Ventas por sucursal de este mes',
+  'Ventas por semana de los ultimos 60 dias',
   'Top 5 prendas mas vendidas este mes',
-  'Que productos estan agotados o con stock bajo?',
-  'Reservas de esta semana',
+  'Categorias con mayores ingresos del mes pasado',
+  'Compara las sucursales en los ultimos 3 meses',
+  'Productos con menor existencia',
   'Arqueo de cajas de ayer',
 ];
 
@@ -173,7 +177,18 @@ export default function PaginaReporteIA() {
       </section>
 
       {reporte.isError && <ErrorEstado error={reporte.error} onReintentar={() => generar(null)} />}
-      {reporte.data && <><BotonesExportar cargar={() => cargarReporteIA(reporte.data!)} deshabilitado={reporte.isPending || reporte.isError} /><ResultadoReporteIA reporte={reporte.data} /></>}
+      {reporte.data && (reporte.data.tipo === 'aclaracion' || reporte.data.tipo === 'no_soportado') && (
+        <SinReporte reporte={reporte.data} ocupado={reporte.isPending} onElegir={(q) => generar(null, q)} />
+      )}
+      {reporte.data && reporte.data.tipo !== 'aclaracion' && reporte.data.tipo !== 'no_soportado' && (
+        <>
+          <BotonesExportar
+            cargar={() => cargarReporteIA(reporte.data!)}
+            deshabilitado={reporte.isPending || reporte.isError}
+          />
+          <ResultadoReporteIA reporte={reporte.data} />
+        </>
+      )}
       {!reporte.data && !reporte.isError && !reporte.isPending && (
         <Vacio titulo="Sin reporte" mensaje="Escribe o dicta una solicitud para generar un reporte." />
       )}
@@ -181,11 +196,53 @@ export default function PaginaReporteIA() {
   );
 }
 
+/** Solicitud ambigua o fuera del catalogo: explica y ofrece reportes posibles. */
+function SinReporte({
+  reporte,
+  ocupado,
+  onElegir,
+}: {
+  reporte: Extract<ReporteIA, { tipo: 'aclaracion' | 'no_soportado' }>;
+  ocupado: boolean;
+  onElegir: (pregunta: string) => void;
+}) {
+  return (
+    <section className="fs-panel" role="status">
+      <div className="fs-fila-entre fs-fila-wrap">
+        <h3>{reporte.tipo === 'aclaracion' ? 'Necesito una aclaracion' : 'Solicitud no disponible'}</h3>
+        <span className="fs-badge">{etiquetaOrigen(reporte.origen)}</span>
+      </div>
+      <div className={`fs-alerta ${reporte.tipo === 'aclaracion' ? 'fs-alerta--info' : ''}`}>
+        <span>{reporte.resumen}</span>
+      </div>
+      {reporte.sugerencias.length > 0 && (
+        <>
+          <p className="fs-sub" style={{ marginTop: 12 }}>
+            Puedes pedir, por ejemplo:
+          </p>
+          <div className="fs-fila-wrap">
+            {reporte.sugerencias.map((s) => (
+              <button key={s} type="button" className="fs-chip" disabled={ocupado} onClick={() => onElegir(s)}>
+                {s}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 function ResultadoReporteIA({ reporte }: { reporte: ReporteIA }) {
   const i = reporte.interpretacion;
   const filtros = [
     i.desde || i.hasta ? `Periodo: ${i.desde ?? 'inicio'} a ${i.hasta ?? 'hoy'}` : null,
-    `Sucursal: ${i.sucursal ?? 'todas las autorizadas'}`,
+    i.sucursales && i.sucursales.length > 1
+      ? `Sucursales: ${i.sucursales.join(', ')}`
+      : `Sucursal: ${i.sucursal ?? 'todas las autorizadas'}`,
+    i.categorias?.length ? `Categorias: ${i.categorias.join(', ')}` : null,
+    i.productos?.length ? `Productos: ${i.productos.join(', ')}` : null,
+    i.meses ? `Meses: ${i.meses}` : null,
     i.canal ? `Canal: ${etiqueta(i.canal)}` : null,
     i.limite ? `Limite: ${i.limite}` : null,
     i.solo_stock_bajo ? 'Solo stock bajo' : null,
@@ -212,6 +269,20 @@ function ResultadoReporteIA({ reporte }: { reporte: ReporteIA }) {
           <span>{reporte.resumen}</span>
         </div>
       </section>
+
+      {reporte.tipo === 'catalogo' && (
+        <section className="fs-panel">
+          <h3>{reporte.grafico.titulo}</h3>
+          {reporte.tabla.filas.length === 0 ? (
+            <Vacio titulo="Sin datos" mensaje="No hay datos con esos filtros." />
+          ) : (
+            <div className="fs-pila">
+              <GraficoDinamico grafico={reporte.grafico} tabla={reporte.tabla} />
+              <TablaDinamica tabla={reporte.tabla} />
+            </div>
+          )}
+        </section>
+      )}
 
       {reporte.tipo === 'ventas' && (
         <>

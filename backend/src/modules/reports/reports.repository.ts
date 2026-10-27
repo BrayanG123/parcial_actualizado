@@ -3,6 +3,7 @@ import { PrismaService } from '../../database/prisma/prisma.service.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import {
   CashShiftsReportQueryDto,
+  type CatalogReportFilters,
   InventoryReportQueryDto,
   SalesReportQueryDto,
 } from './dto/report-query.dto.js';
@@ -186,5 +187,121 @@ export class ReportsRepository {
         AND r.horario_aproximado >= ${period.start} AND r.horario_aproximado < ${period.endExclusive}
         ${branchId ? Prisma.sql`AND r.id_sucursal = ${branchId}` : Prisma.empty}
       GROUP BY r.id_sucursal, s.nombre, r.estado ORDER BY r.id_sucursal, r.estado`;
+  }
+
+  /**
+   * Lineas de venta completadas en BOB unidas a producto, categoria y sucursal.
+   * Los filtros por categoria o producto restringen las lineas, no las ventas.
+   */
+  private salesLines(filters: CatalogReportFilters, period: Period) {
+    const ids = (column: Prisma.Sql, values?: number[]) =>
+      values?.length
+        ? Prisma.sql`AND ${column} IN (${Prisma.join(values)})`
+        : Prisma.empty;
+    return Prisma.sql`
+      WITH lines AS (
+        SELECT v.id_venta AS "saleId", v.id_sucursal AS "branchId", s.nombre AS "branchName",
+          v.canal::text AS channel, p.id_producto AS "productId", p.nombre AS "productName",
+          p.id_categoria AS "categoryId", COALESCE(c.nombre, 'Sin categoria') AS "categoryName",
+          (COALESCE(v.fecha_confirmacion, v.fecha) AT TIME ZONE 'America/La_Paz') AS local_date,
+          d.cantidad AS units, d.cantidad * (d.precio_unitario - d.descuento) AS revenue
+        FROM ventas v
+        JOIN detalles_venta d ON d.id_venta = v.id_venta
+        JOIN productos p ON p.id_producto = d.id_producto
+        LEFT JOIN categorias c ON c.id_categoria = p.id_categoria
+        LEFT JOIN sucursales s ON s.id_sucursal = v.id_sucursal
+        WHERE v.id_empresa = ${tenantContext.requireTenantId()}
+          AND v.estado = 'COMPLETED' AND v.moneda = 'BOB'
+          AND COALESCE(v.fecha_confirmacion, v.fecha) >= ${period.start}
+          AND COALESCE(v.fecha_confirmacion, v.fecha) < ${period.endExclusive}
+          ${ids(Prisma.sql`v.id_sucursal`, filters.branchIds)}
+          ${ids(Prisma.sql`p.id_categoria`, filters.categoryIds)}
+          ${ids(Prisma.sql`p.id_producto`, filters.productIds)}
+          ${filters.channel ? Prisma.sql`AND v.canal::text = ${filters.channel}` : Prisma.empty}
+      )`;
+  }
+
+  private static readonly lineMetrics = Prisma.sql`COUNT(DISTINCT "saleId")::int AS "saleCount",
+    COALESCE(SUM(units), 0)::int AS "unitsSold", COALESCE(SUM(revenue), 0) AS revenue`;
+
+  /** Ventas agrupadas por una dimension de la lista blanca. */
+  salesGrouped(filters: CatalogReportFilters, period: Period) {
+    const key = {
+      branch: Prisma.sql`"branchId"::text`,
+      category: Prisma.sql`COALESCE("categoryId", 0)::text`,
+      channel: Prisma.sql`channel`,
+      day: Prisma.sql`local_date::date::text`,
+      week: Prisma.sql`date_trunc('week', local_date)::date::text`,
+      month: Prisma.sql`to_char(local_date, 'YYYY-MM')`,
+    }[filters.groupBy ?? 'branch'];
+    const label = {
+      branch: Prisma.sql`MIN("branchName")`,
+      category: Prisma.sql`MIN("categoryName")`,
+      channel: Prisma.sql`MIN(channel)`,
+      day: Prisma.sql`MIN(local_date::date::text)`,
+      week: Prisma.sql`MIN(date_trunc('week', local_date)::date::text)`,
+      month: Prisma.sql`MIN(to_char(local_date, 'YYYY-MM'))`,
+    }[filters.groupBy ?? 'branch'];
+    const chronological = ['day', 'week', 'month'].includes(
+      filters.groupBy ?? 'branch',
+    );
+    return this.prisma.$queryRaw`${this.salesLines(filters, period)}
+      SELECT ${key} AS key, ${label} AS label, ${ReportsRepository.lineMetrics}
+      FROM lines GROUP BY 1
+      ORDER BY ${chronological ? Prisma.sql`key` : Prisma.sql`revenue DESC, key`}`;
+  }
+
+  /** Top N productos por unidades, con su categoria. */
+  catalogTopProducts(filters: CatalogReportFilters, period: Period) {
+    return this.prisma.$queryRaw`${this.salesLines(filters, period)}
+      SELECT "productId", MIN("productName") AS "productName", MIN("categoryName") AS "categoryName",
+        ${ReportsRepository.lineMetrics}
+      FROM lines GROUP BY "productId"
+      ORDER BY "unitsSold" DESC, revenue DESC, "productId" LIMIT ${filters.limit ?? 10}`;
+  }
+
+  /** Categorias ordenadas por ingresos, con su participacion porcentual. */
+  topCategories(filters: CatalogReportFilters, period: Period) {
+    return this.prisma.$queryRaw`${this.salesLines(filters, period)},
+      grouped AS (
+        SELECT "categoryId", MIN("categoryName") AS "categoryName", ${ReportsRepository.lineMetrics},
+          COUNT(DISTINCT "productId")::int AS "productCount"
+        FROM lines GROUP BY "categoryId"
+      )
+      SELECT *, ROUND(100 * revenue / NULLIF(SUM(revenue) OVER (), 0), 1) AS share
+      FROM grouped ORDER BY revenue DESC, "categoryId" LIMIT ${filters.limit ?? 10}`;
+  }
+
+  /** Ingresos por sucursal y mes (para comparar sucursales en N meses). */
+  branchComparison(filters: CatalogReportFilters, period: Period) {
+    return this.prisma.$queryRaw`${this.salesLines(filters, period)}
+      SELECT to_char(local_date, 'YYYY-MM') AS month, "branchId", MIN("branchName") AS "branchName",
+        ${ReportsRepository.lineMetrics}
+      FROM lines GROUP BY 1, "branchId" ORDER BY 1, "branchId"`;
+  }
+
+  /** Productos activos con menor existencia disponible sumando sus variantes. */
+  lowStock(filters: CatalogReportFilters) {
+    const ids = (column: Prisma.Sql, values?: number[]) =>
+      values?.length
+        ? Prisma.sql`AND ${column} IN (${Prisma.join(values)})`
+        : Prisma.empty;
+    return this.prisma.$queryRaw`
+      SELECT p.id_producto AS "productId", p.nombre AS "productName",
+        COALESCE(c.nombre, 'Sin categoria') AS "categoryName",
+        COUNT(*)::int AS "variantCount",
+        COALESCE(SUM(i.cantidad_fisica - i.cantidad_reservada), 0)::int AS available,
+        COALESCE(SUM(i.cantidad_reservada), 0)::int AS reserved,
+        COUNT(*) FILTER (WHERE i.cantidad_fisica - i.cantidad_reservada <= 0)::int AS "outOfStockVariants"
+      FROM inventarios i
+      JOIN productos p ON p.id_producto = i.id_producto
+      JOIN sucursales s ON s.id_sucursal = i.id_sucursal
+      LEFT JOIN categorias c ON c.id_categoria = p.id_categoria
+      WHERE i.id_empresa = ${tenantContext.requireTenantId()} AND p.activo AND s.activa
+        ${ids(Prisma.sql`i.id_sucursal`, filters.branchIds)}
+        ${ids(Prisma.sql`p.id_categoria`, filters.categoryIds)}
+        ${ids(Prisma.sql`p.id_producto`, filters.productIds)}
+      GROUP BY p.id_producto, p.nombre, c.nombre
+      ORDER BY available, "outOfStockVariants" DESC, p.id_producto LIMIT ${filters.limit ?? 10}`;
   }
 }

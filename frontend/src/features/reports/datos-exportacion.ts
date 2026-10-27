@@ -2,7 +2,7 @@ import { revisionSesion } from '../../api/sesion';
 import { etiqueta } from '../../lib/format';
 import { reportesService } from '../../services/reportes.service';
 import type { FiltroReporte, FiltroInventarioReporte } from '../../types/reportes';
-import type { ReporteIA } from '../../types/ia';
+import type { ReporteIA, TablaIA } from '../../types/ia';
 import {
   tablasVentas,
   tablasTop,
@@ -10,6 +10,7 @@ import {
   tablasInventario,
   tablasCaja,
   type DocumentoReporte,
+  type TablaReporte,
 } from './modelo-exportacion';
 
 export function verificarSesion(revision: number) {
@@ -93,6 +94,12 @@ export async function cargarReporteIA(reporte: ReporteIA): Promise<DocumentoRepo
     case 'reservas':
       tablas = tablasReservas(reporte.reservas);
       break;
+    case 'catalogo':
+      tablas = [tablaCatalogo(reporte.grafico.titulo, reporte.tabla)];
+      break;
+    case 'aclaracion':
+    case 'no_soportado':
+      throw new Error('Esta solicitud no genero datos para exportar.');
     case 'inventario':
       tablas = tablasInventario(
         await inventarioCompleto({
@@ -104,7 +111,8 @@ export async function cargarReporteIA(reporte: ReporteIA): Promise<DocumentoRepo
       break;
   }
   return {
-    titulo: 'Reporte de FashionStore - ' + etiqueta(reporte.tipo),
+    titulo:
+      'Reporte de FashionStore - ' + (reporte.tipo === 'catalogo' ? reporte.grafico.titulo : etiqueta(reporte.tipo)),
     generado: new Date(),
     contexto: [
       ['Solicitud', reporte.pregunta],
@@ -120,7 +128,9 @@ export async function cargarReporteIA(reporte: ReporteIA): Promise<DocumentoRepo
               : (i.desde ?? 'Período predeterminado del servidor') + (i.hasta ? ' a ' + i.hasta : ''),
       ],
       ['Zona horaria', 'America/La_Paz'],
-      ['Sucursal', i.sucursal ?? 'Todas las autorizadas'],
+      ['Sucursal', i.sucursales?.length ? i.sucursales.join(', ') : (i.sucursal ?? 'Todas las autorizadas')],
+      ['Categorías', i.categorias?.length ? i.categorias.join(', ') : 'Todas'],
+      ['Productos', i.productos?.length ? i.productos.join(', ') : 'Todos'],
       ['Canal (ventas y ranking)', i.canal ? etiqueta(i.canal) : 'Todos'],
       ['Límite de ranking', String(i.limite ?? 10)],
       [
@@ -138,5 +148,17 @@ export async function cargarReporteIA(reporte: ReporteIA): Promise<DocumentoRepo
       ],
     ],
     tablas,
+  };
+}
+
+const FORMATO_EXPORT = { text: undefined, number: 'numero', money: 'dinero', percent: 'numero' } as const;
+
+/** Tabla generica del catalogo analitico con el mismo formato que los reportes convencionales. */
+export function tablaCatalogo(nombre: string, t: TablaIA): TablaReporte {
+  return {
+    nombre: nombre.slice(0, 31),
+    columnas: t.columnas.map((c) => ({ titulo: c.titulo, tipo: FORMATO_EXPORT[c.formato] })),
+    filas: t.filas.map((f) => t.columnas.map((c) => f[c.clave] ?? null)),
+    nota: 'Importes en Bs (solo ventas completadas en BOB). Datos limitados a tu empresa y a tus sucursales autorizadas.',
   };
 }

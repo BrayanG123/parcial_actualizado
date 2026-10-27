@@ -6,7 +6,6 @@ import {
   InventoryReportQueryDto,
   PeriodReportQueryDto,
   SalesReportQueryDto,
-  TopProductsQueryDto,
 } from '../reports/dto/report-query.dto.js';
 import { ReportsService } from '../reports/reports.service.js';
 import { REPORT_INTENT_SYSTEM, REPORT_SUMMARY_SYSTEM } from './ai-prompts.js';
@@ -19,11 +18,22 @@ import {
 } from './providers/ai-provider.js';
 import {
   type BranchOption,
-  parseIntentWithRules,
+  decideWithRules,
+  monthsBack,
+  type NamedOption,
+  REPORT_SUGGESTIONS,
+  type ReportDecision,
   type ReportIntent,
-  sanitizeIntent,
+  rejectReason,
+  sanitizeDecision,
   todayBolivia,
 } from './report-intent.js';
+import {
+  buildTable,
+  chooseChart,
+  type ReportTable,
+  summarizeCatalog,
+} from './report-presentation.js';
 
 type Row = Record<string, unknown>;
 const rows = (value: unknown): Row[] =>
@@ -52,44 +62,74 @@ export class AiReportsService {
   ) {}
 
   async query(dto: AiReportQueryDto, user: AuthenticatedUser) {
+    // Los pedidos prohibidos se rechazan antes de enviarlos al modelo.
+    const reason = rejectReason(dto.question);
+    if (reason)
+      return this.notAnswered(dto, 'rules', {
+        status: 'UNSUPPORTED',
+        message: reason,
+        suggestions: REPORT_SUGGESTIONS,
+      });
     const scopedBranch = user.roles.includes(Role.ADMINISTRATOR)
       ? undefined
       : (await this.repository.employee(user.id))?.branchId;
     // Se valida contra todas las sucursales activas para detectar cuando el
     // encargado pide otra y avisarle; al modelo solo se le ofrecen las autorizadas.
-    const todas = await this.repository.branches();
+    const [todas, catalog] = await Promise.all([
+      this.repository.branches(),
+      this.repository.reportCatalog(),
+    ]);
     const branches = scopedBranch
       ? todas.filter((b) => b.id === scopedBranch)
       : todas;
     const today = todayBolivia();
 
-    let intent: ReportIntent;
+    let decision: ReportDecision;
     let source: string = this.provider.name;
     try {
-      intent = sanitizeIntent(
+      decision = sanitizeDecision(
         await this.provider.generateJson({
           system: REPORT_INTENT_SYSTEM,
           temperature: 0,
-          prompt: `HOY: ${today}\nSUCURSALES: ${JSON.stringify(branches)}\nSOLICITUD: ${dto.question}`,
+          prompt: [
+            `HOY: ${today}`,
+            `SUCURSALES: ${JSON.stringify(branches)}`,
+            `CATEGORIAS: ${JSON.stringify(catalog.categories)}`,
+            `PRODUCTOS: ${JSON.stringify(catalog.products.slice(0, 120))}`,
+            `SOLICITUD: ${dto.question}`,
+          ].join('\n'),
         }),
         todas,
+        catalog,
       );
     } catch (error) {
       this.warn('report intent', error);
-      intent = parseIntentWithRules(dto.question, todas, today);
+      decision = decideWithRules(dto.question, todas, today, catalog);
       source = 'rules';
     }
+    if (decision.status !== 'OK')
+      return this.notAnswered(dto, source, decision);
+    const intent = decision.intent;
     // El encargado siempre consulta su sucursal; ReportsService lo vuelve a validar.
-    if (scopedBranch && intent.branchId !== scopedBranch) {
-      if (intent.branchId === undefined) intent.branchId = scopedBranch;
-      else {
-        intent.branchId = scopedBranch;
+    if (scopedBranch) {
+      const requested =
+        intent.branchIds ?? (intent.branchId ? [intent.branchId] : []);
+      if (requested.some((id) => id !== scopedBranch))
         intent.explanation += ' Se limito a tu sucursal asignada.';
-      }
+      intent.branchId = scopedBranch;
+      if (intent.branchIds) intent.branchIds = [scopedBranch];
     }
+    if (intent.report === 'branch-comparison')
+      Object.assign(intent, {
+        from: monthsBack(today, intent.months ?? 3),
+        to: today,
+      });
 
     const result = await this.run(intent, user);
-    let summary = summarize(intent, result);
+    const table = buildTable(intent, result);
+    const chart = chooseChart(intent, table);
+    let summary =
+      summarizeCatalog(intent, result, table) ?? summarize(intent, result);
     if (source !== 'rules')
       try {
         const output = (await this.provider.generateJson({
@@ -98,7 +138,7 @@ export class AiReportsService {
           prompt: JSON.stringify({
             solicitud: dto.question,
             interpretacion: intent.explanation,
-            resultado: compact(intent, result),
+            resultado: compact(intent, result, table),
           }),
         })) as { summary?: unknown };
         if (typeof output?.summary === 'string' && output.summary.trim())
@@ -107,7 +147,12 @@ export class AiReportsService {
         this.warn('report summary', error);
       }
 
+    const pick = (ids: number[] | undefined, options: NamedOption[]) =>
+      (ids ?? []).map(
+        (id) => options.find((o) => o.id === id)?.name ?? `#${id}`,
+      );
     return {
+      status: 'OK' as const,
       question: dto.question,
       source,
       model: source === 'rules' ? null : this.provider.model,
@@ -116,9 +161,34 @@ export class AiReportsService {
         branchName:
           todas.find((b: BranchOption) => b.id === intent.branchId)?.name ??
           null,
+        branchNames: pick(intent.branchIds, todas),
+        categoryNames: pick(intent.categoryIds, catalog.categories),
+        productNames: pick(intent.productIds, catalog.products),
       },
       summary,
+      table,
+      chart,
       result,
+    };
+  }
+
+  /** Respuesta sin datos: pide aclaracion o explica que no se puede atender. */
+  private notAnswered(
+    dto: AiReportQueryDto,
+    source: string,
+    decision: Exclude<ReportDecision, { status: 'OK' }>,
+  ) {
+    return {
+      status: decision.status,
+      question: dto.question,
+      source,
+      model: source === 'rules' ? null : this.provider.model,
+      interpretation: null,
+      summary: decision.message,
+      suggestions: decision.suggestions,
+      table: null,
+      chart: null,
+      result: null,
     };
   }
 
@@ -128,13 +198,27 @@ export class AiReportsService {
       to: intent.to,
       branchId: intent.branchId,
     };
+    const filters = {
+      from: intent.from,
+      to: intent.to,
+      branchIds: intent.branchIds,
+      categoryIds: intent.categoryIds,
+      productIds: intent.productIds,
+      channel: intent.channel,
+      groupBy: intent.groupBy,
+      limit: intent.limit ?? 10,
+    };
     switch (intent.report) {
+      case 'sales-grouped':
+      case 'top-categories':
+      case 'branch-comparison':
+      case 'low-stock':
       case 'top-products':
-        return this.reports.topProducts(
-          Object.assign(new TopProductsQueryDto(), period, {
-            channel: intent.channel,
-            limit: intent.limit ?? 10,
-          }),
+        return this.reports.catalog(intent.report, filters, user);
+      case 'sales-by-week':
+        return this.reports.catalog(
+          'sales-grouped',
+          { ...filters, groupBy: 'week' },
           user,
         );
       case 'inventory':
@@ -175,9 +259,16 @@ export class AiReportsService {
 }
 
 /** Solo lo necesario para el resumen; evita enviar filas extensas al modelo. */
-function compact(intent: ReportIntent, value: unknown) {
+function compact(intent: ReportIntent, value: unknown, table: ReportTable) {
   const result = (value ?? {}) as Row;
   switch (intent.report) {
+    case 'sales-grouped':
+    case 'sales-by-week':
+    case 'top-categories':
+    case 'branch-comparison':
+    case 'low-stock':
+    case 'top-products':
+      return { periodo: result.period, filas: table.rows.slice(0, 20) };
     case 'sales':
       return {
         periodo: result.period,

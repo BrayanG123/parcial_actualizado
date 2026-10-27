@@ -34,8 +34,39 @@ export interface InterpretacionReporteIA {
   limite: number | null;
   solo_stock_bajo: boolean;
   umbral_stock_bajo?: number;
+  /** Filtros multiples del catalogo analitico (F8). */
+  sucursales?: string[];
+  categorias?: string[];
+  productos?: string[];
+  agrupacion?: string | null;
+  meses?: number | null;
   explicacion: string;
 }
+
+/** Tabla normalizada que entrega el backend para cualquier reporte del catalogo. */
+export interface TablaIA {
+  columnas: Array<{
+    clave: string;
+    titulo: string;
+    formato: 'text' | 'number' | 'money' | 'percent';
+  }>;
+  filas: Array<Record<string, string | number | null>>;
+}
+/** Visualizacion elegida por el backend segun el reporte y la forma de los datos. */
+export interface GraficoIA {
+  tipo: 'barras' | 'lineas' | 'torta' | 'tabla';
+  titulo: string;
+  x: string | null;
+  series: Array<{ clave: string; titulo: string }>;
+  motivo: string;
+}
+export type ReporteCatalogo =
+  | 'sales-grouped'
+  | 'sales-by-week'
+  | 'top-products'
+  | 'top-categories'
+  | 'branch-comparison'
+  | 'low-stock';
 
 interface BaseReporteIA {
   pregunta: string;
@@ -53,4 +84,12 @@ export type ReporteIA = BaseReporteIA &
     | { tipo: 'inventario'; inventario: ReporteInventario }
     | { tipo: 'reservas'; reservas: ConteoPorEstado[] }
     | { tipo: 'caja'; caja: ReporteCaja }
+    | {
+        tipo: 'catalogo';
+        reporte: ReporteCatalogo;
+        tabla: TablaIA;
+        grafico: GraficoIA;
+      }
+    /** La solicitud era ambigua o pedia algo fuera del catalogo: no hay datos. */
+    | { tipo: 'aclaracion' | 'no_soportado'; sugerencias: string[] }
   );

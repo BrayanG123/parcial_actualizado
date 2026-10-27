@@ -41,6 +41,23 @@ export class AiRepository {
     });
   }
 
+  /** Categorias y productos activos que el interprete puede usar como filtros. */
+  async reportCatalog() {
+    const [categories, products] = await Promise.all([
+      this.prisma.category.findMany({
+        select: { id: true, name: true },
+        orderBy: { id: 'asc' },
+      }),
+      this.prisma.product.findMany({
+        where: { active: true },
+        select: { id: true, name: true },
+        orderBy: { id: 'asc' },
+        take: 300,
+      }),
+    ]);
+    return { categories, products };
+  }
+
   /** Catalogo activo con existencias de sucursales activas; acotado para la demo. */
   catalog() {
     return this.prisma.product.findMany({

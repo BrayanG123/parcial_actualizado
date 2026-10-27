@@ -292,19 +292,19 @@ cierra en F12 con lo realmente implementado.
 - [x] ~~**F6.9** Pruebas (`node:test`, como `test/push.test.mjs`) de la cola y el mapeo SQLite.~~ — 2026-10-28, commit `24394ab` (`test/offline-movil.test.mjs`, 7 casos sobre `node:sqlite`)
 
 ### F7 — Ventas offline y cambios de prendas
-- [x] ~~**F7.1** Registro completo de venta offline (todos los campos del enunciado 7.2) en web y móvil.~~ — 2026-10-29 (web y móvil guardan UUID, empresa, sucursal, usuario, cliente, fecha local, variantes, cantidades, precios, total, pago y estado; `tenantId`/`userId` verificados por el servidor; migración SQLite v2)
-- [x] ~~**F7.2** **Cambios de prendas**: plazo configurable por empresa (p. ej. 7 días), misma o distinta variante, diferencia de precio, devolución al stock y kardex; online y como operación `EXCHANGE` sincronizable.~~ — 2026-10-29 (modelo `cambios`, migración `20261029000000_exchanges`, `POST /exchanges`, `EXCHANGE` en `/sync`, `/caja/cambios` online y offline; plazo en `PATCH /tenant/settings`)
-- [x] ~~**F7.3** Aporte propio adicional (proponer y anotar aquí; p. ej. devoluciones con nota de crédito o cupones).~~ — 2026-10-29 (aporte propio: **nota de crédito** por diferencia a favor del cliente, consulta y canje parcial con saldo)
-- [x] ~~**F7.4** Pruebas de consistencia de inventario (venta offline + venta online concurrente, cambio de prenda).~~ — 2026-10-29 (`test/exchanges.e2e-spec.ts`: venta offline vs. online por la última unidad, dos cambios simultáneos de la misma línea, kardex y stock)
+- [x] ~~**F7.1** Registro completo de venta offline (todos los campos del enunciado 7.2) en web y móvil.~~ — 2026-10-27 (web y móvil guardan UUID, empresa, sucursal, usuario, cliente, fecha local, variantes, cantidades, precios, total, pago y estado; `tenantId`/`userId` verificados por el servidor; migración SQLite v2)
+- [x] ~~**F7.2** **Cambios de prendas**: plazo configurable por empresa (p. ej. 7 días), misma o distinta variante, diferencia de precio, devolución al stock y kardex; online y como operación `EXCHANGE` sincronizable.~~ — 2026-10-27 (modelo `cambios`, migración `20261029000000_exchanges`, `POST /exchanges`, `EXCHANGE` en `/sync`, `/caja/cambios` online y offline; plazo en `PATCH /tenant/settings`)
+- [x] ~~**F7.3** Aporte propio adicional (proponer y anotar aquí; p. ej. devoluciones con nota de crédito o cupones).~~ — 2026-10-27 (aporte propio: **nota de crédito** por diferencia a favor del cliente, consulta y canje parcial con saldo)
+- [x] ~~**F7.4** Pruebas de consistencia de inventario (venta offline + venta online concurrente, cambio de prenda).~~ — 2026-10-27 (`test/exchanges.e2e-spec.ts`: venta offline vs. online por la última unidad, dos cambios simultáneos de la misma línea, kardex y stock)
 
 ### F8 — Reportes generativos con IA
-- [ ] **F8.1** Catálogo de reportes ampliado (≥6 tipos, sección 3.6) con consultas parametrizadas multi-tabla y filtros (fechas, sucursales, categorías, productos, canal).
-- [ ] **F8.2** Intérprete: IA → intención JSON validada (lista blanca); reglas de respaldo sin IA; manejo de ambiguas/incompletas/no soportadas.
-- [ ] **F8.3** Respuesta con datos + especificación de gráfico elegida dinámicamente + narrativa.
-- [ ] **F8.4** UI web: texto y voz, tabla/gráfico dinámico, exportar Excel/PDF con formato de reporte convencional.
-- [ ] **F8.5** Restricción por tenant, rol/sucursal y plan (`aiReports`).
-- [ ] **F8.6** (Opcional) Reportes IA en móvil.
-- [ ] **F8.7** Pruebas: intención→consulta, filtros, aislamiento de tenant, rechazo de pedidos no permitidos.
+- [x] ~~**F8.1** Catálogo de reportes ampliado (≥6 tipos, sección 3.6) con consultas parametrizadas multi-tabla y filtros (fechas, sucursales, categorías, productos, canal).~~ — 2026-10-27 (10 tipos: `sales`, `sales-grouped` por sucursal/categoría/canal/día/semana/mes, `sales-by-week`, `top-products`, `top-categories`, `branch-comparison` en N meses, `low-stock`, `inventory`, `reservations`, `cash-shifts`; `ReportsService.catalog` con `Prisma.sql` sobre ventas+detalle+productos+categorías+sucursales)
+- [x] ~~**F8.2** Intérprete: IA → intención JSON validada (lista blanca); reglas de respaldo sin IA; manejo de ambiguas/incompletas/no soportadas.~~ — 2026-10-27 (`sanitizeDecision` con ids de listas permitidas; `decideWithRules`; `NEEDS_CLARIFICATION`/`UNSUPPORTED` con sugerencias; `rejectReason` corta escrituras, datos personales, otras empresas y SQL antes del modelo)
+- [x] ~~**F8.3** Respuesta con datos + especificación de gráfico elegida dinámicamente + narrativa.~~ — 2026-10-27 (`table` tipada + `chart` de `chooseChart`: líneas/torta/barras/tabla según reporte y datos; narrativa del modelo o determinista)
+- [x] ~~**F8.4** UI web: texto y voz, tabla/gráfico dinámico, exportar Excel/PDF con formato de reporte convencional.~~ — 2026-10-27 (`GraficoDinamico` con Recharts, tabla, aclaraciones con sugerencias; exportación verificada con Playwright)
+- [x] ~~**F8.5** Restricción por tenant, rol/sucursal y plan (`aiReports`).~~ — 2026-10-27 (consultas filtran `id_empresa`; encargado limitado a su sucursal con `scopedMany`; `aiReports`; permitido en solo lectura porque solo consulta)
+- [ ] **F8.6** (Opcional) Reportes IA en móvil. — no implementado en esta fase; el endpoint ya devuelve `table`/`chart` reutilizables desde la app.
+- [x] ~~**F8.7** Pruebas: intención→consulta, filtros, aislamiento de tenant, rechazo de pedidos no permitidos.~~ — 2026-10-27 (`report-intent.spec.ts` +3, `ai.e2e-spec.ts` +5 con ventas reales y otra empresa, `reporte-ia.test.tsx` 4)
 
 ### F9 — Módulo de Machine Learning
 - [ ] **F9.1** Crear `ml-service/` (FastAPI, scikit-learn, pandas, Dockerfile, `pytest`).

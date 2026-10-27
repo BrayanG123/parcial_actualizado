@@ -3,6 +3,7 @@ import type { AuthenticatedUser } from '../../common/decorators/current-user.dec
 import { Role } from '../../common/enums/role.enum.js';
 import {
   CashShiftsReportQueryDto,
+  type CatalogReportFilters,
   InventoryReportQueryDto,
   PeriodReportQueryDto,
   SalesReportQueryDto,
@@ -75,5 +76,49 @@ export class ReportsService {
       filters: scoped,
       items: await this.repository.reservations(scoped.branchId, period),
     });
+  }
+
+  /** Igual que `scoped`, pero con varias sucursales: el encargado solo ve la suya. */
+  private async scopedMany(
+    filters: CatalogReportFilters,
+    user: AuthenticatedUser,
+  ): Promise<CatalogReportFilters> {
+    if (user.roles.includes(Role.ADMINISTRATOR)) return { ...filters };
+    const { branchId } = await this.scoped<{ branchId?: number }>({}, user);
+    if (filters.branchIds?.some((id) => id !== branchId))
+      throw new ForbiddenException(
+        'Reports are limited to your assigned branch',
+      );
+    return { ...filters, branchIds: [branchId!] };
+  }
+
+  /** Reportes del catalogo analitico (seccion 3.6): ventas agrupadas, rankings, comparaciones y existencias. */
+  async catalog(
+    report:
+      | 'sales-grouped'
+      | 'top-products'
+      | 'top-categories'
+      | 'branch-comparison'
+      | 'low-stock',
+    filters: CatalogReportFilters,
+    user: AuthenticatedUser,
+  ) {
+    const scoped = await this.scopedMany(filters, user);
+    if (report === 'low-stock')
+      return reportNumbers({
+        generatedAt: new Date(),
+        filters: scoped,
+        items: await this.repository.lowStock(scoped),
+      });
+    const period = reportPeriod(filters.from, filters.to);
+    const items =
+      report === 'top-products'
+        ? await this.repository.catalogTopProducts(scoped, period)
+        : report === 'top-categories'
+          ? await this.repository.topCategories(scoped, period)
+          : report === 'branch-comparison'
+            ? await this.repository.branchComparison(scoped, period)
+            : await this.repository.salesGrouped(scoped, period);
+    return reportNumbers({ period, filters: scoped, items });
   }
 }

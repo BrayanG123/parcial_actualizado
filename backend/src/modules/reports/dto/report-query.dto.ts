@@ -71,3 +71,15 @@ export class InventoryReportQueryDto extends BranchReportQueryDto {
   @Max(100)
   limit = 20;
 }
+
+/** Filtros del catalogo de reportes analiticos (solo lo construye el backend). */
+export interface CatalogReportFilters {
+  from?: string;
+  to?: string;
+  branchIds?: number[];
+  categoryIds?: number[];
+  productIds?: number[];
+  channel?: 'IN_STORE' | 'WEB' | 'MOBILE';
+  groupBy?: 'branch' | 'category' | 'channel' | 'day' | 'week' | 'month';
+  limit?: number;
+}
