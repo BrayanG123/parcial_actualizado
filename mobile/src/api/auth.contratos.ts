@@ -24,6 +24,8 @@ export interface SesionBackend {
   accessToken: string;
   tokenType: 'Bearer';
   user: UsuarioBackend;
+  /** Empresa de la cuenta (parcial 2). */
+  tenant?: { id: number; slug: string; name: string } | null;
 }
 
 /** La app es para clientes: la cuenta sin perfil de cliente se trata como Usuario. */

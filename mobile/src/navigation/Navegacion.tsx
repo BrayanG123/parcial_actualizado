@@ -28,6 +28,14 @@ import { PantallaAcceso } from '../features/auth/PantallaAcceso';
 import { colores, fuentes } from '../theme';
 import type { RootStackParamList } from './tipos';
 import { Tabs } from './Tabs';
+import { TabsVendedor } from './TabsVendedor';
+import { PantallaTiendas } from '../features/offline/PantallaTiendas';
+import { PantallaTiendaOffline } from '../features/offline/PantallaTiendaOffline';
+import { PantallaPendientes } from '../features/offline/PantallaPendientes';
+import { RolNombre } from '../types/domain';
+
+/** Personal que vende en tienda: la app abre el modo vendedor (F6.6). */
+const ROLES_VENDEDOR: string[] = [RolNombre.CAJERO, RolNombre.ENCARGADO_SUCURSAL, RolNombre.ADMINISTRADOR];
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -53,6 +61,7 @@ export function Navegacion() {
   const ref = useNavigationContainerRef<RootStackParamList>();
   const [lista, setLista] = useState(false);
   const { usuario, restaurando } = useSesion();
+  const vendedor = Boolean(usuario?.roles.some((r) => ROLES_VENDEDOR.includes(String(r.nombre))));
   const { pendiente, consumir } = usePush();
   const accesoPedido = useRef<string | null>(null);
   useEffect(() => {
@@ -82,7 +91,10 @@ export function Navegacion() {
           contentStyle: { backgroundColor: colores.crema },
         }}
       >
-        <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
+        <Stack.Screen name="Tabs" component={vendedor ? TabsVendedor : Tabs} options={{ headerShown: false }} />
+        <Stack.Screen name="Tiendas" component={PantallaTiendas} options={{ title: 'Elegir tienda' }} />
+        <Stack.Screen name="TiendaOffline" component={PantallaTiendaOffline} options={{ title: 'Tienda sin conexion' }} />
+        <Stack.Screen name="Pendientes" component={PantallaPendientes} options={{ title: 'Pendientes' }} />
         <Stack.Screen name="Producto" component={PantallaProducto} options={{ title: 'Producto' }} />
         <Stack.Screen name="Probador" component={PantallaProbador} options={{ title: 'Probador virtual' }} />
         <Stack.Screen name="Checkout" component={PantallaCheckout} options={{ title: 'Finalizar compra' }} />

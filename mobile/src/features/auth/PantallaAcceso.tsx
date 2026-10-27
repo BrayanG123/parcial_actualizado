@@ -20,6 +20,7 @@ import { Pantalla } from '../../components/Pantalla';
 import { useAvisos } from '../../context/AvisosContext';
 import { useSesion } from '../../context/SesionContext';
 import { USAR_MOCKS } from '../../api/http';
+import { useEmpresaActiva } from '../../hooks/useEmpresa';
 import { hayErrores, validarLogin, validarRegistro, type Errores } from '../../lib/validacion';
 import type { PropsStack } from '../../navigation/tipos';
 import { colores, esp, radio, texto } from '../../theme';
@@ -27,6 +28,7 @@ import { colores, esp, radio, texto } from '../../theme';
 const CUENTA_DEMO = { email: 'cliente@fashionstore.bo', password: 'cliente123' };
 
 export function PantallaAcceso({ navigation, route }: PropsStack<'Acceso'>) {
+  const empresa = useEmpresaActiva();
   const [modo, setModo] = useState<'login' | 'registro'>(route.params?.modo ?? 'login');
   const motivo = route.params?.motivo;
 
@@ -43,6 +45,12 @@ export function PantallaAcceso({ navigation, route }: PropsStack<'Acceso'>) {
           </Text>
 
           {motivo ? <AvisoEnLinea texto={motivo} tipo="info" /> : null}
+
+          <Pressable onPress={() => navigation.navigate('Tiendas')} accessibilityRole="button">
+            <Text style={estilos.omitirTexto}>
+              Tienda: {empresa?.nombre ?? empresa?.slug ?? 'FashionStore'} · cambiar
+            </Text>
+          </Pressable>
 
           <View style={estilos.conmutador}>
             <Opcion texto="Iniciar sesion" activo={modo === 'login'} onPress={() => setModo('login')} />

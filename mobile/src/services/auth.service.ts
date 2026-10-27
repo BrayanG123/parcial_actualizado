@@ -7,6 +7,7 @@
  */
 import { api, USAR_MOCKS } from '../api/http';
 import { guardarToken } from '../api/almacenamiento';
+import { fijarEmpresa } from '../api/empresa';
 import { endpoints } from '../api/endpoints';
 import { adaptarUsuario, type SesionBackend, type UsuarioBackend } from '../api/auth.contratos';
 import { rutasMock } from '../mocks/endpoints';
@@ -47,6 +48,8 @@ async function crearSesion(url: string, datos: object): Promise<Usuario> {
   if (!sesion.accessToken || sesion.tokenType !== 'Bearer' || !sesion.user?.active) {
     throw new ErrorApi('El servidor no devolvio una sesion valida.', 502);
   }
+  // La tienda activa pasa a ser la empresa real de la cuenta.
+  if (sesion.tenant) fijarEmpresa({ slug: sesion.tenant.slug, nombre: sesion.tenant.name });
   guardarToken(sesion.accessToken);
   return adaptarUsuario(sesion.user);
 }

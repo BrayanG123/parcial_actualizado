@@ -152,6 +152,24 @@ export function PantallaPerfil({ navigation }: PropsTab<'Perfil'>) {
             detalle="Pide recomendaciones de prendas"
             onPress={() => navigation.navigate('Asistente')}
           />
+          <Acceso
+            icono="cloud-offline-outline"
+            titulo="Tienda sin conexion"
+            detalle="Descarga el catalogo y reserva aunque no tengas internet"
+            onPress={() => navigation.navigate('TiendaOffline')}
+          />
+          <Acceso
+            icono="sync-outline"
+            titulo="Operaciones pendientes"
+            detalle="Reservas offline y su sincronizacion"
+            onPress={() => navigation.navigate('Pendientes')}
+          />
+          <Acceso
+            icono="storefront-outline"
+            titulo="Cambiar de tienda"
+            detalle="Elige otra empresa de la plataforma"
+            onPress={() => navigation.navigate('Tiendas')}
+          />
         </View>
 
         <View style={estilos.tarjeta}>

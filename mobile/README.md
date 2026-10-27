@@ -12,6 +12,30 @@ cambiar el backend: los DTO en ingles se traducen al dominio en espanol en
 La app no es un panel administrativo: la gestion de catalogo, inventario,
 caja y reportes vive en el frontend web.
 
+## Parcial 2: tiendas, SQLite offline y modo vendedor
+
+- **Tienda (empresa):** se elige en *Acceso* o *Perfil > Cambiar de tienda*
+  (`GET /tenant/directory`); se envia como `X-Tenant` sin sesion. Al iniciar sesion
+  la tienda pasa a ser la de la cuenta. Sin elegir, el backend usa `fashionstore`.
+- **SQLite (`expo-sqlite` ~57.0.4, modulo nativo):** `src/offline/nucleo.ts` (esquema
+  con migraciones `PRAGMA user_version`, repositorio, cola y sincronizador),
+  `src/offline/sqlite.ts` (adaptador) y `src/offline/servicio.ts`. Tablas:
+  sucursales, descargas, productos, variantes, clientes, operaciones,
+  operacion_lineas y sync_resultados. Contrato comun con la web: `/sync/snapshot` y
+  `/sync/operations` (`backend/docs/ventas-offline.md`).
+- **Cliente:** *Perfil > Tienda sin conexion* descarga el catalogo de una sucursal,
+  lo muestra con su antiguedad y stock conocido, y permite reservar sin internet.
+- **Modo vendedor:** cajero, encargado o administrador ven *Vender*, *Pendientes* y
+  *Cuenta*. El turno se abre con conexion (web/caja); luego se descargan los datos y
+  se cobra en efectivo sin internet.
+- **Pendientes:** estados `LOCAL/SENDING/CONFIRMED/REJECTED/CONFLICT/RETRY` (+
+  descartada); se envian al abrir la app y cada 30 s, con reintentos crecientes. Al
+  abrir la app sin red se conserva la sesion para consultar y registrar operaciones.
+- **Importante:** `expo-sqlite` es nativo: **requiere generar una APK nueva** (no
+  llega por OTA). En `npm run web` el modo offline no esta disponible
+  (`src/offline/sqlite.web.ts`).
+- Pruebas: `npm run test:offline` (node:test sobre `node:sqlite` con el mismo SQL).
+
 ## Puesta en marcha
 
 ```bash

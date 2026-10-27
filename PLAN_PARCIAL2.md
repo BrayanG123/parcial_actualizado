@@ -89,7 +89,7 @@ cd backend && npx tsc --noEmit -p tsconfig.build.json && npx vitest run && npx o
 # frontend
 cd frontend && npm test && npx tsc -b && npx oxlint
 # mobile
-cd mobile && npm run typecheck && npm run lint && npm run test:push && npm run test:reservas
+cd mobile && npm run typecheck && npm run lint && npm run test:push && npm run test:reservas && npm run test:offline
 # (agregar aquí los scripts de prueba nuevos que se creen, p. ej. test:sync)
 # ml-service (cuando exista)
 cd ml-service && pytest -q
@@ -269,25 +269,27 @@ cierra en F12 con lo realmente implementado.
 - [x] ~~**F4.8** Pruebas: idempotencia (reenvío no duplica), conflictos, rechazo cross-tenant, recuperación tras error.~~ — 2026-10-28, commit `6f2e63c` (`test/sync.e2e-spec.ts`, 9 casos + `sync-outcome.spec.ts`)
 
 ### F5 — Web PWA offline
-- [x] ~~**F5.1** Migrar persistencia offline de `localStorage` a **IndexedDB** (capas: repositorio local / cola / sincronizador / UI), migrando tickets existentes.~~ — 2026-10-28 (`src/offline/{db,repositorio,cola,sincronizador,migracion}.ts`; tickets antiguos migrados con su id y su lote; backend acepta `offlineBatchId` en `SALE_CASH`)
-- [x] ~~**F5.2** Catálogo offline consultable (productos, precios, tallas, colores, stock conocido) con indicador de antigüedad de datos.~~ — 2026-10-28 (`/offline`: búsqueda, categorías, precios, tallas, colores, stock conocido y aviso de antigüedad >12 h)
-- [x] ~~**F5.3** Venta de contado offline usando el contrato `/sync/operations`.~~ — 2026-10-28 (`/caja/offline` reescrita sobre `/sync/operations`)
-- [x] ~~**F5.4** Reserva offline.~~ — 2026-10-28 (reserva offline del cliente en `/offline`)
-- [x] ~~**F5.5** Pantalla de operaciones pendientes con estados (`LOCAL/SENDING/CONFIRMED/REJECTED/CONFLICT`), detalle de conflictos, reintento y resolución.~~ — 2026-10-28 (`/pendientes` y `/caja/pendientes`: filtros por estado, detalle de conflicto, reintentar y descartar sin borrar)
-- [x] ~~**F5.6** Sincronización automática al recuperar conexión + manual; indicador global online/offline.~~ — 2026-10-28 (`IndicadorConexion` en ambos layouts; auto-sync al reconectar y cada 30 s)
-- [x] ~~**F5.7** Verificar instalación PWA, recarga sin red y persistencia tras cerrar el navegador.~~ — 2026-10-28 (Playwright sobre build de producción con perfil persistente: SW activo + manifest, recarga sin red, cierre/reapertura del navegador, confirmación al reconectar — venta #40 y reserva #10)
-- [x] ~~**F5.8** Pruebas (cola, reintentos, no-borrado, estados, idempotencia del lado cliente).~~ — 2026-10-28 (`test/offline-sync.test.ts` 9 casos + `offline-ui.test.tsx` reescrita; detectaron doble registro por doble clic y orden inestable, corregidos)
+- [x] ~~**F5.1** Migrar persistencia offline de `localStorage` a **IndexedDB** (capas: repositorio local / cola / sincronizador / UI), migrando tickets existentes.~~ — 2026-10-28, commit `751134b` (`src/offline/{db,repositorio,cola,sincronizador,migracion}.ts`; tickets antiguos migrados con su id y su lote; backend acepta `offlineBatchId` en `SALE_CASH`)
+- [x] ~~**F5.2** Catálogo offline consultable (productos, precios, tallas, colores, stock conocido) con indicador de antigüedad de datos.~~ — 2026-10-28, commit `751134b` (`/offline`: búsqueda, categorías, precios, tallas, colores, stock conocido y aviso de antigüedad >12 h)
+- [x] ~~**F5.3** Venta de contado offline usando el contrato `/sync/operations`.~~ — 2026-10-28, commit `751134b` (`/caja/offline` reescrita sobre `/sync/operations`)
+- [x] ~~**F5.4** Reserva offline.~~ — 2026-10-28, commit `751134b` (reserva offline del cliente en `/offline`)
+- [x] ~~**F5.5** Pantalla de operaciones pendientes con estados (`LOCAL/SENDING/CONFIRMED/REJECTED/CONFLICT`), detalle de conflictos, reintento y resolución.~~ — 2026-10-28, commit `751134b` (`/pendientes` y `/caja/pendientes`: filtros por estado, detalle de conflicto, reintentar y descartar sin borrar)
+- [x] ~~**F5.6** Sincronización automática al recuperar conexión + manual; indicador global online/offline.~~ — 2026-10-28, commit `751134b` (`IndicadorConexion` en ambos layouts; auto-sync al reconectar y cada 30 s)
+- [x] ~~**F5.7** Verificar instalación PWA, recarga sin red y persistencia tras cerrar el navegador.~~ — 2026-10-28, commit `751134b` (Playwright sobre build de producción con perfil persistente: SW activo + manifest, recarga sin red, cierre/reapertura del navegador, confirmación al reconectar — venta #40 y reserva #10)
+- [x] ~~**F5.8** Pruebas (cola, reintentos, no-borrado, estados, idempotencia del lado cliente).~~ — 2026-10-28, commit `751134b` (`test/offline-sync.test.ts` 9 casos + `offline-ui.test.tsx` reescrita; detectaron doble registro por doble clic y orden inestable, corregidos)
 
 ### F6 — Móvil SQLite + modo vendedor
-- [ ] **F6.1** Integrar `expo-sqlite` (según docs SDK 57) con esquema y migraciones versionadas (sección 3.5).
-- [ ] **F6.2** Descarga y almacenamiento del subconjunto del catálogo y sucursales autorizadas.
-- [ ] **F6.3** Consulta offline de productos, precios y existencias conocidas (con antigüedad de datos).
-- [ ] **F6.4** Selección de tienda (tenant) para clientes y envío de `X-Tenant`.
-- [ ] **F6.5** Reserva offline (cliente).
-- [ ] **F6.6** **Modo vendedor**: POS de contado offline para personal (turno abierto con conexión, cobro, ticket).
-- [ ] **F6.7** Cola de sincronización (reintentos con backoff, no-borrado, estados) y pantalla de pendientes/resultados.
+- [x] ~~**F6.1** Integrar `expo-sqlite` (según docs SDK 57) con esquema y migraciones versionadas (sección 3.5).~~ — 2026-10-28 (`expo-sqlite@~57.0.4`, etiqueta `sdk-57` del registro npm; esquema normalizado + migraciones `user_version` en `src/offline/nucleo.ts`)
+  - ⚠️ `docs.expo.dev` no es accesible desde la nube (DNS bloqueado) y `expo install` falla por proxy: la API se verificó con los tipos `.d.ts` y el CHANGELOG del paquete instalado. Revisar contra la doc versionada en local.
+- [x] ~~**F6.2** Descarga y almacenamiento del subconjunto del catálogo y sucursales autorizadas.~~ — 2026-10-28 (`GET /sync/snapshot` → tablas sucursales/productos/variantes/clientes/descargas)
+- [x] ~~**F6.3** Consulta offline de productos, precios y existencias conocidas (con antigüedad de datos).~~ — 2026-10-28 (catálogo local con stock conocido y antigüedad)
+- [x] ~~**F6.4** Selección de tienda (tenant) para clientes y envío de `X-Tenant`.~~ — 2026-10-28 (`PantallaTiendas`, `X-Tenant` sin sesión; verificado en la vista web exportada)
+- [x] ~~**F6.5** Reserva offline (cliente).~~ — 2026-10-28 (`PantallaTiendaOffline`)
+- [x] ~~**F6.6** **Modo vendedor**: POS de contado offline para personal (turno abierto con conexión, cobro, ticket).~~ — 2026-10-28 (`TabsVendedor`: Vender, Pendientes, Cuenta)
+- [x] ~~**F6.7** Cola de sincronización (reintentos con backoff, no-borrado, estados) y pantalla de pendientes/resultados.~~ — 2026-10-28 (`PantallaPendientes`; backoff 5 s–5 min; resultados en `sync_resultados`)
 - [ ] **F6.8** Persistencia tras cerrar/reiniciar la app (verificación manual + prueba).
-- [ ] **F6.9** Pruebas (`node:test`, como `test/push.test.mjs`) de la cola y el mapeo SQLite.
+  - ⏳ Falta: verificación manual en el teléfono con la APK nueva (F11.4). Cubierto por prueba (reapertura del archivo SQLite) y la sesión ya no se descarta al abrir sin red.
+- [x] ~~**F6.9** Pruebas (`node:test`, como `test/push.test.mjs`) de la cola y el mapeo SQLite.~~ — 2026-10-28 (`test/offline-movil.test.mjs`, 7 casos sobre `node:sqlite`)
 
 ### F7 — Ventas offline y cambios de prendas
 - [ ] **F7.1** Registro completo de venta offline (todos los campos del enunciado 7.2) en web y móvil.

@@ -11,6 +11,7 @@ import axios, { AxiosError, type AxiosRequestConfig } from 'axios';
 import { ErrorApi } from '../types/api';
 import { mockRequest } from '../mocks';
 import { guardarToken, obtenerToken } from './almacenamiento';
+import { obtenerEmpresa } from './empresa';
 import { desenvolverRespuesta, type RespuestaBackend } from './contratos';
 
 export const USAR_MOCKS = process.env.EXPO_PUBLIC_USE_MOCKS === 'true';
@@ -26,6 +27,9 @@ export const instancia = axios.create({
 instancia.interceptors.request.use((config) => {
   const token = obtenerToken();
   if (token && !config.headers.Authorization) config.headers.Authorization = `Bearer ${token}`;
+  // Sin sesion, la tienda elegida decide la empresa; con sesion manda el token.
+  const empresa = obtenerEmpresa();
+  if (!config.headers.Authorization && empresa) config.headers['X-Tenant'] = empresa.slug;
   return config;
 });
 
