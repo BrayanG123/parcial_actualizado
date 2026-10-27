@@ -3,6 +3,7 @@
  */
 import { api } from '../api/http';
 import { guardarToken, revisionSesion } from '../api/sesion';
+import { fijarEmpresa } from '../api/empresa';
 import {
   adaptarUsuario,
   type RegistroBackend,
@@ -39,6 +40,8 @@ async function crearSesion(
     throw new ErrorApi('El servidor no devolvio una sesion valida.', 502);
   }
   const usuario = adaptarUsuario(sesion.user);
+  // La tienda activa pasa a ser la empresa real de la cuenta.
+  if (sesion.tenant) fijarEmpresa({ slug: sesion.tenant.slug, nombre: sesion.tenant.name });
   guardarToken(sesion.accessToken);
   return usuario;
 }

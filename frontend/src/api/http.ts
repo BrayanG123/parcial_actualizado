@@ -11,6 +11,7 @@ import { BASE_URL, USAR_MOCKS } from './config';
 import { desenvolverRespuesta, type RespuestaBackend } from './contratos';
 import { endpoints } from './endpoints';
 import { guardarToken, obtenerToken, revisionSesion } from './sesion';
+import { slugEmpresa } from './empresa';
 export { USAR_MOCKS } from './config';
 export { guardarToken, obtenerToken } from './sesion';
 
@@ -96,14 +97,37 @@ const TRADUCCIONES: Record<string, string> = {
   'User is inactive or no longer exists': 'Tu cuenta esta desactivada o ya no existe.',
 };
 
-function normalizarError(error: unknown): ErrorApi {
+/** Reglas SaaS (plan, suscripcion, empresa): mensaje claro segun el codigo del backend. */
+export const MENSAJES_CODIGO: Record<string, string> = {
+  SUBSCRIPTION_READ_ONLY:
+    'La suscripcion de tu empresa no esta vigente: el sistema esta en modo solo lectura. Contacta al administrador de la plataforma para renovarla.',
+  PLAN_FEATURE_REQUIRED:
+    'Esta funcion no esta incluida en el plan de tu empresa. Solicita un cambio de plan para usarla.',
+  PLAN_LIMIT_REACHED:
+    'Tu empresa alcanzo el limite de sucursales activas de su plan. Desactiva una sucursal o cambia de plan.',
+  PLAN_LIMIT_EXCEEDED:
+    'El uso actual de la empresa no cabe en el plan elegido. Reduce las sucursales activas antes de cambiarlo.',
+  TENANT_MISMATCH:
+    'Tu sesion pertenece a otra tienda. Cierra sesion para cambiar de empresa.',
+  TENANT_INACTIVE: 'La empresa esta inactiva. Contacta al administrador de la plataforma.',
+  TENANT_REQUIRED: 'Selecciona una tienda para continuar.',
+};
+
+export function normalizarError(error: unknown): ErrorApi {
   if (error instanceof ErrorApi) return error;
 
   if (axios.isAxiosError(error)) {
-    const err = error as AxiosError<{ message?: string | string[] }>;
+    const err = error as AxiosError<{ message?: string | string[]; code?: string }>;
     const status = err.response?.status ?? 0;
     if (!err.response) {
       return new ErrorApi('No pudimos conectar con el servidor. Verifica tu conexion.', 0);
+    }
+    const codigo = err.response.data?.code;
+    if (codigo && MENSAJES_CODIGO[codigo]) {
+      return new ErrorApi(MENSAJES_CODIGO[codigo], status, undefined, undefined, codigo);
+    }
+    if (status === 404 && err.response.data?.message === 'Empresa no encontrada') {
+      return new ErrorApi('La tienda solicitada no existe.', 404, undefined, undefined, 'TENANT_NOT_FOUND');
     }
     const detalle = err.response.data?.message;
     const mensajes = (Array.isArray(detalle) ? detalle : detalle ? [detalle] : []).map(
@@ -155,6 +179,8 @@ async function peticion<T>(
       headers: {
         ...config?.headers,
         ...(!publica && token ? { Authorization: `Bearer ${token}` } : {}),
+        // Sin sesion, la empresa activa elige la tienda; con sesion manda el token.
+        ...((publica || !token) && slugEmpresa() ? { 'X-Tenant': slugEmpresa() } : {}),
       },
     });
     return desenvolverRespuesta(respuesta.data);
@@ -179,4 +205,56 @@ export const api = {
   put: <T>(url: string, datos?: unknown) => peticion<T>('PUT', url, datos),
   patch: <T>(url: string, datos?: unknown) => peticion<T>('PATCH', url, datos),
   delete: <T>(url: string, datos?: unknown) => peticion<T>('DELETE', url, datos),
+};
+
+/* --- sesion del administrador de plataforma --- */
+
+/**
+ * El administrador de plataforma no pertenece a ninguna empresa: su token se guarda
+ * aparte para no mezclarse con la sesion de la tienda ni con el contexto de empresa.
+ */
+export const CLAVE_TOKEN_PLATAFORMA = `fashionstore.plataforma:${USAR_MOCKS ? 'mock' : BASE_URL}`;
+
+export function tokenPlataforma(): string | null {
+  try {
+    return localStorage.getItem(CLAVE_TOKEN_PLATAFORMA);
+  } catch {
+    return null;
+  }
+}
+
+export function guardarTokenPlataforma(token: string | null): void {
+  try {
+    if (token) localStorage.setItem(CLAVE_TOKEN_PLATAFORMA, token);
+    else localStorage.removeItem(CLAVE_TOKEN_PLATAFORMA);
+  } catch {
+    /* Sin almacenamiento la sesion de plataforma no persiste. */
+  }
+}
+
+async function peticionPlataforma<T>(metodo: Metodo, url: string, datos?: unknown): Promise<T> {
+  const token = tokenPlataforma();
+  try {
+    if (USAR_MOCKS) {
+      const { mockRequest } = await import('../mocks');
+      return await mockRequest<T>(metodo, url, datos);
+    }
+    const respuesta = await instancia.request<RespuestaBackend<T>>({
+      method: metodo,
+      url,
+      data: datos,
+      headers: token && url !== endpoints.plataforma.login ? { Authorization: `Bearer ${token}` } : {},
+    });
+    return desenvolverRespuesta(respuesta.data);
+  } catch (error) {
+    const normalizado = normalizarError(error);
+    if (normalizado.status === 401 && url !== endpoints.plataforma.login) guardarTokenPlataforma(null);
+    throw normalizado;
+  }
+}
+
+export const apiPlataforma = {
+  get: <T>(url: string) => peticionPlataforma<T>('GET', url),
+  post: <T>(url: string, datos?: unknown) => peticionPlataforma<T>('POST', url, datos),
+  patch: <T>(url: string, datos?: unknown) => peticionPlataforma<T>('PATCH', url, datos),
 };

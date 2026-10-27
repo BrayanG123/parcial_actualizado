@@ -3,6 +3,24 @@
  * Las operaciones comerciales restantes se migraran en la siguiente etapa.
  */
 export const endpoints = {
+  empresa: {
+    directorio: '/tenant/directory',
+    publica: '/tenant/public',
+    suscripcion: '/tenant/subscription',
+  },
+  plataforma: {
+    login: '/platform/auth/login',
+    planes: '/platform/plans',
+    plan: (id: number) => `/platform/plans/${id}`,
+    empresas: '/platform/tenants',
+    empresa: (id: number) => `/platform/tenants/${id}`,
+    administradores: (id: number) => `/platform/tenants/${id}/admins`,
+    cambiarPlan: (id: number) => `/platform/tenants/${id}/subscription/plan`,
+    renovar: (id: number) => `/platform/tenants/${id}/subscription/renew`,
+    suspender: (id: number) => `/platform/tenants/${id}/subscription/suspend`,
+    reactivar: (id: number) => `/platform/tenants/${id}/subscription/reactivate`,
+    historial: (id: number) => `/platform/tenants/${id}/subscription/history`,
+  },
   auth: {
     login: '/auth/login',
     registro: '/auth/register',

@@ -35,10 +35,18 @@ export interface UsuarioBackend {
   } | null;
 }
 
+export interface EmpresaBackend {
+  id: number;
+  slug: string;
+  name: string;
+}
+
 export interface SesionBackend {
   accessToken: string;
   tokenType: 'Bearer';
   user: UsuarioBackend;
+  /** Empresa del usuario (parcial 2); null para el administrador de plataforma. */
+  tenant?: EmpresaBackend | null;
 }
 
 export interface RegistroBackend {

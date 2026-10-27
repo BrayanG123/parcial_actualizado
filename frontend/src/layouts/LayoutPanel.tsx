@@ -7,12 +7,15 @@ import { CampanaNotificaciones } from '../features/notifications/CampanaNotifica
 import { RolNombre } from '../types/domain';
 import { iniciales } from '../lib/format';
 import { navegacionPorRol } from '../routes/navegacion';
+import { usePlanEmpresa } from '../hooks/usePlanEmpresa';
+import { AvisoSuscripcion } from '../features/saas/AvisoSuscripcion';
 
 export function LayoutPanel() {
   const { usuario, roles, cerrarSesion, tieneRol } = useAuth();
   const [abierto, setAbierto] = useState(false);
   const navegar = useNavigate();
-  const grupos = navegacionPorRol(roles);
+  const { plan, tieneFuncion } = usePlanEmpresa();
+  const grupos = navegacionPorRol(roles, tieneFuncion);
   // NestJS solo notifica a administradores y encargados.
   const rutaReservas = tieneRol(RolNombre.ADMINISTRADOR)
     ? '/admin/reservas'
@@ -68,6 +71,11 @@ export function LayoutPanel() {
           >
             &#9776;
           </button>
+          {plan?.empresa && (
+            <span className="fs-badge fs-badge--acento" title="Empresa de la sesion">
+              {plan.empresa.nombre} · {plan.plan?.nombre ?? 'sin plan'}
+            </span>
+          )}
           <div className="fs-crecer" />
           <div className="fs-fila">
             {recibeCompras && <AvisosPush />}
@@ -86,6 +94,7 @@ export function LayoutPanel() {
         </header>
 
         <main className="fs-panel-main">
+          <AvisoSuscripcion enlacePlan={tieneRol(RolNombre.ADMINISTRADOR) ? '/admin/plan' : undefined} />
           <Outlet />
         </main>
       </div>

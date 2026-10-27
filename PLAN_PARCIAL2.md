@@ -239,24 +239,24 @@ cierra en F12 con lo realmente implementado.
 - [x] ~~**F1.4** Diagramas de robustez de los casos críticos.~~ — 2026-10-27, commit `2f23c20` (`docs/ICONIX_Parcial2.md` §1–4)
 
 ### F2 — Backend multitenant + planes
-- [x] ~~**F2.1** Modelos Prisma `Tenant`, `Plan`, `Subscription` (+ historial) y rol `PLATFORM_ADMIN`.~~ — 2026-10-27 (tablas `empresas`, `planes`, `suscripciones`, `historial_suscripciones`)
-- [x] ~~**F2.2** Migración: `tenantId` en todas las entidades de negocio (sección 3.1), índices `(tenantId, …)` y uniques compuestos.~~ — 2026-10-27 (migración `20261027000000_multitenancy`; `id_empresa` en 29 tablas; default de BD que falla si la app no fija la empresa)
-- [x] ~~**F2.3** Migración de datos: todo lo existente → Empresa A (plan Profesional); verificar conteos antes/después.~~ — 2026-10-27 (conteos idénticos antes/después en BD local con seed base+demo; 0 usuarios sin empresa)
-- [x] ~~**F2.4** Contexto de tenant por petición (JWT + `X-Tenant` para rutas públicas) con AsyncLocalStorage.~~ — 2026-10-27 (`TenantMiddleware` + `tenantContext`; JWT con `tenantId`; slug por defecto `DEFAULT_TENANT_SLUG`)
-- [x] ~~**F2.5** Capa de aislamiento: extensión Prisma / repositorios que filtran por tenant en lecturas y escrituras; recursos ajenos → 404.~~ — 2026-10-27 (extensión Prisma + `$queryRaw` de reportes con `id_empresa`; JWT válido fija la empresa también en rutas públicas)
-- [x] ~~**F2.6** Auth por tenant: login/registro con slug; email único por tenant; `PLATFORM_ADMIN` sin tenant.~~ — 2026-10-27 (`X-Tenant` en login/registro, `POST /platform/auth/login`; `PLATFORM_ADMIN` no asignable desde una empresa)
-- [x] ~~**F2.7** API de plataforma: CRUD de empresas, designar administrador, asignar/cambiar plan, renovar/suspender suscripción (simulado), consultar estado.~~ — 2026-10-27 (`/platform/*`)
-- [x] ~~**F2.8** API de empresa: ver plan, límites y uso (sucursales activas, etc.).~~ — 2026-10-27 (`GET /tenant/subscription`, `/tenant/public`, `/tenant/directory`)
-- [x] ~~**F2.9** `PlanGuard` / `@RequiresFeature` y validación de límites (sucursales); suscripción vencida → solo lectura.~~ — 2026-10-27 (`TenantAccessInterceptor`: `@RequiresFeature` + solo lectura; límite en `BranchesService`)
-- [x] ~~**F2.10** Seed de Empresa B (plan Básico) con usuarios de todos los roles, sucursales, catálogo, stock, algunas ventas y reservas.~~ — 2026-10-27 (`npm run prisma:seed:tenant-b`, incluye admin de plataforma)
-- [x] ~~**F2.11** Adaptar módulos existentes (catálogo, inventario, carrito, reservas, ventas, pagos/Stripe webhook, push, reportes, IA, probador, notificaciones, jobs de vencimiento) al tenant.~~ — 2026-10-27 (automático vía extensión; ajustes explícitos: reportes raw, jobs y webhook por empresa, tokens push compartidos, uniques por empresa)
-- [x] ~~**F2.12** Pruebas de aislamiento: usuario de A no puede leer/modificar/borrar recursos de B (por id, listados, reportes, sync), límites de plan, feature gating.~~ — 2026-10-27 (`test/tenancy.e2e-spec.ts`, 10 casos; el caso *sync* queda en F4.8)
+- [x] ~~**F2.1** Modelos Prisma `Tenant`, `Plan`, `Subscription` (+ historial) y rol `PLATFORM_ADMIN`.~~ — 2026-10-27, commit `b1c51e5` (tablas `empresas`, `planes`, `suscripciones`, `historial_suscripciones`)
+- [x] ~~**F2.2** Migración: `tenantId` en todas las entidades de negocio (sección 3.1), índices `(tenantId, …)` y uniques compuestos.~~ — 2026-10-27, commit `b1c51e5` (migración `20261027000000_multitenancy`; `id_empresa` en 29 tablas; default de BD que falla si la app no fija la empresa)
+- [x] ~~**F2.3** Migración de datos: todo lo existente → Empresa A (plan Profesional); verificar conteos antes/después.~~ — 2026-10-27, commit `b1c51e5` (conteos idénticos antes/después en BD local con seed base+demo; 0 usuarios sin empresa)
+- [x] ~~**F2.4** Contexto de tenant por petición (JWT + `X-Tenant` para rutas públicas) con AsyncLocalStorage.~~ — 2026-10-27, commit `b1c51e5` (`TenantMiddleware` + `tenantContext`; JWT con `tenantId`; slug por defecto `DEFAULT_TENANT_SLUG`)
+- [x] ~~**F2.5** Capa de aislamiento: extensión Prisma / repositorios que filtran por tenant en lecturas y escrituras; recursos ajenos → 404.~~ — 2026-10-27, commit `e186f93` (extensión Prisma + `$queryRaw` de reportes con `id_empresa`; JWT válido fija la empresa también en rutas públicas)
+- [x] ~~**F2.6** Auth por tenant: login/registro con slug; email único por tenant; `PLATFORM_ADMIN` sin tenant.~~ — 2026-10-27, commit `e186f93` (`X-Tenant` en login/registro, `POST /platform/auth/login`; `PLATFORM_ADMIN` no asignable desde una empresa)
+- [x] ~~**F2.7** API de plataforma: CRUD de empresas, designar administrador, asignar/cambiar plan, renovar/suspender suscripción (simulado), consultar estado.~~ — 2026-10-27, commit `e186f93` (`/platform/*`)
+- [x] ~~**F2.8** API de empresa: ver plan, límites y uso (sucursales activas, etc.).~~ — 2026-10-27, commit `e186f93` (`GET /tenant/subscription`, `/tenant/public`, `/tenant/directory`)
+- [x] ~~**F2.9** `PlanGuard` / `@RequiresFeature` y validación de límites (sucursales); suscripción vencida → solo lectura.~~ — 2026-10-27, commit `e186f93` (`TenantAccessInterceptor`: `@RequiresFeature` + solo lectura; límite en `BranchesService`)
+- [x] ~~**F2.10** Seed de Empresa B (plan Básico) con usuarios de todos los roles, sucursales, catálogo, stock, algunas ventas y reservas.~~ — 2026-10-27, commit `e186f93` (`npm run prisma:seed:tenant-b`, incluye admin de plataforma)
+- [x] ~~**F2.11** Adaptar módulos existentes (catálogo, inventario, carrito, reservas, ventas, pagos/Stripe webhook, push, reportes, IA, probador, notificaciones, jobs de vencimiento) al tenant.~~ — 2026-10-27, commit `e186f93` (automático vía extensión; ajustes explícitos: reportes raw, jobs y webhook por empresa, tokens push compartidos, uniques por empresa)
+- [x] ~~**F2.12** Pruebas de aislamiento: usuario de A no puede leer/modificar/borrar recursos de B (por id, listados, reportes, sync), límites de plan, feature gating.~~ — 2026-10-27, commit `e186f93` (`test/tenancy.e2e-spec.ts`, 10 casos; el caso *sync* queda en F4.8)
 
 ### F3 — Web: SaaS
-- [ ] **F3.1** Rutas de tienda pública por empresa `/t/:slug/...`; selector/landing de empresas; envío de `X-Tenant`.
-- [ ] **F3.2** Login de personal y clientes por empresa; panel de **plataforma** (empresas, planes, suscripciones).
-- [ ] **F3.3** Panel de empresa: plan actual, límites/uso, vencimiento; ocultar/deshabilitar funciones no incluidas (además del bloqueo en backend).
-- [ ] **F3.4** Mensajes claros cuando una acción es bloqueada por plan o suscripción.
+- [x] ~~**F3.1** Rutas de tienda pública por empresa `/t/:slug/...`; selector/landing de empresas; envío de `X-Tenant`.~~ — 2026-10-27 (`/t/:slug/...` fija la tienda activa y continúa en la ruta normal de la tienda —no se duplicaron las rutas—; `/empresas`; `X-Tenant` solo sin sesión)
+- [x] ~~**F3.2** Login de personal y clientes por empresa; panel de **plataforma** (empresas, planes, suscripciones).~~ — 2026-10-27 (login muestra/cambia la tienda; `/plataforma` con sesión propia)
+- [x] ~~**F3.3** Panel de empresa: plan actual, límites/uso, vencimiento; ocultar/deshabilitar funciones no incluidas (además del bloqueo en backend).~~ — 2026-10-27 (`/admin/plan`, menú según `features`, empresa y plan en el panel)
+- [x] ~~**F3.4** Mensajes claros cuando una acción es bloqueada por plan o suscripción.~~ — 2026-10-27 (`MENSAJES_CODIGO` + `AvisoSuscripcion`; verificado con Playwright contra la API real)
 
 ### F4 — Backend: sincronización unificada
 - [ ] **F4.1** Modelos `SyncOperation` (operationId único por tenant, tipo, estado, hash, resultado) y `SyncLog`.

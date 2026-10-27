@@ -6,6 +6,7 @@ import { iniciales } from '../lib/format';
 import { RolNombre } from '../types/domain';
 import { rutaInicialPorRol } from '../routes/permisos';
 import { AsistenteIA } from '../features/ia/AsistenteIA';
+import { useEmpresaActiva } from '../hooks/useEmpresaActiva';
 
 const ENLACES = [
   { a: '/catalogo', texto: 'Catalogo' },
@@ -19,6 +20,7 @@ export function LayoutTienda() {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [asistenteAbierto, setAsistenteAbierto] = useState(false);
   const navegar = useNavigate();
+  const empresa = useEmpresaActiva();
 
   const panelInterno = tieneRol(
     RolNombre.ADMINISTRADOR,
@@ -48,6 +50,9 @@ export function LayoutTienda() {
 
           <Link to="/" className="fs-marca">
             Fashion<span>Store</span>
+          </Link>
+          <Link to="/empresas" className="fs-badge fs-badge--acento" title="Cambiar de tienda">
+            {empresa?.nombre ?? empresa?.slug ?? 'FashionStore'} · cambiar
           </Link>
 
           <nav className={`fs-header__nav${menuAbierto ? ' fs-header__nav--abierto' : ''}`}>

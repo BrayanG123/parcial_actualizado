@@ -42,6 +42,13 @@ const PaginaMovimientos = lazy(() => import('./features/inventory/PaginaMovimien
 const PaginaReportes = lazy(() => import('./features/reports/PaginaReportes'));
 const PaginaReporteIA = lazy(() => import('./features/reports/PaginaReporteIA'));
 
+/* SaaS multitenant */
+const PaginaEmpresas = lazy(() => import('./features/saas/PaginaEmpresas'));
+const EntradaEmpresa = lazy(() => import('./features/saas/EntradaEmpresa'));
+const PaginaPlanEmpresa = lazy(() => import('./features/saas/PaginaPlanEmpresa'));
+const PaginaPlataforma = lazy(() => import('./features/saas/PaginaPlataforma'));
+const PaginaPlataformaLogin = lazy(() => import('./features/saas/PaginaPlataformaLogin'));
+
 /* Caja y proveedor */
 const PaginaOffline = lazy(() => import('./features/pos/PaginaOffline'));
 const PaginaTurnos = lazy(() => import('./features/pos/PaginaTurnos'));
@@ -140,6 +147,12 @@ export default function App() {
           <Route path="*" element={<NoEncontrada />} />
         </Route>
 
+        {/* --- tiendas por empresa y plataforma SaaS --- */}
+        <Route path="/t/:slug/*" element={<EntradaEmpresa />} />
+        <Route path="/empresas" element={<PaginaEmpresas />} />
+        <Route path="/plataforma/login" element={<PaginaPlataformaLogin />} />
+        <Route path="/plataforma" element={<PaginaPlataforma />} />
+
         {/* --- autenticacion --- */}
         <Route path="/login" element={<PaginaLogin />} />
         <Route path="/registro" element={<PaginaRegistro />} />
@@ -164,6 +177,7 @@ export default function App() {
           <Route path="proveedores" element={<PaginaProveedores />} />
           <Route path="usuarios" element={<PaginaUsuarios />} />
           <Route path="roles" element={<PaginaRoles />} />
+          <Route path="plan" element={<PaginaPlanEmpresa />} />
           <Route path="inventario" element={<PaginaInventarioAdmin />} />
           <Route path="movimientos" element={<PaginaMovimientos />} />
           <Route path="reservas" element={<PaginaReservasOperacion />} />
