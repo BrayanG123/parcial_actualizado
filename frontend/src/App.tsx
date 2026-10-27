@@ -41,6 +41,7 @@ const PaginaVentasOperacion = lazy(() => import('./features/sales/PaginaVentasOp
 const PaginaMovimientos = lazy(() => import('./features/inventory/PaginaMovimientos'));
 const PaginaReportes = lazy(() => import('./features/reports/PaginaReportes'));
 const PaginaReporteIA = lazy(() => import('./features/reports/PaginaReporteIA'));
+const PaginaAnalitica = lazy(() => import('./features/analitica/PaginaAnalitica'));
 
 /* SaaS multitenant */
 const PaginaEmpresas = lazy(() => import('./features/saas/PaginaEmpresas'));
@@ -198,6 +199,7 @@ export default function App() {
           <Route path="ventas" element={<PaginaVentasOperacion />} />
           <Route path="reportes" element={<PaginaReportes />} />
           <Route path="reportes-ia" element={<PaginaReporteIA />} />
+          <Route path="analitica" element={<PaginaAnalitica />} />
         </Route>
 
         {/* --- sucursal --- */}
@@ -216,6 +218,7 @@ export default function App() {
           <Route path="ventas" element={<PaginaVentasOperacion />} />
           <Route path="reportes" element={<PaginaReportes />} />
           <Route path="reportes-ia" element={<PaginaReporteIA />} />
+          <Route path="analitica" element={<PaginaAnalitica />} />
         </Route>
 
         {/* --- caja --- */}

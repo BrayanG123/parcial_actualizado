@@ -202,6 +202,8 @@ export const api = {
     }),
   get: <T>(url: string, params?: object) => peticion<T>('GET', url, undefined, { params }),
   post: <T>(url: string, datos?: unknown) => peticion<T>('POST', url, datos),
+  /** Operaciones lentas del servidor (p. ej. entrenar modelos de ML). */
+  postLargo: <T>(url: string, datos?: unknown, timeout = 120000) => peticion<T>('POST', url, datos, { timeout }),
   put: <T>(url: string, datos?: unknown) => peticion<T>('PUT', url, datos),
   patch: <T>(url: string, datos?: unknown) => peticion<T>('PATCH', url, datos),
   delete: <T>(url: string, datos?: unknown) => peticion<T>('DELETE', url, datos),

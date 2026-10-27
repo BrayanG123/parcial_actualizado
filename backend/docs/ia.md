@@ -95,6 +95,19 @@ Pruebas: `src/modules/ai/report-intent.spec.ts` (reglas, lista blanca, rechazos 
 
 Pendiente: reportes con IA en móvil (F8.6, opcional).
 
+## Analítica con Machine Learning (`/ml`)
+
+El backend consume el servicio interno `ml-service` (ver `ml-service/README.md`) con `ML_SERVICE_URL` y `ML_SERVICE_TOKEN`. Requiere la funcionalidad `mlAnalytics` del plan (Profesional).
+
+| Endpoint | Roles | Descripción |
+|---|---|---|
+| `POST /ml/train` | Administrador | `{ source: "synthetic" \| "real" }`. Sintético: envía el catálogo de la empresa (sucursales, productos, categorías y precios) y el servicio simula 104 semanas con semilla fija. Real: envía ventas completadas agregadas por semana/producto/sucursal y compras `(id de cliente, fecha, importe)`, sin datos personales. Un entrenamiento por empresa a la vez (`ML_TRAINING_IN_PROGRESS`). Bloqueado en modo solo lectura. |
+| `GET /ml/dashboard?horizon=4&branchId=` | Administrador, encargado | Métricas de los tres modelos, predicción de demanda (top 10 series con nombres de producto y sucursal), segmentos RFM y semanas atípicas. El encargado queda limitado a su sucursal. Sin modelos: `{ trained: false }`. |
+
+La empresa siempre sale de `tenantContext` y va en la ruta del servicio (`/v1/tenants/:id/...`); las consultas `$queryRaw` de `MlRepository` filtran `id_empresa`. Errores: `ML_NOT_CONFIGURED`/`ML_UNAVAILABLE` (503), `ML_MODEL_NOT_TRAINED`/`ML_PART_NOT_TRAINED` (409), `ML_INSUFFICIENT_DATA` (422), `ML_ERROR` (502); nunca se reenvía el cuerpo crudo del servicio.
+
+Pruebas: `test/ml.e2e-spec.ts` (servicio falso por HTTP: token interno, ruta por empresa, plan, roles, alcance del encargado, datos enviados y traducción de errores).
+
 ## Probador virtual: RA en vivo y foto con IA
 
 **RA en vivo (sin servidor).** El móvil abre un WebView con MediaPipe Pose Landmarker, detecta hombros y cadera en cada cuadro y dibuja la foto de la prenda encima (rotada y escalada con el cuerpo). El fondo claro de la foto se quita en el teléfono. Funciona en Expo Go y no consume cuota de IA. Necesita internet la primera vez para descargar el detector (CDN de jsDelivr y Google Storage).

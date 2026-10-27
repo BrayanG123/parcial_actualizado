@@ -91,7 +91,7 @@ cd frontend && npm test && npx tsc -b && npx oxlint
 # mobile
 cd mobile && npm run typecheck && npm run lint && npm run test:push && npm run test:reservas && npm run test:offline
 # (agregar aquí los scripts de prueba nuevos que se creen, p. ej. test:sync)
-# ml-service (cuando exista)
+# ml-service (una vez: pip install -r requirements-dev.txt)
 cd ml-service && pytest -q
 ```
 
@@ -307,15 +307,16 @@ cierra en F12 con lo realmente implementado.
 - [x] ~~**F8.7** Pruebas: intención→consulta, filtros, aislamiento de tenant, rechazo de pedidos no permitidos.~~ — 2026-10-27, commit `beb7d62` (`report-intent.spec.ts` +3, `ai.e2e-spec.ts` +5 con ventas reales y otra empresa, `reporte-ia.test.tsx` 4)
 
 ### F9 — Módulo de Machine Learning
-- [ ] **F9.1** Crear `ml-service/` (FastAPI, scikit-learn, pandas, Dockerfile, `pytest`).
-- [ ] **F9.2** Generador de **datos sintéticos** reproducible (semilla) con forma del dominio.
-- [ ] **F9.3** Selección de variables y preprocesamiento (documentado en el código/notebook).
-- [ ] **F9.4** Modelo **supervisado** (demanda) + evaluación (MAE/RMSE/R², validación cruzada).
-- [ ] **F9.5** Modelo **no supervisado** (segmentación K-Means/RFM y/o anomalías) + evaluación (silhouette, etc.).
-- [ ] **F9.6** API del servicio (entrenar, predecir, segmentos, métricas) y persistencia de modelos.
-- [ ] **F9.7** Integración NestJS ↔ ml-service con permisos, tenant y plan.
-- [ ] **F9.8** Reportes inteligentes (predicciones, patrones, métricas) y **dashboard analítico** en la web.
-- [ ] **F9.9** `docker-compose` local con el nuevo servicio.
+- [x] ~~**F9.1** Crear `ml-service/` (FastAPI, scikit-learn, pandas, Dockerfile, `pytest`).~~ — 2026-10-27 (`ml-service/` con requisitos fijados, Dockerfile no-root con volumen de modelos, 12 pruebas `pytest`)
+- [x] ~~**F9.2** Generador de **datos sintéticos** reproducible (semilla) con forma del dominio.~~ — 2026-10-27 (`app/synthetic.py`: estacionalidad por categoría, diciembre, Día de la Madre, promociones, precio, ruido Poisson-Gamma, anomalías y perfiles de clientes; usa el catálogo real de la empresa)
+- [x] ~~**F9.3** Selección de variables y preprocesamiento (documentado en el código/notebook).~~ — 2026-10-27 (`app/features.py`: rezagos, ventanas solo con pasado, calendario cíclico, precio relativo, one-hot; justificación en el docstring y en `ml-service/README.md`)
+- [x] ~~**F9.4** Modelo **supervisado** (demanda) + evaluación (MAE/RMSE/R², validación cruzada).~~ — 2026-10-27 (RandomForestRegressor; `TimeSeriesSplit(5)` + prueba con 8 semanas + 2 líneas base; mejora 13–25 % el MAE en 3 semillas; intervalo 10–90 % por árboles)
+- [x] ~~**F9.5** Modelo **no supervisado** (segmentación K-Means/RFM y/o anomalías) + evaluación (silhouette, etc.).~~ — 2026-10-27 (K-Means RFM con silueta, Davies-Bouldin, Calinski-Harabasz y ARI; IsolationForest con precisión/recall sobre anomalías inyectadas)
+- [x] ~~**F9.6** API del servicio (entrenar, predecir, segmentos, métricas) y persistencia de modelos.~~ — 2026-10-27 (`/v1/tenants/{id}/train|metrics|forecast|segments|anomalies` con `X-Internal-Token`; joblib por empresa con escritura atómica)
+- [x] ~~**F9.7** Integración NestJS ↔ ml-service con permisos, tenant y plan.~~ — 2026-10-27 (`MlModule`: `POST /ml/train` y `GET /ml/dashboard`, `mlAnalytics`, roles, encargado limitado a su sucursal, sin datos personales; `test/ml.e2e-spec.ts` 5 casos)
+- [x] ~~**F9.8** Reportes inteligentes (predicciones, patrones, métricas) y **dashboard analítico** en la web.~~ — 2026-10-27 (`/admin/analitica` y `/sucursal/analitica`: predicción con banda, top productos, segmentos con acciones, semanas atípicas y evaluación; verificado con Playwright contra el stack real)
+- [x] ~~**F9.9** `docker-compose` local con el nuevo servicio.~~ — 2026-10-27 (servicio `ml` sin puertos publicados y volumen `ml-models`)
+  - ⏳ Falta construir la imagen en local: el entorno en la nube no tiene demonio de Docker.
 
 ### F10 — Calidad
 - [ ] **F10.1** Pruebas de reglas críticas: aislamiento multitenant, límites de plan, idempotencia, conflictos, integridad de inventario, cambios de prendas.
