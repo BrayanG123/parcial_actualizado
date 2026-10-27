@@ -24,6 +24,51 @@ Para instalar el proyecto en otro equipo y poblar una base vacía, seguir la
 ejecuta con `npm run prisma:seed:demo` e incluye el seed base, usuarios de prueba,
 catálogo, inventario, reservas y ventas históricas. Requiere `SEED_DEMO_PASSWORD`.
 
+## SaaS multitenant (parcial 2)
+
+Base PostgreSQL compartida con **aislamiento lógico por empresa** (`empresas`,
+`planes`, `suscripciones`, `historial_suscripciones`; `id_empresa` en toda tabla de
+negocio). Diseño y casos de uso: [ICONIX parcial 2](../docs/ICONIX_Parcial2.md).
+
+- **Empresa de cada petición** (`src/common/tenant/tenant-context.ts`,
+  `src/modules/tenancy/tenant.middleware.ts`): empresa del JWT si hay token válido;
+  si no, header `X-Tenant: <slug>`; si no, `DEFAULT_TENANT_SLUG` (`fashionstore`,
+  para las apps del parcial 1). Header distinto al token → 403 `TENANT_MISMATCH`;
+  slug inexistente → 404.
+- **Aislamiento en backend** (`src/database/prisma/tenant-isolation.extension.ts`):
+  extensión de Prisma que agrega `tenantId` a todo `where` y a toda alta (también
+  anidada) de los modelos con empresa. Un recurso de otra empresa "no existe" (404).
+  Sin contexto la consulta falla (fail closed) y la columna `id_empresa` tiene un
+  default de BD que también falla si la aplicación no la envía. Las consultas
+  `$queryRaw` filtran `id_empresa` explícitamente (`reports.repository.ts`). Jobs y
+  webhook de Stripe se ejecutan por empresa (`TenantsService.forEachTenant`).
+- **Planes** configurables en la tabla `planes` (`maxActiveBranches`, `features`):
+  `@RequiresFeature('aiReports' | 'conventionalReports' | 'offline' …)` lo verifica
+  `TenantAccessInterceptor` después del JWT → 403 `PLAN_FEATURE_REQUIRED`. Crear o
+  reactivar una sucursal por encima del límite → 403 `PLAN_LIMIT_REACHED`.
+- **Suscripción vencida o suspendida → solo lectura**: GET y login permitidos; toda
+  otra escritura de la empresa → 403 `SUBSCRIPTION_READ_ONLY`. El vencimiento se
+  registra solo (`EXPIRE` en el historial) al detectarse.
+- Los errores de estas reglas incluyen `code` en el cuerpo para que la UI muestre
+  mensajes claros.
+
+| Ruta | Acceso | Uso |
+|---|---|---|
+| `GET /tenant/directory` | público | Empresas activas (slug, nombre) para el selector |
+| `GET /tenant/public` | público | Empresa resuelta por `X-Tenant` |
+| `GET /tenant/subscription` | personal y clientes | Plan, funcionalidades, límites, uso, vencimiento, `readOnly` |
+| `POST /platform/auth/login` | público | Login del administrador de plataforma (`PLATFORM_ADMIN`, sin empresa) |
+| `GET/POST /platform/plans`, `PATCH /platform/plans/:id` | `PLATFORM_ADMIN` | Planes y sus límites |
+| `GET/POST /platform/tenants`, `GET/PATCH /platform/tenants/:id` | `PLATFORM_ADMIN` | Empresas (alta con suscripción y administrador) |
+| `POST /platform/tenants/:id/admins` | `PLATFORM_ADMIN` | Designar administrador de empresa |
+| `PATCH /platform/tenants/:id/subscription/plan` | `PLATFORM_ADMIN` | Cambio de plan (409 `PLAN_LIMIT_EXCEEDED` si el uso no cabe) |
+| `POST /platform/tenants/:id/subscription/{renew,suspend,reactivate}` | `PLATFORM_ADMIN` | Renovación simulada (sin cobro), suspensión, reactivación |
+| `GET /platform/tenants/:id/subscription/history` | `PLATFORM_ADMIN` | Historial de la suscripción |
+
+Login de personal/clientes: `POST /auth/login` con `X-Tenant` (sin header usa la
+empresa por defecto). El email es único **por empresa**. Pruebas:
+`test/tenancy.e2e-spec.ts` y `src/database/prisma/tenant-isolation.extension.spec.ts`.
+
 ## Reservas
 
 El módulo permite reservar varias prendas por sucursal, gestionar su atención y

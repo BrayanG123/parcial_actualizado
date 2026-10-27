@@ -11,12 +11,14 @@ import { Role } from '../../../common/enums/role.enum.js';
 import { tenantContext } from '../../../common/tenant/tenant-context.js';
 import { UsersService } from '../../users/users.service.js';
 import { JwtPayload } from '../auth.service.js';
+import { TenantsService } from '../../tenancy/tenants.service.js';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     configService: ConfigService,
     private readonly usersService: UsersService,
+    private readonly tenants: TenantsService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -36,12 +38,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (payload.tenantId !== undefined && payload.tenantId !== user.tenantId) {
       throw new UnauthorizedException('Token no corresponde a la empresa');
     }
+    if (
+      user.tenantId !== null &&
+      !(await this.tenants.findById(user.tenantId))?.active
+    )
+      throw new ForbiddenException({
+        code: 'TENANT_INACTIVE',
+        message: 'La empresa esta inactiva',
+      });
     const roles = user.roles.map(({ role }) => role.name as Role);
     const store = tenantContext.getStore();
     if (store && !store.system) {
       if (
-        store.source === 'header' &&
+        (store.source === 'header' || store.source === 'jwt') &&
         user.tenantId !== null &&
+        store.tenantId !== null &&
         store.tenantId !== user.tenantId
       ) {
         throw new ForbiddenException({

@@ -13,8 +13,10 @@ import {
   TopProductsQueryDto,
 } from './dto/report-query.dto.js';
 import { ReportsService } from './reports.service.js';
+import { RequiresFeature } from '../tenancy/plan.decorators.js';
 
 @Controller('reports')
+@RequiresFeature('conventionalReports')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMINISTRATOR, Role.BRANCH_MANAGER)
 export class ReportsController {

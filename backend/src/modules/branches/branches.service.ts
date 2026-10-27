@@ -7,12 +7,18 @@ import { BranchesRepository } from './branches.repository.js';
 import { CreateBranchDto } from './dto/create-branch.dto.js';
 import { ListBranchesQueryDto } from './dto/list-branches-query.dto.js';
 import { UpdateBranchDto } from './dto/update-branch.dto.js';
+import { SubscriptionAccessService } from '../tenancy/subscription-access.service.js';
 
 @Injectable()
 export class BranchesService {
-  constructor(private readonly branchesRepository: BranchesRepository) {}
+  constructor(
+    private readonly branchesRepository: BranchesRepository,
+    private readonly access: SubscriptionAccessService,
+  ) {}
 
   async create(dto: CreateBranchDto) {
+    // Toda sucursal nueva nace activa: cuenta para el limite del plan.
+    await this.access.assertCanActivateBranch();
     if (await this.branchesRepository.findByCityAndName(dto.city, dto.name)) {
       throw new ConflictException(
         'A branch with the same name already exists in this city',
@@ -58,6 +64,8 @@ export class BranchesService {
         'A branch with the same name already exists in this city',
       );
     }
+    if (dto.active === true && !current.active)
+      await this.access.assertCanActivateBranch();
     return this.branchesRepository.update(id, dto);
   }
 

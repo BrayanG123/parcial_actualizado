@@ -4,6 +4,7 @@ import { hash } from 'bcrypt';
 import { Role } from '../../common/enums/role.enum.js';
 import { UsersService } from '../users/users.service.js';
 import { AuthService } from './auth.service.js';
+import { TenantsService } from '../tenancy/tenants.service.js';
 
 describe('AuthService', () => {
   const jwtService = {
@@ -14,7 +15,17 @@ describe('AuthService', () => {
     findByEmailForAuthentication: vi.fn(),
     findOne: vi.fn(),
   } as unknown as UsersService;
-  const service = new AuthService(usersService, jwtService);
+  const tenants = {
+    findById: vi
+      .fn()
+      .mockResolvedValue({
+        id: 1,
+        slug: 'fashionstore',
+        name: 'FashionStore',
+        active: true,
+      }),
+  } as unknown as TenantsService;
+  const service = new AuthService(usersService, jwtService, tenants);
 
   beforeEach(() => vi.clearAllMocks());
 
@@ -24,6 +35,7 @@ describe('AuthService', () => {
       name: 'Ana Cliente',
       email: 'ana@example.com',
       active: true,
+      tenantId: 1,
       registeredAt: new Date(),
       updatedAt: new Date(),
       client: null,
@@ -42,6 +54,12 @@ describe('AuthService', () => {
       sub: 1,
       email: 'ana@example.com',
       roles: [Role.CUSTOMER],
+      tenantId: 1,
+    });
+    expect(result.tenant).toEqual({
+      id: 1,
+      slug: 'fashionstore',
+      name: 'FashionStore',
     });
   });
 
@@ -53,6 +71,7 @@ describe('AuthService', () => {
       email: 'ana@example.com',
       passwordHash,
       active: true,
+      tenantId: 1,
       registeredAt: new Date(),
       updatedAt: new Date(),
       client: null,

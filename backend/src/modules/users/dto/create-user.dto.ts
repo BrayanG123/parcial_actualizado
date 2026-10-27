@@ -6,7 +6,7 @@ import {
   IsBoolean,
   ValidateIf,
   IsEmail,
-  IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsPositive,
@@ -15,7 +15,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { Role } from '../../../common/enums/role.enum.js';
+import { Role, TENANT_ROLES } from '../../../common/enums/role.enum.js';
 
 export class CreateUserDto {
   @IsOptional()
@@ -48,7 +48,7 @@ export class CreateUserDto {
   @IsArray()
   @ArrayNotEmpty()
   @ArrayUnique()
-  @IsEnum(Role, { each: true })
+  @IsIn(TENANT_ROLES, { each: true })
   roles: Role[];
 
   @IsOptional()

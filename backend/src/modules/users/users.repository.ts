@@ -93,6 +93,18 @@ export class UsersRepository {
     });
   }
 
+  /** Requiere contexto de sistema: el administrador de plataforma no tiene empresa. */
+  findPlatformAdminForAuthentication(email: string) {
+    return this.prisma.user.findFirst({
+      where: {
+        email,
+        tenantId: null,
+        roles: { some: { role: { name: 'PLATFORM_ADMIN' } } },
+      },
+      select: userAuthenticationSelect,
+    });
+  }
+
   findRolesByNames(names: RoleName[]) {
     return this.prisma.role.findMany({
       where: { name: { in: names } },

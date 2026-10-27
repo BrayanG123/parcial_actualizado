@@ -35,6 +35,7 @@ import {
   PosBranchQueryDto,
   SearchPosCustomersDto,
 } from './dto/in-store-selection.dto.js';
+import { RequiresFeature } from '../tenancy/plan.decorators.js';
 
 @Controller('sales')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -47,6 +48,7 @@ export class SalesController {
 
   @Post('offline/prepare')
   @Roles(Role.ADMINISTRATOR, Role.BRANCH_MANAGER, Role.CASHIER)
+  @RequiresFeature('offline')
   prepareOffline(
     @Body() dto: PrepareOfflineDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -56,6 +58,7 @@ export class SalesController {
 
   @Post('offline/:id/sales')
   @Roles(Role.ADMINISTRATOR, Role.BRANCH_MANAGER, Role.CASHIER)
+  @RequiresFeature('offline')
   syncOffline(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: OfflineSaleDto,

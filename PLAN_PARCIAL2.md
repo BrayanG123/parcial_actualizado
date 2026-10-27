@@ -11,7 +11,7 @@
 1. **Leer este archivo completo antes de tocar código** y retomar desde la primera tarea sin tachar
    de la fase en curso.
 2. **Al terminar una tarea, tacharla aquí mismo**, en el mismo commit que la implementa:
-   - Pendiente: `- [x] ~~**F2.3** Texto`~~ — 2026-10-27 (conteos idénticos antes/después en BD local con seed base+demo; 0 usuarios sin empresa)
+   - Pendiente: `- [ ] **F2.3** Texto`
    - Hecha: `- [x] ~~**F2.3** Texto~~ — 2026-10-28, commit `abc1234``
    - Parcial: dejarla `[ ]` y agregar debajo `  - ⏳ Falta: …` (una línea, sin crear archivos).
 3. **Bitácora** (sección 9): al final de cada sesión agregar **una sola entrada corta** (fecha, qué
@@ -230,7 +230,7 @@ cierra en F12 con lo realmente implementado.
   - D4: jobs sin usuario (vencimiento de reservas y checkout, conciliación Stripe) y webhook de Stripe recorren todos los registros: necesitan contexto "sistema" explícito (→ F2.4/F2.11).
   - D5: el JWT no lleva tenant y las apps instaladas no envían `X-Tenant` → slug por defecto `fashionstore` (→ F2.4/F2.6).
   - D6: ventas offline web en `localStorage` (ya conocido, → F5.1).
-  - D7: entorno: Node local 22.22.0 por debajo de `engines` de la CLI de Nest (solo advertencia); los e2e se saltan sin `TEST_DATABASE_URL` (documentado en `backend/docs/instalacion-y-seed.md`).
+  - D7: entorno: Node local 22.22.0 por debajo de `engines` de la CLI de Nest (solo advertencia); los e2e se saltan sin `TEST_DATABASE_URL` (documentado en `backend/docs/carrito.md`).
 
 ### F1 — ICONIX: análisis inicial (antes de codificar F2)
 - [x] ~~**F1.1** Modelo de dominio actualizado (Tenant, Plan, Subscription, SyncOperation, SyncLog, Exchange, ReportRequest, MLModel…).~~ — 2026-10-27, commit `2f23c20` (`docs/ICONIX_Parcial2.md` §1–4)
@@ -241,17 +241,16 @@ cierra en F12 con lo realmente implementado.
 ### F2 — Backend multitenant + planes
 - [x] ~~**F2.1** Modelos Prisma `Tenant`, `Plan`, `Subscription` (+ historial) y rol `PLATFORM_ADMIN`.~~ — 2026-10-27 (tablas `empresas`, `planes`, `suscripciones`, `historial_suscripciones`)
 - [x] ~~**F2.2** Migración: `tenantId` en todas las entidades de negocio (sección 3.1), índices `(tenantId, …)` y uniques compuestos.~~ — 2026-10-27 (migración `20261027000000_multitenancy`; `id_empresa` en 29 tablas; default de BD que falla si la app no fija la empresa)
-- [ ] **F2.3** Migración de datos: todo lo existente → Empresa A (plan Profesional); verificar conteos antes/después.
+- [x] ~~**F2.3** Migración de datos: todo lo existente → Empresa A (plan Profesional); verificar conteos antes/después.~~ — 2026-10-27 (conteos idénticos antes/después en BD local con seed base+demo; 0 usuarios sin empresa)
 - [x] ~~**F2.4** Contexto de tenant por petición (JWT + `X-Tenant` para rutas públicas) con AsyncLocalStorage.~~ — 2026-10-27 (`TenantMiddleware` + `tenantContext`; JWT con `tenantId`; slug por defecto `DEFAULT_TENANT_SLUG`)
-- [ ] **F2.5** Capa de aislamiento: extensión Prisma / repositorios que filtran por tenant en lecturas y escrituras; recursos ajenos → 404.
-  - ⏳ Falta: extensión Prisma hecha (`tenant-isolation.extension.ts`, jobs y webhook por empresa); faltan las 13 `$queryRaw` de reportes (D3) y pruebas cross-tenant (F2.12).
-- [ ] **F2.6** Auth por tenant: login/registro con slug; email único por tenant; `PLATFORM_ADMIN` sin tenant.
-- [ ] **F2.7** API de plataforma: CRUD de empresas, designar administrador, asignar/cambiar plan, renovar/suspender suscripción (simulado), consultar estado.
-- [ ] **F2.8** API de empresa: ver plan, límites y uso (sucursales activas, etc.).
-- [ ] **F2.9** `PlanGuard` / `@RequiresFeature` y validación de límites (sucursales); suscripción vencida → solo lectura.
-- [ ] **F2.10** Seed de Empresa B (plan Básico) con usuarios de todos los roles, sucursales, catálogo, stock, algunas ventas y reservas.
-- [ ] **F2.11** Adaptar módulos existentes (catálogo, inventario, carrito, reservas, ventas, pagos/Stripe webhook, push, reportes, IA, probador, notificaciones, jobs de vencimiento) al tenant.
-- [ ] **F2.12** Pruebas de aislamiento: usuario de A no puede leer/modificar/borrar recursos de B (por id, listados, reportes, sync), límites de plan, feature gating.
+- [x] ~~**F2.5** Capa de aislamiento: extensión Prisma / repositorios que filtran por tenant en lecturas y escrituras; recursos ajenos → 404.~~ — 2026-10-27 (extensión Prisma + `$queryRaw` de reportes con `id_empresa`; JWT válido fija la empresa también en rutas públicas)
+- [x] ~~**F2.6** Auth por tenant: login/registro con slug; email único por tenant; `PLATFORM_ADMIN` sin tenant.~~ — 2026-10-27 (`X-Tenant` en login/registro, `POST /platform/auth/login`; `PLATFORM_ADMIN` no asignable desde una empresa)
+- [x] ~~**F2.7** API de plataforma: CRUD de empresas, designar administrador, asignar/cambiar plan, renovar/suspender suscripción (simulado), consultar estado.~~ — 2026-10-27 (`/platform/*`)
+- [x] ~~**F2.8** API de empresa: ver plan, límites y uso (sucursales activas, etc.).~~ — 2026-10-27 (`GET /tenant/subscription`, `/tenant/public`, `/tenant/directory`)
+- [x] ~~**F2.9** `PlanGuard` / `@RequiresFeature` y validación de límites (sucursales); suscripción vencida → solo lectura.~~ — 2026-10-27 (`TenantAccessInterceptor`: `@RequiresFeature` + solo lectura; límite en `BranchesService`)
+- [x] ~~**F2.10** Seed de Empresa B (plan Básico) con usuarios de todos los roles, sucursales, catálogo, stock, algunas ventas y reservas.~~ — 2026-10-27 (`npm run prisma:seed:tenant-b`, incluye admin de plataforma)
+- [x] ~~**F2.11** Adaptar módulos existentes (catálogo, inventario, carrito, reservas, ventas, pagos/Stripe webhook, push, reportes, IA, probador, notificaciones, jobs de vencimiento) al tenant.~~ — 2026-10-27 (automático vía extensión; ajustes explícitos: reportes raw, jobs y webhook por empresa, tokens push compartidos, uniques por empresa)
+- [x] ~~**F2.12** Pruebas de aislamiento: usuario de A no puede leer/modificar/borrar recursos de B (por id, listados, reportes, sync), límites de plan, feature gating.~~ — 2026-10-27 (`test/tenancy.e2e-spec.ts`, 10 casos; el caso *sync* queda en F4.8)
 
 ### F3 — Web: SaaS
 - [ ] **F3.1** Rutas de tienda pública por empresa `/t/:slug/...`; selector/landing de empresas; envío de `X-Tenant`.
@@ -374,3 +373,4 @@ cierra en F12 con lo realmente implementado.
 | Fecha | Quién / dónde | Hecho | Pendiente / próximo paso |
 |---|---|---|---|
 | 2026-10-27 | Claude Code (local) | Plan creado a partir del enunciado y del estado real del repo. | Empezar F0 en Claude web. |
+| 2026-10-27 | Claude Code (web) | F0, F1 (ICONIX §1–4) y F2 completas: migración multitenant, aislamiento en Prisma, planes, solo lectura, API de plataforma/empresa, seed Empresa B; unit 221, e2e 118, web 167, móvil 11. Decisiones confirmadas: se mantienen React/Expo; suscripción vencida = solo lectura. | Push a GitHub bloqueado (403, falta acceso de la app de Claude); bóveda de la wiki (`D:/…`) no disponible en la nube: actualizar notas de multitenancy allí. Siguiente: F3 (web SaaS). |

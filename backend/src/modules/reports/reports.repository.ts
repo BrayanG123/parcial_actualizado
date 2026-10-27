@@ -7,8 +7,14 @@ import {
   SalesReportQueryDto,
 } from './dto/report-query.dto.js';
 import { reportPeriod } from './report-period.js';
+import { tenantContext } from '../../common/tenant/tenant-context.js';
 
 type Period = ReturnType<typeof reportPeriod>;
+/**
+ * Las consultas `$queryRaw` no pasan por la extension de aislamiento de Prisma:
+ * cada una filtra `id_empresa` en su tabla raiz (las tablas unidas por FK pertenecen
+ * a la misma empresa).
+ */
 @Injectable()
 export class ReportsRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -25,7 +31,8 @@ export class ReportsRepository {
         SELECT v.*, COALESCE(v.fecha_confirmacion, v.fecha) AS reporting_date,
           (SELECT COALESCE(SUM(d.cantidad), 0) FROM detalles_venta d WHERE d.id_venta = v.id_venta) AS units
         FROM ventas v
-        WHERE v.estado = 'COMPLETED'
+        WHERE v.id_empresa = ${tenantContext.requireTenantId()}
+          AND v.estado = 'COMPLETED'
           AND COALESCE(v.fecha_confirmacion, v.fecha) >= ${period.start}
           AND COALESCE(v.fecha_confirmacion, v.fecha) < ${period.endExclusive}
           ${query.branchId ? Prisma.sql`AND v.id_sucursal = ${query.branchId}` : Prisma.empty}
@@ -80,7 +87,8 @@ export class ReportsRepository {
       JOIN cajas c ON c.id_caja = t.id_caja
       JOIN sucursales s ON s.id_sucursal = c.id_sucursal
       JOIN usuarios u ON u.id_usuario = t.id_usuario
-      WHERE t.fecha_apertura >= ${period.start} AND t.fecha_apertura < ${period.endExclusive}
+      WHERE t.id_empresa = ${tenantContext.requireTenantId()}
+        AND t.fecha_apertura >= ${period.start} AND t.fecha_apertura < ${period.endExclusive}
         ${query.branchId ? Prisma.sql`AND c.id_sucursal = ${query.branchId}` : Prisma.empty}
         ${query.registerId ? Prisma.sql`AND t.id_caja = ${query.registerId}` : Prisma.empty}
     )`;
@@ -132,7 +140,7 @@ export class ReportsRepository {
           WHERE m.id_inventario = i.id_inventario AND m.tipo = 'PENDING_ENTRY' AND m.estado = 'PENDING'), 0) AS incoming
       FROM inventarios i JOIN sucursales s ON s.id_sucursal = i.id_sucursal
       JOIN productos p ON p.id_producto = i.id_producto JOIN tallas t ON t.id_talla = i.id_talla JOIN colores c ON c.id_color = i.id_color
-      WHERE 1 = 1
+      WHERE i.id_empresa = ${tenantContext.requireTenantId()}
       ${query.branchId ? Prisma.sql`AND i.id_sucursal = ${query.branchId}` : Prisma.empty}
       ${query.categoryId ? Prisma.sql`AND p.id_categoria = ${query.categoryId}` : Prisma.empty}
       ${query.productId ? Prisma.sql`AND i.id_producto = ${query.productId}` : Prisma.empty}
@@ -174,7 +182,8 @@ export class ReportsRepository {
     return this.prisma.$queryRaw`
       SELECT r.id_sucursal AS "branchId", s.nombre AS "branchName", r.estado::text AS status, COUNT(*)::int AS count
       FROM reservas r JOIN sucursales s ON s.id_sucursal = r.id_sucursal
-      WHERE r.horario_aproximado >= ${period.start} AND r.horario_aproximado < ${period.endExclusive}
+      WHERE r.id_empresa = ${tenantContext.requireTenantId()}
+        AND r.horario_aproximado >= ${period.start} AND r.horario_aproximado < ${period.endExclusive}
         ${branchId ? Prisma.sql`AND r.id_sucursal = ${branchId}` : Prisma.empty}
       GROUP BY r.id_sucursal, s.nombre, r.estado ORDER BY r.id_sucursal, r.estado`;
   }

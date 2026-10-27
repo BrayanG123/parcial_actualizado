@@ -23,6 +23,7 @@ import {
   RecommendationsQueryDto,
 } from './dto/ai.dto.js';
 import { RecommendationService } from './recommendation.service.js';
+import { RequiresFeature } from '../tenancy/plan.decorators.js';
 
 @Controller('ai')
 export class AiController {
@@ -59,6 +60,7 @@ export class AiController {
   @HttpCode(200)
   @UseGuards(JwtAuthGuard, RolesGuard, AiRateLimitGuard)
   @Roles(Role.ADMINISTRATOR, Role.BRANCH_MANAGER)
+  @RequiresFeature('aiReports')
   report(
     @Body() dto: AiReportQueryDto,
     @CurrentUser() user: AuthenticatedUser,

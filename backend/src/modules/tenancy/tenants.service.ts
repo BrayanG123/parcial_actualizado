@@ -54,6 +54,26 @@ export class TenantsService {
     return tenant;
   }
 
+  async findById(id: number): Promise<ResolvedTenant | null> {
+    const key = `#${id}`;
+    const cached = this.cache.get(key);
+    if (cached && cached.expiresAt > Date.now()) return cached.tenant;
+    const row = await this.prisma.tenant.findUnique({
+      where: { id },
+      select: { id: true, slug: true, name: true, status: true },
+    });
+    const tenant = row
+      ? {
+          id: row.id,
+          slug: row.slug,
+          name: row.name,
+          active: row.status === 'ACTIVE',
+        }
+      : null;
+    this.cache.set(key, { tenant, expiresAt: Date.now() + CACHE_TTL_MS });
+    return tenant;
+  }
+
   /** Empresa activa por slug o error HTTP claro. */
   async requireActiveBySlug(slug: string): Promise<ResolvedTenant> {
     const tenant = await this.findBySlug(slug);

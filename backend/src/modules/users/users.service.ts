@@ -73,6 +73,12 @@ export class UsersService {
     return user?.active ? user : null;
   }
 
+  findPlatformAdminForAuthentication(email: string) {
+    return this.usersRepository.findPlatformAdminForAuthentication(
+      email.trim().toLowerCase(),
+    );
+  }
+
   findByEmailForAuthentication(email: string) {
     return this.usersRepository.findByEmailForAuthentication(
       email.trim().toLowerCase(),
@@ -183,6 +189,10 @@ export class UsersService {
     roles: Role[],
   ) {
     const email = data.email.trim().toLowerCase();
+    if (roles.includes(Role.PLATFORM_ADMIN))
+      throw new BadRequestException(
+        'PLATFORM_ADMIN no se asigna desde una empresa',
+      );
     if (data.supplierId != null)
       await this.validateSupplier(
         data.supplierId,

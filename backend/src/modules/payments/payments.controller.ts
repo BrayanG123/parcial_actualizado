@@ -21,6 +21,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { CreateStripeIntentDto } from './dto/create-stripe-intent.dto.js';
 import { PaymentsService } from './payments.service.js';
+import { AllowWhenReadOnly } from '../tenancy/plan.decorators.js';
 
 @Controller('payments')
 export class PaymentsController {
@@ -58,6 +59,7 @@ export class PaymentsController {
 
   @Post('stripe/webhook')
   @HttpCode(200)
+  @AllowWhenReadOnly()
   webhook(
     @Req() request: RawBodyRequest<Request>,
     @Headers('stripe-signature') signature?: string,

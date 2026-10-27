@@ -37,19 +37,22 @@ export const tenantContext = {
     return storage.run(store, callback);
   },
 
-  /** Ejecuta `callback` restringido a una empresa. */
-  runInTenant<T>(tenantId: number, callback: () => T): T {
+  /**
+   * Ejecuta `callback` restringido a una empresa. Espera el resultado dentro del
+   * contexto: las consultas de Prisma son diferidas y se ejecutan al hacer `then`.
+   */
+  runInTenant<T>(tenantId: number, callback: () => T): Promise<Awaited<T>> {
     return storage.run(
       { tenantId, system: false, source: 'explicit' },
-      callback,
+      async (): Promise<Awaited<T>> => await callback(),
     );
   },
 
   /** Ejecuta `callback` sin filtro de empresa (jobs y administracion de plataforma). */
-  runAsSystem<T>(callback: () => T): T {
+  runAsSystem<T>(callback: () => T): Promise<Awaited<T>> {
     return storage.run(
       { tenantId: null, system: true, source: 'system' },
-      callback,
+      async (): Promise<Awaited<T>> => await callback(),
     );
   },
 
