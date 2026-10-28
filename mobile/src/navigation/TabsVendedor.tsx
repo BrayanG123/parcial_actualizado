@@ -1,4 +1,5 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { Alert, ScrollView, Text } from 'react-native';
 import { useEmpresaActiva } from '../hooks/useEmpresa';
@@ -7,6 +8,9 @@ import { Pantalla } from '../components/Pantalla';
 import { useSesion } from '../context/SesionContext';
 import { PantallaPendientes } from '../features/offline/PantallaPendientes';
 import { PantallaVender } from '../features/offline/PantallaVender';
+import { PantallaReportesIA } from '../features/reportes/PantallaReportesIA';
+import { reportesService } from '../services/reportes.service';
+import { RolNombre } from '../types/domain';
 import { useAlcanceOffline, useDatosOffline } from '../hooks/useOffline';
 import { colores, esp, fuentes, texto } from '../theme';
 import type { TabsVendedorParamList } from './tipos';
@@ -48,10 +52,25 @@ function PerfilVendedor() {
   );
 }
 
-/** Modo vendedor (F6.6): POS offline, pendientes y cuenta. */
+/** Roles que consultan reportes en el backend (POST /ai/reports). */
+const ROLES_REPORTES: string[] = [RolNombre.ADMINISTRADOR, RolNombre.ENCARGADO_SUCURSAL];
+
+/**
+ * Modo vendedor (F6.6): POS offline, pendientes y cuenta. Administrador y encargado ven
+ * ademas "Reportes" (F8.6) si el plan de la empresa incluye reportes con IA.
+ */
 export function TabsVendedor() {
   const alcance = useAlcanceOffline();
   const { pendientes } = useDatosOffline(alcance);
+  const { usuario, sesionOffline } = useSesion();
+  const puedeReportes = Boolean(usuario?.roles.some((r) => ROLES_REPORTES.includes(String(r.nombre))));
+  // El backend vuelve a verificar rol y plan; aqui solo se evita mostrar una pestana inutil.
+  const plan = useQuery({
+    queryKey: ['plan-reportes-ia', usuario?.id_usuario],
+    queryFn: reportesService.incluyeReportesIA,
+    enabled: puedeReportes && !sesionOffline,
+    staleTime: 5 * 60_000,
+  });
   return (
     <Tab.Navigator
       screenOptions={{
@@ -75,6 +94,16 @@ export function TabsVendedor() {
           tabBarIcon: ({ color, size }) => <Ionicons name="sync-outline" size={size - 2} color={color} />,
         }}
       />
+      {plan.data === true && (
+        <Tab.Screen
+          name="ReportesIA"
+          component={PantallaReportesIA}
+          options={{
+            title: 'Reportes',
+            tabBarIcon: ({ color, size }) => <Ionicons name="bar-chart-outline" size={size - 2} color={color} />,
+          }}
+        />
+      )}
       <Tab.Screen
         name="PerfilVendedor"
         component={PerfilVendedor}

@@ -35,6 +35,16 @@ caja y reportes vive en el frontend web.
   llega por OTA). En `npm run web` el modo offline no esta disponible
   (`src/offline/sqlite.web.ts`).
 - Pruebas: `npm run test:offline` (node:test sobre `node:sqlite` con el mismo SQL).
+- **Reportes con IA (F8.6):** administrador y encargado ven ademas *Reportes* en el modo
+  vendedor si el plan incluye `aiReports` (`GET /tenant/subscription`); el backend lo
+  vuelve a verificar. `POST /ai/reports` devuelve tabla y especificacion de grafico; la app
+  las dibuja con `View` (barras, columnas para series temporales y barra al 100 % en lugar de
+  torta), muestra la tabla con desplazamiento horizontal y permite compartirla como CSV
+  (`Share`). Aclaraciones y rechazos traen sugerencias que se pueden tocar.
+  **Voz:** se usa el dictado del teclado del telefono (microfono de Gboard o iOS); no se
+  agrego un modulo nativo de reconocimiento de voz para no exigir otra build ni depender
+  de una API que no se pudo verificar en la documentacion de Expo SDK 57. Logica pura en
+  `src/features/reportes/modelo.ts`; pruebas: `npm run test:reportes`.
 
 ## Puesta en marcha
 
@@ -330,7 +340,9 @@ Todas bajo `EXPO_PUBLIC_API_URL` (`.../api/v1`).
 | Reservas | `GET /reservations/mine`, `GET /reservations/:id`, `POST /reservations`, `PATCH /reservations/:id/cancel` |
 | Compras | `GET /sales/mine`, `GET /sales/:id`, `POST /sales/checkout/preview`, `POST /sales/checkout`, `PATCH /sales/:id/cancel` |
 | Pagos | `POST /payments/stripe/intents` |
-| IA | `POST /ai/assistant`, `GET /ai/recommendations` |
+| IA | `POST /ai/assistant`, `GET /ai/recommendations`, `POST /ai/reports` (administrador y encargado) |
+| Empresa | `GET /tenant/directory`, `GET /tenant/subscription` |
+| Offline | `GET /sync/snapshot`, `POST /sync/operations` |
 
 La forma de cada respuesta esta en los adaptadores de `src/api/*.contratos.ts`.
 

@@ -93,7 +93,7 @@ Acceso: `POST /ai/reports` exige administrador o encargado y la funcionalidad `a
 
 Pruebas: `src/modules/ai/report-intent.spec.ts` (reglas, lista blanca, rechazos y elección de gráfico) y `test/ai.e2e-spec.ts` (consultas reales en PostgreSQL, aislamiento entre empresas, aclaración/rechazo y alcance del encargado).
 
-Pendiente: reportes con IA en móvil (F8.6, opcional).
+Móvil (F8.6): pestaña *Reportes* del modo vendedor para administrador y encargado con `aiReports`; dibuja la misma `table`/`chart` con componentes nativos y comparte CSV (ver `mobile/README.md`).
 
 ## Analítica con Machine Learning (`/ml`)
 

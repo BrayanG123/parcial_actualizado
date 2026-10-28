@@ -323,8 +323,8 @@ funcionalidades del plan).
   `SHIFT_REQUIRED`. 1a) Sin conexión → operación `EXCHANGE` que sigue CU14.
 
 ### CU30 Solicitar reporte generativo
-- **Actor:** Admin empresa / Encargado. **Precondición:** plan con `aiReports`.
-- **Flujo básico:** 1) Escribe o dicta la solicitud. 2) El backend descarta pedidos prohibidos
+- **Actor:** Admin empresa / Encargado (web o móvil). **Precondición:** plan con `aiReports`.
+- **Flujo básico:** 1) Escribe o dicta la solicitud (Web Speech API en la web; dictado del teclado en el móvil). 2) El backend descarta pedidos prohibidos
   (escrituras, datos personales, otras empresas, SQL). 3) Pide a la IA **solo** una intención JSON y
   la valida contra los 10 reportes y los filtros permitidos (ids de sucursales, categorías y
   productos de la empresa). 4) Ejecuta la consulta parametrizada predefinida, restringida al tenant y
@@ -1411,7 +1411,7 @@ web `frontend/test/`; móvil `mobile/test/`; ML `ml-service/tests/`.
 | IV. Conflictos de inventario | CU15 | `classify`, `PaginaPendientes` | `sync.e2e-spec.ts`, `exchanges.e2e-spec.ts` (venta offline vs online por la última unidad) |
 | IV. Cambios de prendas en un plazo | CU20 | `ExchangesService`, `/exchanges`, `PaginaCambios`, operación `EXCHANGE` | `exchanges.e2e-spec.ts` (plazo, doble cambio concurrente, kardex) |
 | IV. Aporte propio | CU21 | `CreditNote`, `/credit-notes/:code/redeem` | `exchanges.e2e-spec.ts` |
-| V. Reportes por texto y voz, ≥4 tipos, filtros, multi-tabla | CU30 | `AiReportsService`, `report-intent.ts`, `ReportsService.catalog`, `PaginaReporteIA` | `report-intent.spec.ts`, `ai.e2e-spec.ts`, `reporte-ia.test.tsx` |
+| V. Reportes por texto y voz, ≥4 tipos, filtros, multi-tabla | CU30 | `AiReportsService`, `report-intent.ts`, `ReportsService.catalog`, `PaginaReporteIA` (web), `PantallaReportesIA` (móvil) | `report-intent.spec.ts`, `ai.e2e-spec.ts`, `reporte-ia.test.tsx`, `mobile/test/reportes-ia.test.mjs` |
 | V. Tabla o gráfico, exportar Excel/PDF | CU30, CU31 | `report-presentation.ts`, `GraficoDinamico`, `datos-exportacion.ts` | `reporte-ia.test.tsx`, `exportacion-*.test.ts(x)` |
 | V. Ambiguas, incompletas o no soportadas; sin consultas arbitrarias | CU30 | `rejectReason`, `sanitizeDecision`, lista blanca | `report-intent.spec.ts`, `ai.e2e-spec.ts` |
 | V. ML: datos sintéticos, supervisado, no supervisado, evaluación | CU33 | `ml-service/app/{synthetic,features,demand,segmentation,anomalies}.py` | `ml-service/tests/test_models.py`, `test_synthetic.py` |
@@ -1435,7 +1435,7 @@ web `frontend/test/`; móvil `mobile/test/`; ML `ml-service/tests/`.
 | RNF08 Compatibilidad | PWA en navegadores modernos (Web Locks con respaldo); Expo SDK 57 conserva push, cámara y RA | Playwright (Chromium) F5/F7/F8/F9; `push.test.mjs` |
 | RNF09 Rendimiento | Índices por `tenantId`, índice de reportes `(id_empresa, estado, fecha_confirmacion)`, descarga offline acotada, paginación | `schema-indexes.spec.ts`; mediciones en `backend/README.md` |
 | RNF10 Observabilidad | `SyncLog` por intento (estado, código, latencia, sin payload); `GET /sync/logs`; logs sin datos de consulta | `sync.e2e-spec.ts`, `http-exception.filter.spec.ts` |
-| RNF11 Calidad | Backend 242 unitarias + 144 e2e; web 194; móvil 19; ml-service 12 | `PLAN_PARCIAL2.md` §1.4 |
+| RNF11 Calidad | Backend 242 unitarias + 144 e2e; web 194; móvil 24; ml-service 12 | `PLAN_PARCIAL2.md` §1.4 |
 | RNF12 Coherencia documental | Revisión F12 de §1–4 contra el código (tabla 4.9); §5–8 con nombres reales | Este documento |
 
 ---

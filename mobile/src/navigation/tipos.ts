@@ -31,6 +31,7 @@ export type RootStackParamList = {
 export type TabsVendedorParamList = {
   Vender: undefined;
   PendientesVendedor: undefined;
+  ReportesIA: undefined;
   PerfilVendedor: undefined;
 };
 
