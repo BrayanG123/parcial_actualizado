@@ -331,11 +331,11 @@ cierra en F12 con lo realmente implementado.
 - [ ] **F11.4** Generar APK nueva (cambios nativos por `expo-sqlite`).
 
 ### F12 — Documentación ICONIX / UML 2.5+ (coherente con lo implementado)
-- [ ] **F12.1** Diagramas de secuencia de los casos críticos (derivados de los de robustez).
-- [ ] **F12.2** Diagrama de clases de diseño actualizado (backend + clientes offline) y modelo de datos.
-- [ ] **F12.3** Diagramas de componentes y despliegue (Azure + ml-service + clientes offline).
-- [ ] **F12.4** Matriz de trazabilidad requisito → caso de uso → clases/endpoints → pruebas.
-- [ ] **F12.5** Guion de demostración (2 empresas, plan bloqueando IA, venta/reserva offline, conflicto, cambio de prenda, 4+ reportes, dashboard ML).
+- [x] ~~**F12.1** Diagramas de secuencia de los casos críticos (derivados de los de robustez).~~ — 2026-10-28 (`docs/ICONIX_Parcial2.md` §5: 8 secuencias, incluida la petición común con empresa)
+- [x] ~~**F12.2** Diagrama de clases de diseño actualizado (backend + clientes offline) y modelo de datos.~~ — 2026-10-28 (§6: clases de multitenancy, sync/cambios, IA/ML, ml-service y clientes offline; modelo de datos en `erDiagram`)
+- [x] ~~**F12.3** Diagramas de componentes y despliegue (Azure + ml-service + clientes offline).~~ — 2026-10-28 (§7: componentes y despliegue objetivo de F11, sin nombres de recursos)
+- [x] ~~**F12.4** Matriz de trazabilidad requisito → caso de uso → clases/endpoints → pruebas.~~ — 2026-10-28 (§8: requisitos de los 6 desafíos y RNF01–12 → CU → diseño → pruebas)
+- [x] ~~**F12.5** Guion de demostración (2 empresas, plan bloqueando IA, venta/reserva offline, conflicto, cambio de prenda, 4+ reportes, dashboard ML).~~ — 2026-10-28 (§9: guion de 11 pasos)
 
 ---
 
@@ -376,4 +376,4 @@ cierra en F12 con lo realmente implementado.
 | Fecha | Quién / dónde | Hecho | Pendiente / próximo paso |
 |---|---|---|---|
 | 2026-10-27 | Claude Code (local) | Plan creado a partir del enunciado y del estado real del repo. | Empezar F0 en Claude web. |
-| 2026-10-27 | Claude Code (web) | F0–F10 completas: ICONIX §1–4, multitenancy, web SaaS, sync unificado, PWA offline (IndexedDB), móvil (expo-sqlite + modo vendedor), cambios de prendas con notas de crédito, reportes con IA, ml-service con dashboard analítico y calidad (auditoría automática de rutas/SQL/índices, banderas de plan corregidas, índice de reportes medido con 180 000 ventas, dependencias del backend sin vulnerabilidades altas). Backend unit 242, e2e 144; web 194; móvil 19; ml-service 12. Decisiones confirmadas: se mantienen React/Expo; suscripción vencida = solo lectura. | Push a GitHub bloqueado (403, falta acceso de la app de Claude) → commits solo locales en `parcial2`, PRs sin abrir. Bóveda wiki (`D:/…`) no disponible: actualizar notas de multitenancy, sync, PWA/móvil offline, cambios, reportes IA, ML y seguridad. `docs.expo.dev` inaccesible; sin Docker en la nube (imagen de ml-service sin construir). Pendientes: F6.8 (prueba en teléfono), F8.6 opcional, vulnerabilidades de `firebase` (web) y dependencias de Expo (móvil), F11 en local. Siguiente: F12 (ICONIX §5–8). |
+| 2026-10-27/28 | Claude Code (web) | F0–F10 y F12 completas: ICONIX §1–9 (análisis revisado contra el código, secuencia, clases, datos, componentes, despliegue, trazabilidad y guion; 26 diagramas Mermaid verificados al renderizar), multitenancy, web SaaS, sync unificado, PWA offline, móvil (expo-sqlite + modo vendedor), cambios de prendas con notas de crédito, reportes con IA, ml-service con dashboard y calidad (auditoría automática de rutas/SQL/índices, banderas de plan corregidas, índice de reportes). Backend unit 242, e2e 144; web 194; móvil 19; ml-service 12. Decisiones confirmadas: se mantienen React/Expo; suscripción vencida = solo lectura. | F11 en espera: el equipo consigue créditos de Azure esta semana. Push a GitHub bloqueado (403, falta acceso de la app de Claude) → commits solo locales en `parcial2`, PRs sin abrir. Bóveda wiki (`D:/…`) no disponible: actualizar notas de multitenancy, sync, PWA/móvil offline, cambios, reportes IA, ML y seguridad. Pendientes: F6.8 (prueba en teléfono), F8.6 opcional, imagen Docker de ml-service, vulnerabilidades de `firebase` (web) y dependencias de Expo (móvil). |
