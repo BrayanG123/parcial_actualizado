@@ -331,11 +331,11 @@ cierra en F12 con lo realmente implementado.
 - [ ] **F11.4** Generar APK nueva (cambios nativos por `expo-sqlite`).
 
 ### F12 — Documentación ICONIX / UML 2.5+ (coherente con lo implementado)
-- [x] ~~**F12.1** Diagramas de secuencia de los casos críticos (derivados de los de robustez).~~ — 2026-10-28 (`docs/ICONIX_Parcial2.md` §5: 8 secuencias, incluida la petición común con empresa)
-- [x] ~~**F12.2** Diagrama de clases de diseño actualizado (backend + clientes offline) y modelo de datos.~~ — 2026-10-28 (§6: clases de multitenancy, sync/cambios, IA/ML, ml-service y clientes offline; modelo de datos en `erDiagram`)
-- [x] ~~**F12.3** Diagramas de componentes y despliegue (Azure + ml-service + clientes offline).~~ — 2026-10-28 (§7: componentes y despliegue objetivo de F11, sin nombres de recursos)
-- [x] ~~**F12.4** Matriz de trazabilidad requisito → caso de uso → clases/endpoints → pruebas.~~ — 2026-10-28 (§8: requisitos de los 6 desafíos y RNF01–12 → CU → diseño → pruebas)
-- [x] ~~**F12.5** Guion de demostración (2 empresas, plan bloqueando IA, venta/reserva offline, conflicto, cambio de prenda, 4+ reportes, dashboard ML).~~ — 2026-10-28 (§9: guion de 11 pasos)
+- [x] ~~**F12.1** Diagramas de secuencia de los casos críticos (derivados de los de robustez).~~ — 2026-10-28, commit `1214299` (`docs/ICONIX_Parcial2.md` §5: 8 secuencias, incluida la petición común con empresa)
+- [x] ~~**F12.2** Diagrama de clases de diseño actualizado (backend + clientes offline) y modelo de datos.~~ — 2026-10-28, commit `1214299` (§6: clases de multitenancy, sync/cambios, IA/ML, ml-service y clientes offline; modelo de datos en `erDiagram`)
+- [x] ~~**F12.3** Diagramas de componentes y despliegue (Azure + ml-service + clientes offline).~~ — 2026-10-28, commit `1214299` (§7: componentes y despliegue objetivo de F11, sin nombres de recursos)
+- [x] ~~**F12.4** Matriz de trazabilidad requisito → caso de uso → clases/endpoints → pruebas.~~ — 2026-10-28, commit `1214299` (§8: requisitos de los 6 desafíos y RNF01–12 → CU → diseño → pruebas)
+- [x] ~~**F12.5** Guion de demostración (2 empresas, plan bloqueando IA, venta/reserva offline, conflicto, cambio de prenda, 4+ reportes, dashboard ML).~~ — 2026-10-28, commit `1214299` (§9: guion de 11 pasos)
 
 ---
 
