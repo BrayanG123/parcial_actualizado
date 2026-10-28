@@ -5,6 +5,7 @@ import { AuthService } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
+import { AllowWhenReadOnly } from '../tenancy/plan.decorators.js';
 
 @Controller('auth')
 export class AuthController {
@@ -16,6 +17,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @AllowWhenReadOnly()
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }

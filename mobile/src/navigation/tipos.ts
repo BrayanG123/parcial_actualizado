@@ -22,6 +22,17 @@ export type RootStackParamList = {
   DetalleCompra: { id: number };
   Asistente: undefined;
   Acceso: { modo?: 'login' | 'registro'; motivo?: string } | undefined;
+  Tiendas: undefined;
+  TiendaOffline: undefined;
+  Pendientes: undefined;
+};
+
+/** Modo vendedor (F6.6): cajero, encargado o administrador. */
+export type TabsVendedorParamList = {
+  Vender: undefined;
+  PendientesVendedor: undefined;
+  ReportesIA: undefined;
+  PerfilVendedor: undefined;
 };
 
 export type PropsStack<T extends keyof RootStackParamList> = NativeStackScreenProps<

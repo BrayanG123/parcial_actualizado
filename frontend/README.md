@@ -284,6 +284,40 @@ Reglas de negocio implementadas en `src/lib/domain.ts`:
 | Sucursal       | `/sucursal/...`                                                             | ENCARGADO_SUCURSAL |
 | Caja           | `/caja`, `/caja/ventas`, `/caja/turnos`, `/caja/offline`                                                     | CAJERO, ENCARGADO_SUCURSAL, ADMINISTRADOR |
 | Proveedor      | `/proveedor/...`                                                            | PROVEEDOR          |
+| Tiendas (SaaS) | `/empresas`, `/t/:slug/...`                                                 | publico            |
+| Plan empresa   | `/admin/plan`                                                               | ADMINISTRADOR      |
+| Plataforma     | `/plataforma/login`, `/plataforma`                                          | PLATFORM_ADMIN (sesion propia) |
+| Offline        | `/offline`, `/pendientes`, `/caja/offline`, `/caja/pendientes`              | cliente / personal |
+| Cambios        | `/caja/cambios` (online y offline, notas de credito)                        | CAJERO, ENCARGADO_SUCURSAL, ADMINISTRADOR |
+
+### PWA offline (parcial 2)
+
+Datos offline en **IndexedDB** (`src/offline/`), operaciones con UUID y estados
+`LOCAL/SENDING/CONFIRMED/REJECTED/CONFLICT/RETRY` (+ `DESCARTADA`, nunca se borran) y
+contrato `/sync/operations`. Detalle y recorrido de demostracion en
+[ventas offline y PWA](../backend/docs/ventas-offline.md#pwa-offline-parcial-2).
+
+### SaaS multitenant (parcial 2)
+
+- **Tienda activa** (`src/api/empresa.ts`): `/t/:slug/...` fija la empresa y continua
+  en la ruta normal (`/t/empresa-b/catalogo` -> `/catalogo`); `/empresas` lista las
+  tiendas (`GET /tenant/directory`). Sin sesion, cada peticion envia `X-Tenant`; con
+  sesion manda la empresa del token (el backend rechaza un header distinto). El login
+  adopta la empresa que devuelve la API y cambiar de tienda cierra la sesion. Al
+  cambiar de empresa se limpia la cache de TanStack Query.
+- **Plan de la empresa** (`usePlanEmpresa`, `GET /tenant/subscription`): el menu oculta
+  lo que el plan no incluye (p. ej. Reportes con IA en Basico), el panel muestra
+  empresa y plan, y `AvisoSuscripcion` avisa el modo **solo lectura** o el
+  vencimiento cercano. Es UX: el backend vuelve a validar plan y suscripcion.
+- **Mensajes por codigo** (`MENSAJES_CODIGO` en `src/api/http.ts`):
+  `SUBSCRIPTION_READ_ONLY`, `PLAN_FEATURE_REQUIRED`, `PLAN_LIMIT_REACHED`,
+  `PLAN_LIMIT_EXCEEDED`, `TENANT_MISMATCH`, `TENANT_INACTIVE`; `ErrorApi.codigo`
+  conserva el codigo.
+- **Plataforma** (`/plataforma`): empresas, cambio de plan, renovacion simulada,
+  suspension/reactivacion, historial y edicion de limites/funcionalidades de los
+  planes. Usa un token separado (`apiPlataforma`) que no se mezcla con la tienda.
+  En la demo con mocks: `plataforma@fashionstore.bo` / `plataforma123`.
+- Pruebas: `test/saas.test.tsx`.
 
 Los permisos por area estan centralizados en `src/routes/permisos.ts` y los usan
 tanto los guards del router como la redireccion posterior al login.

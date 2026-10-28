@@ -38,14 +38,12 @@ describe('SalesRepository', () => {
   });
 
   it('bounds retry attempts and does not repeat stock/business errors', async () => {
-    const transaction = vi
-      .fn()
-      .mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('conflict', {
-          code: 'P2034',
-          clientVersion: '7.10.0',
-        }),
-      );
+    const transaction = vi.fn().mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('conflict', {
+        code: 'P2034',
+        clientVersion: '7.10.0',
+      }),
+    );
     const repo = new SalesRepository({
       $transaction: transaction,
     } as unknown as PrismaService);

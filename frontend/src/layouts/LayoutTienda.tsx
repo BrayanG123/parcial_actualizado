@@ -6,11 +6,14 @@ import { iniciales } from '../lib/format';
 import { RolNombre } from '../types/domain';
 import { rutaInicialPorRol } from '../routes/permisos';
 import { AsistenteIA } from '../features/ia/AsistenteIA';
+import { useEmpresaActiva } from '../hooks/useEmpresaActiva';
+import { IndicadorConexion } from '../features/offline/IndicadorConexion';
 
 const ENLACES = [
   { a: '/catalogo', texto: 'Catalogo' },
   { a: '/catalogo?solo_promocion=true', texto: 'Promociones' },
   { a: '/reservas/nueva', texto: 'Reservar en tienda' },
+  { a: '/offline', texto: 'Tienda offline' },
 ];
 
 export function LayoutTienda() {
@@ -19,6 +22,7 @@ export function LayoutTienda() {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [asistenteAbierto, setAsistenteAbierto] = useState(false);
   const navegar = useNavigate();
+  const empresa = useEmpresaActiva();
 
   const panelInterno = tieneRol(
     RolNombre.ADMINISTRADOR,
@@ -48,6 +52,9 @@ export function LayoutTienda() {
 
           <Link to="/" className="fs-marca">
             Fashion<span>Store</span>
+          </Link>
+          <Link to="/empresas" className="fs-badge fs-badge--acento" title="Cambiar de tienda">
+            {empresa?.nombre ?? empresa?.slug ?? 'FashionStore'} · cambiar
           </Link>
 
           <nav className={`fs-header__nav${menuAbierto ? ' fs-header__nav--abierto' : ''}`}>
@@ -79,6 +86,7 @@ export function LayoutTienda() {
           </nav>
 
           <div className="fs-header__acciones">
+            {autenticado && <IndicadorConexion rutaPendientes="/pendientes" />}
             <button
               type="button"
               className="fs-btn fs-btn--fantasma"

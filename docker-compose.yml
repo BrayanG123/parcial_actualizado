@@ -4,6 +4,7 @@
 #   docker compose up -d db                     # solo PostgreSQL para desarrollo (npm run start:dev)
 #   docker compose up -d --build                # base + API + web en http://localhost:8080
 #   docker compose --profile ia-local up -d     # agrega Ollama como IA local
+#   El servicio ml (FastAPI) solo se publica en la red interna; el backend lo consume.
 name: fashionstore
 
 services:
@@ -39,8 +40,20 @@ services:
       CORS_ORIGINS: ${WEB_ORIGIN:-http://localhost:8080},http://localhost:8081
       RUN_MIGRATIONS: 'true'
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      ML_SERVICE_URL: http://ml:8000
+      ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN:?Define ML_SERVICE_TOKEN en el .env de la raiz}
     ports:
       - '${API_PORT:-3000}:3000'
+
+  ml:
+    build: ./ml-service
+    restart: unless-stopped
+    environment:
+      ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN:?Define ML_SERVICE_TOKEN en el .env de la raiz}
+      ML_MODELS_DIR: /data/models
+    # Sin "ports": no se expone fuera de la red de compose.
+    volumes:
+      - ml-models:/data/models
 
   frontend:
     build:
@@ -67,3 +80,4 @@ services:
 volumes:
   db-data:
   ollama-data:
+  ml-models:

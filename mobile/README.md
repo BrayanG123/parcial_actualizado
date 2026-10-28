@@ -12,6 +12,40 @@ cambiar el backend: los DTO en ingles se traducen al dominio en espanol en
 La app no es un panel administrativo: la gestion de catalogo, inventario,
 caja y reportes vive en el frontend web.
 
+## Parcial 2: tiendas, SQLite offline y modo vendedor
+
+- **Tienda (empresa):** se elige en *Acceso* o *Perfil > Cambiar de tienda*
+  (`GET /tenant/directory`); se envia como `X-Tenant` sin sesion. Al iniciar sesion
+  la tienda pasa a ser la de la cuenta. Sin elegir, el backend usa `fashionstore`.
+- **SQLite (`expo-sqlite` ~57.0.4, modulo nativo):** `src/offline/nucleo.ts` (esquema
+  con migraciones `PRAGMA user_version`, repositorio, cola y sincronizador),
+  `src/offline/sqlite.ts` (adaptador) y `src/offline/servicio.ts`. Tablas:
+  sucursales, descargas, productos, variantes, clientes, operaciones,
+  operacion_lineas y sync_resultados. Contrato comun con la web: `/sync/snapshot` y
+  `/sync/operations` (`backend/docs/ventas-offline.md`).
+- **Cliente:** *Perfil > Tienda sin conexion* descarga el catalogo de una sucursal,
+  lo muestra con su antiguedad y stock conocido, y permite reservar sin internet.
+- **Modo vendedor:** cajero, encargado o administrador ven *Vender*, *Pendientes* y
+  *Cuenta*. El turno se abre con conexion (web/caja); luego se descargan los datos y
+  se cobra en efectivo sin internet.
+- **Pendientes:** estados `LOCAL/SENDING/CONFIRMED/REJECTED/CONFLICT/RETRY` (+
+  descartada); se envian al abrir la app y cada 30 s, con reintentos crecientes. Al
+  abrir la app sin red se conserva la sesion para consultar y registrar operaciones.
+- **Importante:** `expo-sqlite` es nativo: **requiere generar una APK nueva** (no
+  llega por OTA). En `npm run web` el modo offline no esta disponible
+  (`src/offline/sqlite.web.ts`).
+- Pruebas: `npm run test:offline` (node:test sobre `node:sqlite` con el mismo SQL).
+- **Reportes con IA (F8.6):** administrador y encargado ven ademas *Reportes* en el modo
+  vendedor si el plan incluye `aiReports` (`GET /tenant/subscription`); el backend lo
+  vuelve a verificar. `POST /ai/reports` devuelve tabla y especificacion de grafico; la app
+  las dibuja con `View` (barras, columnas para series temporales y barra al 100 % en lugar de
+  torta), muestra la tabla con desplazamiento horizontal y permite compartirla como CSV
+  (`Share`). Aclaraciones y rechazos traen sugerencias que se pueden tocar.
+  **Voz:** se usa el dictado del teclado del telefono (microfono de Gboard o iOS); no se
+  agrego un modulo nativo de reconocimiento de voz para no exigir otra build ni depender
+  de una API que no se pudo verificar en la documentacion de Expo SDK 57. Logica pura en
+  `src/features/reportes/modelo.ts`; pruebas: `npm run test:reportes`.
+
 ## Puesta en marcha
 
 ```bash
@@ -306,7 +340,9 @@ Todas bajo `EXPO_PUBLIC_API_URL` (`.../api/v1`).
 | Reservas | `GET /reservations/mine`, `GET /reservations/:id`, `POST /reservations`, `PATCH /reservations/:id/cancel` |
 | Compras | `GET /sales/mine`, `GET /sales/:id`, `POST /sales/checkout/preview`, `POST /sales/checkout`, `PATCH /sales/:id/cancel` |
 | Pagos | `POST /payments/stripe/intents` |
-| IA | `POST /ai/assistant`, `GET /ai/recommendations` |
+| IA | `POST /ai/assistant`, `GET /ai/recommendations`, `POST /ai/reports` (administrador y encargado) |
+| Empresa | `GET /tenant/directory`, `GET /tenant/subscription` |
+| Offline | `GET /sync/snapshot`, `POST /sync/operations` |
 
 La forma de cada respuesta esta en los adaptadores de `src/api/*.contratos.ts`.
 

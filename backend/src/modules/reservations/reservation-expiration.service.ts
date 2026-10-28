@@ -1,11 +1,13 @@
 import {
   Injectable,
+  Optional,
   Logger,
   OnApplicationBootstrap,
   OnModuleDestroy,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ReservationsService } from './reservations.service.js';
+import { TenantsService } from '../tenancy/tenants.service.js';
 
 @Injectable()
 export class ReservationExpirationService
@@ -18,6 +20,7 @@ export class ReservationExpirationService
   constructor(
     private readonly reservations: ReservationsService,
     private readonly config: ConfigService,
+    @Optional() private readonly tenants?: TenantsService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -29,8 +32,9 @@ export class ReservationExpirationService
 
   private tick(): void {
     if (this.running) return;
-    this.running = this.reservations
-      .expireDueReservations()
+    // Cada empresa se procesa con su propio contexto (aislamiento por tenant).
+    const run = () => this.reservations.expireDueReservations();
+    this.running = (this.tenants ? this.tenants.forEachTenant(run) : run())
       .then(() => undefined)
       .catch((error: unknown) => {
         this.logger.error(

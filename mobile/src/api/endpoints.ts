@@ -50,6 +50,10 @@ export const endpoints = {
   ia: {
     asistente: '/ai/assistant',
     recomendaciones: '/ai/recommendations',
+    reportes: '/ai/reports',
+  },
+  empresa: {
+    suscripcion: '/tenant/subscription',
   },
   probador: {
     estado: '/virtual-fitting/status',

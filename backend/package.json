@@ -31,6 +31,7 @@
     "prisma:seed:reservations": "tsx prisma/seed-reservations.ts",
     "prisma:seed:cart": "tsx prisma/seed-cart.ts",
     "prisma:seed:sales": "tsx prisma/seed-sales.ts",
+    "prisma:seed:tenant-b": "tsx prisma/seed-tenant-b.ts",
     "prisma:studio": "prisma studio",
     "postinstall": "prisma generate"
   },

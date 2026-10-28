@@ -1,5 +1,5 @@
 import type { RecomendacionIA } from '../types/domain';
-import type { ReporteIA, RespuestaAsistente } from '../types/ia';
+import type { GraficoIA, ReporteCatalogo, ReporteIA, RespuestaAsistente, TablaIA } from '../types/ia';
 import { adaptarProducto, type ProductoBackend } from './catalogo.contratos';
 import {
   adaptarReporteCaja,
@@ -36,13 +36,46 @@ export interface RecomendacionBackend {
   createdAt: string;
   product: ProductoBackend;
 }
+interface TablaIABackend {
+  columns: Array<{
+    key: string;
+    label: string;
+    format: TablaIA['columnas'][number]['formato'];
+  }>;
+  rows: TablaIA['filas'];
+}
+interface GraficoIABackend {
+  type: 'bar' | 'line' | 'pie' | 'table';
+  title: string;
+  x?: string;
+  y: Array<{ key: string; label: string }>;
+  reason: string;
+}
+const TIPO_GRAFICO = {
+  bar: 'barras',
+  line: 'lineas',
+  pie: 'torta',
+  table: 'tabla',
+} as const;
+
 export interface ReporteIABackend {
+  /** Ausente en respuestas anteriores a F8: equivale a OK. */
+  status?: 'OK' | 'NEEDS_CLARIFICATION' | 'UNSUPPORTED';
   question: string;
   source: string;
   model: string | null;
   summary: string;
-  interpretation: {
-    report: 'sales' | 'top-products' | 'inventory' | 'reservations' | 'cash-shifts';
+  suggestions?: string[];
+  table?: TablaIABackend | null;
+  chart?: GraficoIABackend | null;
+  interpretation: null | {
+    report: 'sales' | 'inventory' | 'reservations' | 'cash-shifts' | ReporteCatalogo;
+    branchIds?: number[];
+    branchNames?: string[];
+    categoryNames?: string[];
+    productNames?: string[];
+    groupBy?: string;
+    months?: number;
     from?: string;
     to?: string;
     branchId?: number;
@@ -89,8 +122,56 @@ export function adaptarRecomendacion(v: RecomendacionBackend): RecomendacionIA {
   };
 }
 
+const CATALOGO: ReporteCatalogo[] = [
+  'sales-grouped',
+  'sales-by-week',
+  'top-products',
+  'top-categories',
+  'branch-comparison',
+  'low-stock',
+];
+
+export function adaptarTablaIA(t: TablaIABackend): TablaIA {
+  return {
+    columnas: t.columns.map((c) => ({
+      clave: c.key,
+      titulo: c.label,
+      formato: c.format,
+    })),
+    filas: t.rows,
+  };
+}
+export function adaptarGraficoIA(g: GraficoIABackend): GraficoIA {
+  return {
+    tipo: TIPO_GRAFICO[g.type] ?? 'tabla',
+    titulo: g.title,
+    x: g.x ?? null,
+    series: g.y.map((s) => ({ clave: s.key, titulo: s.label })),
+    motivo: g.reason,
+  };
+}
+
 export function adaptarReporteIA(v: ReporteIABackend): ReporteIA {
   const i = v.interpretation;
+  if (!i || (v.status && v.status !== 'OK'))
+    return {
+      pregunta: v.question,
+      origen: v.source,
+      modelo: v.model,
+      resumen: v.summary,
+      interpretacion: {
+        desde: null,
+        hasta: null,
+        id_sucursal: null,
+        sucursal: null,
+        canal: null,
+        limite: null,
+        solo_stock_bajo: false,
+        explicacion: v.summary,
+      },
+      tipo: v.status === 'UNSUPPORTED' ? 'no_soportado' : 'aclaracion',
+      sugerencias: v.suggestions ?? [],
+    };
   const base = {
     pregunta: v.question,
     origen: v.source,
@@ -105,12 +186,29 @@ export function adaptarReporteIA(v: ReporteIABackend): ReporteIA {
       limite: i.limit ?? null,
       solo_stock_bajo: i.lowStockOnly ?? false,
       umbral_stock_bajo: i.lowStockThreshold ?? 5,
+      sucursales: i.branchNames ?? [],
+      categorias: i.categoryNames ?? [],
+      productos: i.productNames ?? [],
+      agrupacion: i.groupBy ?? null,
+      meses: i.months ?? null,
       explicacion: i.explanation,
     },
   };
+  if (CATALOGO.includes(i.report as ReporteCatalogo) && v.table && v.chart)
+    return {
+      ...base,
+      tipo: 'catalogo',
+      reporte: i.report as ReporteCatalogo,
+      tabla: adaptarTablaIA(v.table),
+      grafico: adaptarGraficoIA(v.chart),
+    };
   switch (i.report) {
     case 'top-products':
-      return { ...base, tipo: 'top', top: adaptarTopProductos(v.result as TopProductosBackend) };
+      return {
+        ...base,
+        tipo: 'top',
+        top: adaptarTopProductos(v.result as TopProductosBackend),
+      };
     case 'inventory':
       return {
         ...base,
@@ -118,7 +216,11 @@ export function adaptarReporteIA(v: ReporteIABackend): ReporteIA {
         inventario: adaptarReporteInventario(v.result as ReporteInventarioBackend),
       };
     case 'cash-shifts':
-      return { ...base, tipo: 'caja', caja: adaptarReporteCaja(v.result as ReporteCajaBackend) };
+      return {
+        ...base,
+        tipo: 'caja',
+        caja: adaptarReporteCaja(v.result as ReporteCajaBackend),
+      };
     case 'reservations':
       return {
         ...base,
@@ -126,6 +228,10 @@ export function adaptarReporteIA(v: ReporteIABackend): ReporteIA {
         reservas: adaptarReservasPorEstado(v.result as ReporteReservasBackend),
       };
     default:
-      return { ...base, tipo: 'ventas', ventas: adaptarReporteVentas(v.result as ReporteVentasBackend) };
+      return {
+        ...base,
+        tipo: 'ventas',
+        ventas: adaptarReporteVentas(v.result as ReporteVentasBackend),
+      };
   }
 }

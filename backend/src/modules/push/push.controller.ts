@@ -18,6 +18,7 @@ import {
   RemovePushTokenDto,
 } from './dto/push-token.dto.js';
 import { PushService } from './push.service.js';
+import { AllowWhenReadOnly } from '../tenancy/plan.decorators.js';
 
 /** Cada usuario registra o elimina sus propios dispositivos. */
 @Controller('push')
@@ -33,6 +34,7 @@ export class PushController {
 
   @Post('tokens')
   @HttpCode(200)
+  @AllowWhenReadOnly()
   register(
     @Body() dto: RegisterPushTokenDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -41,6 +43,7 @@ export class PushController {
   }
 
   @Delete('tokens')
+  @AllowWhenReadOnly()
   unregister(
     @Body() dto: RemovePushTokenDto,
     @CurrentUser() user: AuthenticatedUser,

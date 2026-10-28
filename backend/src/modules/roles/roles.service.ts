@@ -20,6 +20,10 @@ export class RolesService {
   }
 
   async assign(userId: number, role: Role, dto: AssignRoleDto) {
+    if (role === Role.PLATFORM_ADMIN)
+      throw new BadRequestException(
+        'PLATFORM_ADMIN no se asigna desde una empresa',
+      );
     const [user, roleRecord] = await Promise.all([
       this.rolesRepository.findUserContext(userId),
       this.rolesRepository.findByName(role as unknown as RoleName),
@@ -63,6 +67,10 @@ export class RolesService {
   }
 
   async remove(userId: number, role: Role) {
+    if (role === Role.PLATFORM_ADMIN)
+      throw new BadRequestException(
+        'PLATFORM_ADMIN no se administra desde una empresa',
+      );
     const [user, roleRecord] = await Promise.all([
       this.rolesRepository.findUserContext(userId),
       this.rolesRepository.findByName(role as unknown as RoleName),

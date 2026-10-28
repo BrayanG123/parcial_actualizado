@@ -41,11 +41,24 @@ const PaginaVentasOperacion = lazy(() => import('./features/sales/PaginaVentasOp
 const PaginaMovimientos = lazy(() => import('./features/inventory/PaginaMovimientos'));
 const PaginaReportes = lazy(() => import('./features/reports/PaginaReportes'));
 const PaginaReporteIA = lazy(() => import('./features/reports/PaginaReporteIA'));
+const PaginaAnalitica = lazy(() => import('./features/analitica/PaginaAnalitica'));
+
+/* SaaS multitenant */
+const PaginaEmpresas = lazy(() => import('./features/saas/PaginaEmpresas'));
+const EntradaEmpresa = lazy(() => import('./features/saas/EntradaEmpresa'));
+const PaginaPlanEmpresa = lazy(() => import('./features/saas/PaginaPlanEmpresa'));
+const PaginaPlataforma = lazy(() => import('./features/saas/PaginaPlataforma'));
+const PaginaPlataformaLogin = lazy(() => import('./features/saas/PaginaPlataformaLogin'));
+
+/* Operacion offline (PWA) */
+const PaginaTiendaOffline = lazy(() => import('./features/offline/PaginaTiendaOffline'));
+const PaginaPendientes = lazy(() => import('./features/offline/PaginaPendientes'));
 
 /* Caja y proveedor */
 const PaginaOffline = lazy(() => import('./features/pos/PaginaOffline'));
 const PaginaTurnos = lazy(() => import('./features/pos/PaginaTurnos'));
 const PaginaPuntoVenta = lazy(() => import('./features/pos/PaginaPuntoVenta'));
+const PaginaCambios = lazy(() => import('./features/pos/PaginaCambios'));
 const PaginaProductosProveedor = lazy(() => import('./features/supplier/PaginaProductosProveedor'));
 const PaginaEntregasProveedor = lazy(() => import('./features/supplier/PaginaEntregas'));
 
@@ -136,9 +149,24 @@ export default function App() {
               </RutaProtegida>
             }
           />
+          <Route path="offline" element={<PaginaTiendaOffline />} />
+          <Route
+            path="pendientes"
+            element={
+              <RutaProtegida>
+                <PaginaPendientes />
+              </RutaProtegida>
+            }
+          />
           <Route path="sin-permisos" element={<SinPermisos />} />
           <Route path="*" element={<NoEncontrada />} />
         </Route>
+
+        {/* --- tiendas por empresa y plataforma SaaS --- */}
+        <Route path="/t/:slug/*" element={<EntradaEmpresa />} />
+        <Route path="/empresas" element={<PaginaEmpresas />} />
+        <Route path="/plataforma/login" element={<PaginaPlataformaLogin />} />
+        <Route path="/plataforma" element={<PaginaPlataforma />} />
 
         {/* --- autenticacion --- */}
         <Route path="/login" element={<PaginaLogin />} />
@@ -164,12 +192,14 @@ export default function App() {
           <Route path="proveedores" element={<PaginaProveedores />} />
           <Route path="usuarios" element={<PaginaUsuarios />} />
           <Route path="roles" element={<PaginaRoles />} />
+          <Route path="plan" element={<PaginaPlanEmpresa />} />
           <Route path="inventario" element={<PaginaInventarioAdmin />} />
           <Route path="movimientos" element={<PaginaMovimientos />} />
           <Route path="reservas" element={<PaginaReservasOperacion />} />
           <Route path="ventas" element={<PaginaVentasOperacion />} />
           <Route path="reportes" element={<PaginaReportes />} />
           <Route path="reportes-ia" element={<PaginaReporteIA />} />
+          <Route path="analitica" element={<PaginaAnalitica />} />
         </Route>
 
         {/* --- sucursal --- */}
@@ -188,6 +218,7 @@ export default function App() {
           <Route path="ventas" element={<PaginaVentasOperacion />} />
           <Route path="reportes" element={<PaginaReportes />} />
           <Route path="reportes-ia" element={<PaginaReporteIA />} />
+          <Route path="analitica" element={<PaginaAnalitica />} />
         </Route>
 
         {/* --- caja --- */}
@@ -202,6 +233,8 @@ export default function App() {
           <Route index element={<PaginaPuntoVenta />} />
           <Route path="turnos" element={<PaginaTurnos />} />
           <Route path="offline" element={<PaginaOffline />} />
+          <Route path="pendientes" element={<PaginaPendientes />} />
+          <Route path="cambios" element={<PaginaCambios />} />
           <Route path="ventas" element={<PaginaVentasOperacion />} />
         </Route>
 

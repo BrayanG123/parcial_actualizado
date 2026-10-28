@@ -12,6 +12,7 @@ import { rutasComercio } from './rutas/comercio';
 import { rutasIA } from './rutas/ia';
 import { rutasInventario } from './rutas/inventario';
 import { rutasReportes } from './rutas/reportes';
+import { rutasSaas } from './rutas/saas';
 import { guardarEstado, restaurarEstado } from './persistencia';
 
 const rutas: RutaMock[] = [
@@ -22,6 +23,7 @@ const rutas: RutaMock[] = [
   ...rutasAdmin,
   ...rutasReportes,
   ...rutasIA,
+  ...rutasSaas,
 ];
 
 restaurarEstado();

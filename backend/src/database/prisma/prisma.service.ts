@@ -2,6 +2,7 @@ import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client.js';
+import { tenantIsolationExtension } from './tenant-isolation.extension.js';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleDestroy {
@@ -25,6 +26,9 @@ export class PrismaService extends PrismaClient implements OnModuleDestroy {
       adapter,
       log: isDevelopment ? ['warn', 'error'] : ['error'],
     });
+    // Las extensiones de consulta no cambian los tipos del cliente: todos los
+    // repositorios reciben el cliente aislado por empresa sin cambiar su firma.
+    return this.$extends(tenantIsolationExtension()) as unknown as this;
   }
 
   async onModuleDestroy(): Promise<void> {

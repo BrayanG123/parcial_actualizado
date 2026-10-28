@@ -5,6 +5,7 @@ import {
   type Color,
   type Size,
 } from '../../src/generated/prisma/client.js';
+import { seedTenantId } from './tenant.js';
 
 const fixtureVersion = 'MASSIVE:V1';
 const fixturePassword = 'Password123';
@@ -135,7 +136,7 @@ export async function seedMassive(
   return client.$transaction(
     async (prisma) => {
       await prisma.$executeRaw`SELECT pg_advisory_xact_lock(731202)`;
-      const marker = await prisma.user.findUnique({
+      const marker = await prisma.user.findFirst({
         where: { email: 'admin@masivo.fashionstore.test' },
       });
       if (marker)
@@ -171,7 +172,7 @@ export async function seedMassive(
       ].entries())
         seasonRows.push(
           await prisma.season.upsert({
-            where: { name },
+            where: { tenantId_name: { tenantId: seedTenantId(), name } },
             update: {},
             create: {
               name,
@@ -207,7 +208,7 @@ export async function seedMassive(
       for (const name of categories)
         categoryRows.push(
           await prisma.category.upsert({
-            where: { name },
+            where: { tenantId_name: { tenantId: seedTenantId(), name } },
             update: {},
             create: { name, description: `Categoria ${name} para Bolivia` },
           }),
@@ -216,7 +217,7 @@ export async function seedMassive(
       for (const name of ['XS', 'S', 'M', 'L', 'XL'])
         sizeRows.push(
           await prisma.size.upsert({
-            where: { name },
+            where: { tenantId_name: { tenantId: seedTenantId(), name } },
             update: {},
             create: { name },
           }),
@@ -232,7 +233,7 @@ export async function seedMassive(
       ])
         colorRows.push(
           await prisma.color.upsert({
-            where: { name },
+            where: { tenantId_name: { tenantId: seedTenantId(), name } },
             update: {},
             create: { name, hexCode },
           }),

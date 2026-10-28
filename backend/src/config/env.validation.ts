@@ -15,6 +15,10 @@ export const environmentValidationSchema = Joi.object({
   DATABASE_CONNECTION_TIMEOUT_MS: Joi.number().integer().min(1).default(5000),
   JWT_SECRET: Joi.string().min(32).required(),
   JWT_EXPIRES_IN: Joi.string().default('1d'),
+  // Empresa usada cuando una peticion publica no envia X-Tenant (apps del parcial 1).
+  DEFAULT_TENANT_SLUG: Joi.string()
+    .pattern(/^[a-z0-9-]{2,60}$/)
+    .default('fashionstore'),
   CHECKOUT_HOLD_MINUTES: Joi.number().integer().min(1).max(120).default(15),
   STRIPE_SECRET_KEY: Joi.string()
     .empty('')
@@ -69,6 +73,13 @@ export const environmentValidationSchema = Joi.object({
   OLLAMA_MODEL: Joi.string()
     .pattern(/^[a-zA-Z0-9._:/-]+$/)
     .default('qwen2.5:3b'),
+  // Servicio de Machine Learning (red interna); sin URL la analitica responde ML_NOT_CONFIGURED.
+  ML_SERVICE_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .empty('')
+    .optional(),
+  ML_SERVICE_TOKEN: Joi.string().min(16).empty('').optional(),
+  ML_TIMEOUT_MS: Joi.number().integer().min(1000).max(300000).default(60000),
   // Notificaciones push (Firebase Cloud Messaging): las tres juntas o ninguna.
   FIREBASE_PROJECT_ID: Joi.string().empty('').optional(),
   FIREBASE_CLIENT_EMAIL: Joi.string().email().empty('').optional(),

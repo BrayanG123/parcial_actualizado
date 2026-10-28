@@ -7,6 +7,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { Client } from 'pg';
 import { hash } from 'bcrypt';
 import request from 'supertest';
+import { isolatedTestClient } from './tenant-test-client.js';
 import { AppModule } from '../../src/app.module.js';
 import { PrismaService } from '../../src/database/prisma/prisma.service.js';
 import { PrismaClient } from '../../src/generated/prisma/client.js';
@@ -58,15 +59,17 @@ export async function cartTestContext(
         migration.replace('CREATE SCHEMA IF NOT EXISTS "public";', ''),
       );
     }
-    prisma = new PrismaClient({
-      adapter: new PrismaPg(
-        {
-          connectionString: databaseUrl,
-          options: `-c search_path=${schema} -c timezone=UTC`,
-        },
-        { schema },
-      ),
-    });
+    prisma = await isolatedTestClient(
+      new PrismaClient({
+        adapter: new PrismaPg(
+          {
+            connectionString: databaseUrl,
+            options: `-c search_path=${schema} -c timezone=UTC`,
+          },
+          { schema },
+        ),
+      }),
+    );
     const branch = await prisma.branch.create({
       data: {
         name: 'Central',

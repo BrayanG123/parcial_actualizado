@@ -40,8 +40,8 @@ export class BranchesRepository {
   }
 
   findByCityAndName(city: string, name: string) {
-    return this.prisma.branch.findUnique({
-      where: { city_name: { city, name } },
+    return this.prisma.branch.findFirst({
+      where: { city, name },
       select: { id: true },
     });
   }

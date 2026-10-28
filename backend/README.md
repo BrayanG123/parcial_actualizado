@@ -24,6 +24,110 @@ Para instalar el proyecto en otro equipo y poblar una base vacía, seguir la
 ejecuta con `npm run prisma:seed:demo` e incluye el seed base, usuarios de prueba,
 catálogo, inventario, reservas y ventas históricas. Requiere `SEED_DEMO_PASSWORD`.
 
+## SaaS multitenant (parcial 2)
+
+Base PostgreSQL compartida con **aislamiento lógico por empresa** (`empresas`,
+`planes`, `suscripciones`, `historial_suscripciones`; `id_empresa` en toda tabla de
+negocio). Diseño y casos de uso: [ICONIX parcial 2](../docs/ICONIX_Parcial2.md).
+
+- **Empresa de cada petición** (`src/common/tenant/tenant-context.ts`,
+  `src/modules/tenancy/tenant.middleware.ts`): empresa del JWT si hay token válido;
+  si no, header `X-Tenant: <slug>`; si no, `DEFAULT_TENANT_SLUG` (`fashionstore`,
+  para las apps del parcial 1). Header distinto al token → 403 `TENANT_MISMATCH`;
+  slug inexistente → 404.
+- **Aislamiento en backend** (`src/database/prisma/tenant-isolation.extension.ts`):
+  extensión de Prisma que agrega `tenantId` a todo `where` y a toda alta (también
+  anidada) de los modelos con empresa. Un recurso de otra empresa "no existe" (404).
+  Sin contexto la consulta falla (fail closed) y la columna `id_empresa` tiene un
+  default de BD que también falla si la aplicación no la envía. Las consultas
+  `$queryRaw` filtran `id_empresa` explícitamente (`reports.repository.ts`, `ml.repository.ts`). Jobs y
+  webhook de Stripe se ejecutan por empresa (`TenantsService.forEachTenant`).
+- **Planes** configurables en la tabla `planes` (`maxActiveBranches`, `features`):
+  `@RequiresFeature('aiReports' | 'conventionalReports' | 'offline' …)` lo verifica
+  `TenantAccessInterceptor` después del JWT → 403 `PLAN_FEATURE_REQUIRED`. Crear o
+  reactivar una sucursal por encima del límite → 403 `PLAN_LIMIT_REACHED`.
+- **Suscripción vencida o suspendida → solo lectura**: GET y login permitidos; toda
+  otra escritura de la empresa → 403 `SUBSCRIPTION_READ_ONLY`. El vencimiento se
+  registra solo (`EXPIRE` en el historial) al detectarse.
+- Los errores de estas reglas incluyen `code` en el cuerpo para que la UI muestre
+  mensajes claros.
+
+| Ruta | Acceso | Uso |
+|---|---|---|
+| `GET /tenant/directory` | público | Empresas activas (slug, nombre) para el selector |
+| `GET /tenant/public` | público | Empresa resuelta por `X-Tenant` |
+| `GET /tenant/subscription` | personal y clientes | Plan, funcionalidades, límites, uso, vencimiento, `readOnly` |
+| `POST /platform/auth/login` | público | Login del administrador de plataforma (`PLATFORM_ADMIN`, sin empresa) |
+| `GET/POST /platform/plans`, `PATCH /platform/plans/:id` | `PLATFORM_ADMIN` | Planes y sus límites |
+| `GET/POST /platform/tenants`, `GET/PATCH /platform/tenants/:id` | `PLATFORM_ADMIN` | Empresas (alta con suscripción y administrador) |
+| `POST /platform/tenants/:id/admins` | `PLATFORM_ADMIN` | Designar administrador de empresa |
+| `PATCH /platform/tenants/:id/subscription/plan` | `PLATFORM_ADMIN` | Cambio de plan (409 `PLAN_LIMIT_EXCEEDED` si el uso no cabe) |
+| `POST /platform/tenants/:id/subscription/{renew,suspend,reactivate}` | `PLATFORM_ADMIN` | Renovación simulada (sin cobro), suspensión, reactivación |
+| `GET /platform/tenants/:id/subscription/history` | `PLATFORM_ADMIN` | Historial de la suscripción |
+
+Login de personal/clientes: `POST /auth/login` con `X-Tenant` (sin header usa la
+empresa por defecto). El email es único **por empresa**. Pruebas:
+`test/tenancy.e2e-spec.ts` y `src/database/prisma/tenant-isolation.extension.spec.ts`.
+
+### Calidad: seguridad y rendimiento (F10)
+
+**Pruebas automáticas de seguridad** (corren con `npx vitest run`):
+
+- `src/common/security/route-access.spec.ts` inventaría las 151 rutas desde los
+  decoradores. Exige JWT en toda ruta que no esté en la lista pública revisada, que los
+  roles se verifiquen con `RolesGuard`, que la plataforma no comparta rutas con las
+  empresas, que cada módulo pida la funcionalidad de su plan (`sales`, `reservations`,
+  `products` en escrituras, `offline`, reportes, IA y ML) y que solo las operaciones
+  revisadas se permitan en modo solo lectura.
+- `src/common/security/raw-sql.spec.ts`: toda consulta `$queryRaw` filtra
+  `id_empresa` y no se usan variantes `Unsafe` ni `Prisma.raw`.
+- `src/database/prisma/schema-indexes.spec.ts`: cada tabla con empresa tiene un índice
+  que empieza por `tenantId`, y los `@@unique` sin empresa están acotados por un padre de
+  una sola empresa.
+- `src/common/filters/http-exception.filter.spec.ts`: los errores conocidos de Prisma
+  se traducen (`UNIQUE_CONSTRAINT` 409, `RELATED_RECORD` 409, `NOT_FOUND` 404) sin
+  devolver valores ni nombres de tablas, y el log de un error de Prisma guarda solo
+  código y modelo (el mensaje de Prisma incluye datos de la consulta).
+
+Hallazgo corregido: las banderas `products`, `reservations` y `sales` de los planes
+eran configurables pero casi no se verificaban; ahora un plan sin reservas las bloquea
+(403 `PLAN_FEATURE_REQUIRED`, `test/tenancy.e2e-spec.ts`) y el menú web las oculta.
+Dependencias: `npm audit --omit=dev` sin vulnerabilidades altas ni críticas en el
+backend (Nest 12.3, Prisma 7.10.1). En la web quedan las de `firebase` (el arreglo que
+propone npm es bajar de versión mayor) y en el móvil no se tocaron las versiones que fija
+Expo SDK 57.
+
+**Rendimiento (RNF09)**, medido con `EXPLAIN ANALYZE` en PostgreSQL 16 sobre una base
+sintética de 2 empresas, 180 000 ventas, 450 000 líneas y 15 000 variantes:
+
+| Consulta | Antes | Después | Nota |
+|---|---|---|---|
+| Ventas por sucursal, 30 días (empresa grande) | 47 ms (recorre sus 150 000 ventas) | 31 ms | índice `(id_empresa, estado, fecha_confirmacion)` |
+| Igual, empresa chica | 9,8 ms (lee 60 000 filas) | 1,4 ms | ya no paga el volumen de la otra empresa |
+| Ventas por sucursal, 365 días | 208 ms | ~220 ms | domina el detalle (70 000 ventas útiles) |
+| Listado de ventas del panel (20 filas) | 0,1 ms | — | índice `(id_empresa, fecha)` |
+| Catálogo público por categoría | 0,07 ms | — | |
+| Inventario de una sucursal (descarga offline) | 1,1 ms | — | acotada a 2 000 variantes y 500 clientes |
+| Ventas semanales para ML (156 semanas) | 437 ms | — | lectura completa intencional; solo al entrenar |
+
+Los reportes filtran por `COALESCE(fecha_confirmacion, fecha)`, que ningún índice
+cubre; `reportingDateBetween` lo reescribe como dos rangos equivalentes para usar el
+índice nuevo (migración `20261030000000_report_indexes`). No se usó un índice de
+expresión porque Prisma no lo representa en el schema y `migrate dev` lo borraría. Los
+listados paginan (20 por defecto, máximo 100).
+
+## Cambios de prendas y notas de crédito (parcial 2)
+
+`src/modules/exchanges`. Plazo configurable por empresa (`PATCH /tenant/settings`
+`{ exchangeWindowDays }`, administrador; 7 días por defecto). `GET /exchanges/sales/:saleId`
+muestra las líneas cambiables, el plazo y las prendas candidatas de la sucursal;
+`POST /exchanges` registra el cambio en una transacción serializable: la prenda devuelta
+vuelve al stock (kardex `RETURN`), la nueva se descuenta (kardex `SALE`) y la diferencia se
+cobra en efectivo al turno (`CHARGED`) o queda como **nota de crédito** (`CREDIT_NOTE`,
+aporte propio): `GET /credit-notes/:code` y `POST /credit-notes/:code/redeem`. Una línea no
+puede cambiarse más veces que su cantidad (control optimista + `CHECK` en la base). Offline
+se envía como operación `EXCHANGE` de `/sync/operations`. Pruebas: `test/exchanges.e2e-spec.ts`.
+
 ## Reservas
 
 El módulo permite reservar varias prendas por sucursal, gestionar su atención y

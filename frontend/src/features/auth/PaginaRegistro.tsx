@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ErrorApi } from '../../types/api';
+import { useEmpresaActiva } from '../../hooks/useEmpresaActiva';
 import {
   email as validarEmail,
   hayErrores,
@@ -29,6 +30,7 @@ const INICIAL: Campos = {
 };
 
 export default function PaginaRegistro() {
+  const empresa = useEmpresaActiva();
   const { registrarse } = useAuth();
   const navegar = useNavigate();
   const [campos, setCampos] = useState<Campos>(INICIAL);
@@ -91,6 +93,9 @@ export default function PaginaRegistro() {
           <div>
             <p className="fs-eyebrow">Nueva cuenta</p>
             <h1>Registrate</h1>
+            <p className="fs-sub">
+              Tu cuenta sera de la tienda <strong>{empresa?.nombre ?? empresa?.slug ?? 'FashionStore'}</strong>.
+            </p>
           </div>
 
           {errorGeneral && <div className="fs-alerta fs-alerta--error">{errorGeneral}</div>}

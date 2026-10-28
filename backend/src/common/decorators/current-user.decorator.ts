@@ -6,6 +6,8 @@ export interface AuthenticatedUser {
   id: number;
   email: string;
   roles: Role[];
+  /** Empresa del usuario; null solo para PLATFORM_ADMIN. */
+  tenantId?: number | null;
 }
 
 type AuthenticatedRequest = Request & { user?: AuthenticatedUser };

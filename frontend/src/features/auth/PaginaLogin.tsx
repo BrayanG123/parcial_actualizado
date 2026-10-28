@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { USAR_MOCKS } from '../../api/config';
+import { useEmpresaActiva } from '../../hooks/useEmpresaActiva';
 import { ErrorApi } from '../../types/api';
 import { puedeAcceder, rutaInicialPorRol } from '../../routes/permisos';
 import { email as validarEmail, hayErrores, requerido, type Errores } from '../../lib/validacion';
@@ -30,6 +31,7 @@ export default function PaginaLogin() {
   const [errores, setErrores] = useState<Errores<Campos>>({});
   const [errorGeneral, setErrorGeneral] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const empresa = useEmpresaActiva();
 
   async function enviar(e: FormEvent) {
     e.preventDefault();
@@ -75,6 +77,10 @@ export default function PaginaLogin() {
           <div>
             <p className="fs-eyebrow">Bienvenida de vuelta</p>
             <h1>Iniciar sesion</h1>
+            <p className="fs-sub">
+              Tienda: <strong>{empresa?.nombre ?? empresa?.slug ?? 'FashionStore'}</strong>{' '}
+              <Link to="/empresas" style={{ color: 'var(--fs-acento)' }}>Cambiar</Link>
+            </p>
           </div>
 
           {errorGeneral && <div className="fs-alerta fs-alerta--error">{errorGeneral}</div>}
@@ -111,6 +117,9 @@ export default function PaginaLogin() {
 
           <p className="fs-sub">
             No tienes cuenta? <Link to="/registro" style={{ color: 'var(--fs-acento)' }}>Crea una aqui</Link>
+          </p>
+          <p className="fs-sub">
+            Administras la plataforma? <Link to="/plataforma/login" style={{ color: 'var(--fs-acento)' }}>Acceso de plataforma</Link>
           </p>
 
           {USAR_MOCKS && <div className="fs-pila" style={{ gap: 8 }}>

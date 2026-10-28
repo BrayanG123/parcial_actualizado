@@ -15,6 +15,7 @@ import {
 import { desactivarPush } from '../lib/push';
 import { useQueryClient } from '@tanstack/react-query';
 import { obtenerToken, revisionSesion, suscribirSesion } from '../api/sesion';
+import { suscribirEmpresa } from '../api/empresa';
 import { authService, type CredencialesLogin, type DatosRegistro } from '../services/auth.service';
 import { RolNombre, type Usuario } from '../types/domain';
 
@@ -60,6 +61,9 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       }),
     [queryClient],
   );
+
+  // Otra tienda tiene otro catalogo: no se reutiliza la cache de la empresa anterior.
+  useEffect(() => suscribirEmpresa(() => queryClient.clear()), [queryClient]);
 
   // Rehidrata la sesion si hay token guardado.
   useEffect(() => {

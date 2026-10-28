@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../../../common/guards/roles.guard.js';
 import { ArResourcesService } from './ar-resources.service.js';
 import { CreateArResourceDto } from './dto/ar-resource.dto.js';
+import { RequiresFeature } from '../../tenancy/plan.decorators.js';
 
 @Controller('products/:productId/ar-resources')
 export class ArResourcesController {
@@ -27,6 +28,7 @@ export class ArResourcesController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMINISTRATOR)
+  @RequiresFeature('products')
   create(
     @Param('productId', ParseIntPipe) productId: number,
     @Body() dto: CreateArResourceDto,
@@ -37,6 +39,7 @@ export class ArResourcesController {
   @Delete(':resourceId')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMINISTRATOR)
+  @RequiresFeature('products')
   deactivate(
     @Param('productId', ParseIntPipe) productId: number,
     @Param('resourceId', ParseIntPipe) resourceId: number,

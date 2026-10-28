@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { seedBase } from '../prisma/seeds/base.js';
 import { seedDemo } from '../prisma/seeds/demo.js';
+import { inTenant } from '../prisma/seeds/tenant.js';
 import { cartTestContext } from './helpers/cart-test-context.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -19,10 +20,12 @@ describe.skipIf(!databaseUrl)('Repeatable demo seed (PostgreSQL)', () => {
   afterAll(async () => ctx?.close());
 
   it('populates coherent data, authenticates demo users and can be repeated without resetting anything', async () => {
-    const oldAdmin = await ctx.prisma.user.findUniqueOrThrow({
+    const oldAdmin = await ctx.prisma.user.findFirstOrThrow({
       where: { email: options.adminEmail },
     });
-    const result = await seedDemo(ctx.prisma, options);
+    const result = await inTenant(ctx.prisma, 'fashionstore', () =>
+      seedDemo(ctx.prisma, options),
+    );
     expect(result).toMatchObject({
       created: true,
       completedSales: 30,
@@ -40,7 +43,7 @@ describe.skipIf(!databaseUrl)('Repeatable demo seed (PostgreSQL)', () => {
     });
     expect(
       (
-        await ctx.prisma.user.findUniqueOrThrow({
+        await ctx.prisma.user.findFirstOrThrow({
           where: { email: options.adminEmail },
         })
       ).passwordHash,
@@ -100,14 +103,18 @@ describe.skipIf(!databaseUrl)('Repeatable demo seed (PostgreSQL)', () => {
       stocks: await ctx.prisma.inventory.findMany({ orderBy: { id: 'asc' } }),
     };
     expect(
-      await seedDemo(ctx.prisma, {
-        ...options,
-        demoPassword: 'AnotherDemoPassword123!',
-      }),
+      await inTenant(ctx.prisma, 'fashionstore', () =>
+        seedDemo(ctx.prisma, {
+          ...options,
+          demoPassword: 'AnotherDemoPassword123!',
+        }),
+      ),
     ).toMatchObject({ created: false, notificationsAdded: 0 });
     expect(await ctx.prisma.notification.count()).toBe(7);
     expect(await ctx.prisma.notificationRead.findMany()).toEqual([receipt]);
-    await seedBase(ctx.prisma, options);
+    await inTenant(ctx.prisma, 'fashionstore', () =>
+      seedBase(ctx.prisma, options),
+    );
     expect({
       users: await ctx.prisma.user.count(),
       sales: await ctx.prisma.sale.count(),
@@ -126,9 +133,11 @@ describe.skipIf(!databaseUrl)('Repeatable demo seed (PostgreSQL)', () => {
   it('does not promote an existing customer to administrator', async () => {
     const email = ctx.users[0]!.email;
     await expect(
-      seedBase(ctx.prisma, { ...options, adminEmail: email }),
+      inTenant(ctx.prisma, 'fashionstore', () =>
+        seedBase(ctx.prisma, { ...options, adminEmail: email }),
+      ),
     ).rejects.toThrow('non-administrator');
-    const user = await ctx.prisma.user.findUniqueOrThrow({
+    const user = await ctx.prisma.user.findFirstOrThrow({
       where: { email },
       include: { roles: { include: { role: true } } },
     });
@@ -144,7 +153,11 @@ describe.skipIf(!databaseUrl)('Repeatable demo seed (PostgreSQL)', () => {
       where: { reads: { none: {} } },
     });
     await ctx.prisma.notification.delete({ where: { id: notice.id } });
-    expect(await seedDemo(ctx.prisma, options)).toMatchObject({
+    expect(
+      await inTenant(ctx.prisma, 'fashionstore', () =>
+        seedDemo(ctx.prisma, options),
+      ),
+    ).toMatchObject({
       created: false,
       notificationsAdded: 1,
     });
@@ -159,10 +172,14 @@ describe.skipIf(!databaseUrl)('Repeatable demo seed (PostgreSQL)', () => {
   it('rejects invalid demo inputs before creating records', async () => {
     const before = await ctx.prisma.user.count();
     await expect(
-      seedDemo(ctx.prisma, { ...options, demoPassword: '' }),
+      inTenant(ctx.prisma, 'fashionstore', () =>
+        seedDemo(ctx.prisma, { ...options, demoPassword: '' }),
+      ),
     ).rejects.toThrow('SEED_DEMO_PASSWORD');
     await expect(
-      seedDemo(ctx.prisma, { ...options, referenceDate: '2026-02-30' }),
+      inTenant(ctx.prisma, 'fashionstore', () =>
+        seedDemo(ctx.prisma, { ...options, referenceDate: '2026-02-30' }),
+      ),
     ).rejects.toThrow('SEED_DEMO_DATE');
     expect(await ctx.prisma.user.count()).toBe(before);
   });

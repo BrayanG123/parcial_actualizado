@@ -1,9 +1,10 @@
 import { CashModule } from './modules/cash/cash.module.js';
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import aiConfig from './config/ai.config.js';
+import mlConfig from './config/ml.config.js';
 import appConfig from './config/app.config.js';
 import databaseConfig from './config/database.config.js';
 import { validateEnvironment } from './config/env.validation.js';
@@ -23,6 +24,12 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { AiModule } from './modules/ai/ai.module.js';
 import { VirtualFittingModule } from './modules/virtual-fitting/virtual-fitting.module.js';
 import { PushModule } from './modules/push/push.module.js';
+import { SyncModule } from './modules/sync/sync.module.js';
+import { ExchangesModule } from './modules/exchanges/exchanges.module.js';
+import { MlModule } from './modules/ml/ml.module.js';
+import { PlatformModule } from './modules/platform/platform.module.js';
+import { TenancyModule } from './modules/tenancy/tenancy.module.js';
+import { TenantMiddleware } from './modules/tenancy/tenant.middleware.js';
 
 @Module({
   imports: [
@@ -30,10 +37,11 @@ import { PushModule } from './modules/push/push.module.js';
       isGlobal: true,
       cache: true,
       expandVariables: true,
-      load: [appConfig, databaseConfig, aiConfig],
+      load: [appConfig, databaseConfig, aiConfig, mlConfig],
       validate: validateEnvironment,
     }),
     PrismaModule,
+    TenancyModule,
     AuthModule,
     UsersModule,
     RolesModule,
@@ -50,8 +58,16 @@ import { PushModule } from './modules/push/push.module.js';
     AiModule,
     VirtualFittingModule,
     PushModule,
+    PlatformModule,
+    SyncModule,
+    ExchangesModule,
+    MlModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(TenantMiddleware).forRoutes('*path');
+  }
+}

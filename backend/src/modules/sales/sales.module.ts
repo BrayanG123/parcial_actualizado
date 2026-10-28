@@ -21,6 +21,6 @@ import { SalesService } from './sales.service.js';
     CheckoutExpirationService,
     OfflineSalesService,
   ],
-  exports: [SalesService, SalesRepository],
+  exports: [SalesService, SalesRepository, OfflineSalesService],
 })
 export class SalesModule {}

@@ -18,10 +18,12 @@ import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { AddCartItemDto } from './dto/add-cart-item.dto.js';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto.js';
 import { CartService } from './cart.service.js';
+import { RequiresFeature } from '../tenancy/plan.decorators.js';
 
 @Controller('cart')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.CUSTOMER)
+@RequiresFeature('sales')
 export class CartController {
   constructor(private readonly cartService: CartService) {}
 

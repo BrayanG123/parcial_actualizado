@@ -34,9 +34,23 @@ export class ReservationsService {
     @Optional() private readonly push?: PushService,
   ) {}
 
-  async create(dto: CreateReservationDto, user: AuthenticatedUser) {
+  /**
+   * `operationKey`: operationId de una reserva registrada offline (/sync/operations).
+   * Si ya existe una reserva con esa clave se devuelve la misma (idempotencia).
+   */
+  async create(
+    dto: CreateReservationDto,
+    user: AuthenticatedUser,
+    options: { operationKey?: string } = {},
+  ) {
     if (!user.roles.includes(Role.CUSTOMER))
       throw new ForbiddenException('A customer role is required');
+    if (options.operationKey) {
+      const existing = await this.reservationsRepository.findByOperationKey(
+        options.operationKey,
+      );
+      if (existing) return existing;
+    }
     const approximateTime = new Date(dto.approximateTime);
     if (
       !Number.isFinite(approximateTime.getTime()) ||
@@ -91,6 +105,7 @@ export class ReservationsService {
             approximateTime,
             expiresAt,
             observation: dto.observation,
+            operationKey: options.operationKey,
             items,
           },
           tx,

@@ -205,11 +205,29 @@ No es un comando de reinicio ni de reparación: para recuperar el conjunto exact
 usar una base nueva. Puede coexistir con el seed base o DEMO, pero una base vacía
 es la forma recomendada de conservar los conteos descritos.
 
+### Opción D: segunda empresa y administrador de plataforma (parcial 2)
+
+La migración `20261027000000_multitenancy` crea los planes **Básico** y
+**Profesional** y asigna todos los datos existentes a la Empresa A
+(`fashionstore`, plan Profesional). Los seeds anteriores cargan sus datos en esa
+empresa. Para la demostración SaaS:
+
+```powershell
+npm run prisma:seed:tenant-b
+```
+
+Crea la **Empresa B** (`empresa-b`, plan Básico: 2 sucursales activas, sin IA) con
+usuarios de todos los roles, catálogo, stock, 6 ventas y 2 reservas, y el
+administrador de plataforma definido por `SEED_PLATFORM_ADMIN_EMAIL` y
+`SEED_PLATFORM_ADMIN_PASSWORD` (si faltan, se omite). Usa `SEED_DEMO_PASSWORD`
+para las cuentas de la Empresa B. Es idempotente y se rechaza en producción.
+Para iniciar sesión como usuario de la Empresa B, enviar `X-Tenant: empresa-b`.
+
 ## 6. Cuentas de demostración
 
 | Cuenta                              | Rol / sucursal          | Contraseña            |
 |---                                  |---                      |---                    |
-| Valor de `SEED_ADMIN_EMAIL`         | Administrador global    | `SEED_ADMIN_PASSWORD` |
+| Valor de `SEED_ADMIN_EMAIL`         | Administrador de la Empresa A | `SEED_ADMIN_PASSWORD` |
 | `encargado1@demo.fashionstore.test` | Encargado de La Paz     | `SEED_DEMO_PASSWORD` |
 | `encargado2@demo.fashionstore.test` | Encargado de Cochabamba | `SEED_DEMO_PASSWORD` |
 | `encargado3@demo.fashionstore.test` | Encargado de Santa Cruz | `SEED_DEMO_PASSWORD` |
@@ -217,6 +235,8 @@ es la forma recomendada de conservar los conteos descritos.
 | `cajero2@demo.fashionstore.test`    | Cajero de Cochabamba    | `SEED_DEMO_PASSWORD` |
 | `cajero3@demo.fashionstore.test`    | Cajero de Santa Cruz    | `SEED_DEMO_PASSWORD` |
 | `cliente1@demo.fashionstore.test` a `cliente4@demo.fashionstore.test` | Clientes | `SEED_DEMO_PASSWORD` |
+| `admin@empresa-b.test`, `encargado@empresa-b.test`, `cajero@empresa-b.test`, `proveedor@empresa-b.test`, `cliente1@empresa-b.test`, `cliente2@empresa-b.test` | Empresa B (`X-Tenant: empresa-b`) | `SEED_DEMO_PASSWORD` |
+| Valor de `SEED_PLATFORM_ADMIN_EMAIL` | Administrador de plataforma (`POST /platform/auth/login`) | `SEED_PLATFORM_ADMIN_PASSWORD` |
 
 Son direcciones ficticias, no se envían correos. Si una cuenta ya existía o se
 cambió después su contraseña, se conserva la contraseña existente: modificar el

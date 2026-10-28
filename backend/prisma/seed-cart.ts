@@ -5,6 +5,7 @@ import { PrismaService } from '../src/database/prisma/prisma.service.js';
 import { Role } from '../src/common/enums/role.enum.js';
 import { CartRepository } from '../src/modules/cart/cart.repository.js';
 import { CartService } from '../src/modules/cart/cart.service.js';
+import { DEFAULT_SEED_TENANT, inTenant } from './seeds/tenant.js';
 
 const prisma = new PrismaService(
   new ConfigService({ database: { url: process.env.DATABASE_URL } }),
@@ -26,7 +27,7 @@ async function main() {
   const role = await prisma.role.findUniqueOrThrow({
     where: { name: 'CUSTOMER' },
   });
-  let user = await prisma.user.findUnique({
+  let user = await prisma.user.findFirst({
     where: { email },
     include: { client: true, roles: { include: { role: true } } },
   });
@@ -84,7 +85,7 @@ async function main() {
   );
 }
 
-main()
+inTenant(prisma, DEFAULT_SEED_TENANT, () => main())
   .catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : 'Cart seed failed');
     process.exitCode = 1;

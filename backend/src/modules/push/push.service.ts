@@ -8,6 +8,7 @@ import {
 } from 'firebase-admin/messaging';
 import { PrismaService } from '../../database/prisma/prisma.service.js';
 import type { RegisterPushTokenDto } from './dto/push-token.dto.js';
+import { tenantContext } from '../../common/tenant/tenant-context.js';
 
 const APP_NAME = 'fashionstore-push';
 /** FCM acepta como maximo 500 dispositivos por envio multicast. */
@@ -71,6 +72,13 @@ export class PushService {
 
   async register(userId: number, dto: RegisterPushTokenDto) {
     // Un navegador puede cambiar de usuario: el token queda con el ultimo que inicio sesion.
+    // El token es unico global; si el dispositivo estaba en otra empresa, se libera alli.
+    const tenantId = tenantContext.requireTenantId();
+    await tenantContext.runAsSystem(() =>
+      this.prisma.pushToken.deleteMany({
+        where: { token: dto.token, tenantId: { not: tenantId } },
+      }),
+    );
     await this.prisma.pushToken.upsert({
       where: { token: dto.token },
       create: { userId, token: dto.token, platform: dto.platform ?? 'WEB' },

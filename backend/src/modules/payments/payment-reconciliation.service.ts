@@ -1,11 +1,13 @@
 import {
   Injectable,
+  Optional,
   Logger,
   OnApplicationBootstrap,
   OnModuleDestroy,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PaymentsService } from './payments.service.js';
+import { TenantsService } from '../tenancy/tenants.service.js';
 
 @Injectable()
 export class PaymentReconciliationService
@@ -17,6 +19,7 @@ export class PaymentReconciliationService
   constructor(
     private readonly payments: PaymentsService,
     private readonly config: ConfigService,
+    @Optional() private readonly tenants?: TenantsService,
   ) {}
 
   onApplicationBootstrap() {
@@ -27,8 +30,9 @@ export class PaymentReconciliationService
   }
   private tick() {
     if (this.running) return;
-    this.running = this.payments
-      .reconcilePendingPayments()
+    // Cada empresa se procesa con su propio contexto (aislamiento por tenant).
+    const run = () => this.payments.reconcilePendingPayments();
+    this.running = (this.tenants ? this.tenants.forEachTenant(run) : run())
       .then(() => undefined)
       .catch(() =>
         this.logger.error(

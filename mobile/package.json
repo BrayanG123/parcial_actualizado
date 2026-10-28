@@ -19,6 +19,7 @@
     "expo-media-library": "~57.0.5",
     "expo-notifications": "~57.0.21",
     "expo-splash-screen": "~57.0.9",
+    "expo-sqlite": "~57.0.4",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -44,7 +45,9 @@
     "doctor": "expo-doctor",
     "web": "expo start --web",
     "test:reservas": "node --test test/stock-reserva.test.mjs",
-    "test:push": "node --test test/push.test.mjs"
+    "test:push": "node --test test/push.test.mjs",
+    "test:offline": "node --test test/offline-movil.test.mjs",
+    "test:reportes": "node --test test/reportes-ia.test.mjs"
   },
   "private": true
 }

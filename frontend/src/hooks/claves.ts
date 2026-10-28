@@ -24,4 +24,6 @@ export const claves = {
   venta: (id: number) => ['venta', id] as const,
   reportes: (nombre: string, filtros?: unknown) => ['reportes', nombre, filtros ?? {}] as const,
   recomendaciones: (opciones?: unknown) => ['recomendaciones', opciones ?? {}] as const,
+  planEmpresa: ['plan-empresa'] as const,
+  directorioEmpresas: ['directorio-empresas'] as const,
 };
