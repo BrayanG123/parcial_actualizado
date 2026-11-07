@@ -42,5 +42,5 @@ export function rutaInicialPorRol(roles: string[]): string {
   if (roles.includes(ENCARGADO_SUCURSAL)) return '/sucursal/reservas';
   if (roles.includes(CAJERO)) return '/caja';
   if (roles.includes(PROVEEDOR)) return '/proveedor/productos';
-  return '/';
+  return '/tienda';
 }

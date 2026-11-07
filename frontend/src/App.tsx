@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react';
-import { Link, Navigate, Route, Routes } from 'react-router-dom';
+import { lazy, Suspense, useEffect } from 'react';
+import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { Cargando } from './components/ui/Estados';
 import { useAuth } from './context/AuthContext';
 import { LayoutTienda } from './layouts/LayoutTienda';
@@ -9,8 +9,12 @@ import { ROLES_AREA, rutaInicialPorRol } from './routes/permisos';
 
 /* Tienda */
 const PaginaInicio = lazy(() => import('./features/catalog/PaginaInicio'));
+const PaginaLanding = lazy(() => import('./features/saas/PaginaLanding'));
+const PaginaRegistroEmpresa = lazy(() => import('./features/saas/PaginaRegistroEmpresa'));
+const PaginaMisEmpresas = lazy(() => import('./features/saas/PaginaMisEmpresas'));
 const PaginaCatalogo = lazy(() => import('./features/catalog/PaginaCatalogo'));
 const PaginaProducto = lazy(() => import('./features/catalog/PaginaProducto'));
+const ElegirSucursal = lazy(() => import('./features/catalog/ElegirSucursal'));
 const PaginaCarrito = lazy(() => import('./features/cart/PaginaCarrito'));
 const PaginaCheckout = lazy(() => import('./features/checkout/PaginaCheckout'));
 const PaginaNuevaReserva = lazy(() => import('./features/reservations/PaginaNuevaReserva'));
@@ -87,14 +91,30 @@ function NoEncontrada() {
   );
 }
 
+/** Al cambiar de pagina se vuelve arriba (salvo enlaces a una seccion, p. ej. /#planes). */
+function ScrollArriba() {
+  const { pathname, hash } = useLocation();
+  useEffect(() => {
+    if (!hash) window.scrollTo(0, 0);
+  }, [pathname, hash]);
+  return null;
+}
+
 export default function App() {
   return (
     <Suspense fallback={<Cargando />}>
+      <ScrollArriba />
       <Routes>
-        {/* --- tienda --- */}
+        {/* --- landing SaaS: la entrada de la plataforma no muestra ninguna tienda --- */}
+        <Route index element={<PaginaLanding />} />
+        <Route path="/registro-empresa" element={<PaginaRegistroEmpresa />} />
+        <Route path="/cuenta" element={<PaginaMisEmpresas />} />
+
+        {/* --- tienda de la empresa activa (se entra por /t/:codigo) --- */}
         <Route element={<LayoutTienda />}>
-          <Route index element={<PaginaInicio />} />
+          <Route path="tienda" element={<PaginaInicio />} />
           <Route path="catalogo" element={<PaginaCatalogo />} />
+          <Route path="elegir-sucursal" element={<ElegirSucursal />} />
           <Route path="producto/:id" element={<PaginaProducto />} />
           <Route path="reservas/nueva" element={
             <RutaProtegida roles={[...ROLES_AREA.cliente]}>

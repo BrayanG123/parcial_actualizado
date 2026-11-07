@@ -11,6 +11,7 @@ import { Pantalla, TituloSeccion } from '../../components/Pantalla';
 import { useCategorias, useProductos } from '../../hooks/useCatalogo';
 import { useRecomendaciones } from '../../hooks/useIA';
 import { useSesion } from '../../context/SesionContext';
+import { useEmpresaActiva } from '../../hooks/useEmpresa';
 import type { Producto } from '../../types/domain';
 import type { PropsTab } from '../../navigation/tipos';
 import { colores, esp, radio, texto } from '../../theme';
@@ -26,6 +27,7 @@ const ACCESOS = [
 
 export function PantallaInicio({ navigation }: PropsTab<'Inicio'>) {
   const { usuario } = useSesion();
+  const empresa = useEmpresaActiva();
 
   const novedades = useProductos({ orden: 'nombre', solo_disponibles: true });
   const promociones = useProductos({ solo_promocion: true, orden: 'descuento' });
@@ -70,9 +72,9 @@ export function PantallaInicio({ navigation }: PropsTab<'Inicio'>) {
           <Text style={estilos.saludo}>
             {usuario ? `Hola, ${usuario.nombre.split(' ')[0]}` : 'Bienvenida a'}
           </Text>
-          <Text style={estilos.marca}>FashionStore</Text>
+          <Text style={estilos.marca}>{empresa?.nombre ?? empresa?.slug ?? 'FashionStore'}</Text>
           <Text style={estilos.lema}>
-            Coleccion de temporada, disponible en nuestras sucursales y lista para probar.
+            Coleccion de temporada, disponible en sus sucursales y lista para probar.
           </Text>
           <Pressable
             style={estilos.botonHero}

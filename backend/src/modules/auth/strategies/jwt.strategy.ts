@@ -28,6 +28,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
+    // El token de una cuenta de dueño (F14) no es de un usuario de empresa.
+    if ((payload as { kind?: string }).kind === 'owner')
+      throw new UnauthorizedException('Entra a una de tus empresas para operar');
     // El usuario se busca sin filtro: su empresa real sale de la base, no del token.
     const user = await tenantContext.runAsSystem(() =>
       this.usersService.findActiveForAuthentication(payload.sub),

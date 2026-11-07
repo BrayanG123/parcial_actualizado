@@ -145,7 +145,7 @@ function Tablero({
       <div className={`fs-alerta ${d.model.source === 'synthetic' ? 'fs-alerta--info' : ''}`}>
         <span>
           {d.model.source === 'synthetic'
-            ? 'Modelos entrenados con datos sinteticos (catalogo real, historia simulada): sirven para demostrar el metodo, no para decidir compras.'
+            ? 'Modelos entrenados con el catalogo de la empresa y un historial de ventas estimado; se ajustan a medida que se registran ventas reales.'
             : 'Modelos entrenados con las ventas reales de la empresa.'}{' '}
           Entrenado el {fecha(d.model.trainedAt)}
           {d.scope ? ` · Vista limitada a ${d.scope.join(', ')}` : ''}.
@@ -408,12 +408,12 @@ function EvaluacionDemanda({ m }: { m: MetricasDemanda }) {
       <p className="fs-sub">
         RandomForestRegressor · {m.rows.toLocaleString('es-BO')} filas, {m.series} series, {m.weeks} semanas. Validacion
         cruzada temporal ({m.crossValidation.method}): MAE {m.crossValidation.mean.mae} ± {m.crossValidation.std.mae},
-        RMSE {m.crossValidation.mean.rmse}, R² {m.crossValidation.mean.r2} ± {m.crossValidation.std.r2}. Prueba final
+        RMSE {m.crossValidation.mean.rmse}, R² {m.crossValidation.mean.r2} ± {m.crossValidation.std.r2}. Evaluacion final
         con las ultimas {m.holdout.weeks} semanas.
       </p>
       <div className="fs-rejilla-2">
         <article>
-          <h4>MAE en la prueba final (menor es mejor)</h4>
+          <h4>MAE en la evaluacion final (menor es mejor)</h4>
           <div style={{ width: '100%', height: 280 }}>
             <ResponsiveContainer>
               <BarChart data={comparacion} layout="vertical" margin={{ left: 30, right: 16 }}>

@@ -9,6 +9,7 @@ import { useToast } from '../../context/ToastContext';
 import { useProducto } from '../../hooks/useCatalogo';
 import { useAgregarAlCarrito, useCarrito } from '../../hooks/useComercio';
 import { useDisponibilidad, useRecomendaciones } from '../../hooks/useOperaciones';
+import { useSucursalTienda } from '../../lib/sucursal-tienda';
 import { precioActual, promocionVigente, stockDisponible } from '../../lib/domain';
 import { fecha, moneda } from '../../lib/format';
 import { TarjetaProducto } from './TarjetaProducto';
@@ -29,15 +30,21 @@ export default function PaginaProducto() {
   const [idTalla, setIdTalla] = useState<number | null>(null);
   const [idColor, setIdColor] = useState<number | null>(null);
   const [cantidad, setCantidad] = useState(1);
+  const [verOtras, setVerOtras] = useState(false);
+  const sucursal = useSucursalTienda();
+  const idSucursal = sucursal?.id_sucursal ?? 0;
 
-  const disponibilidad = useDisponibilidad(
-    idTalla && idColor ? { id_producto: idProducto, id_talla: idTalla, id_color: idColor } : null,
-  );
-
-  const totalDisponible = useMemo(
-    () => (disponibilidad.data ?? []).reduce((acc, i) => acc + stockDisponible(i), 0),
-    [disponibilidad.data],
-  );
+  // Una sola consulta: existencias de la prenda en todas las sucursales. De ahi salen las
+  // combinaciones disponibles en la sucursal del cliente y, a pedido, donde mas hay.
+  const disponibilidad = useDisponibilidad(idProducto > 0 ? { id_producto: idProducto } : null);
+  const enSucursal = useMemo(() => {
+    const mapa = new Map<string, number>();
+    for (const i of disponibilidad.data ?? [])
+      if (i.id_sucursal === idSucursal && stockDisponible(i) > 0)
+        mapa.set(`${i.id_talla}:${i.id_color}`, stockDisponible(i));
+    return mapa;
+  }, [disponibilidad.data, idSucursal]);
+  const hay = (talla: number, color: number) => (enSucursal.get(`${talla}:${color}`) ?? 0) > 0;
 
   if (consulta.isPending) return <Cargando texto="Cargando prenda..." />;
   if (consulta.isError)
@@ -61,7 +68,15 @@ export default function PaginaProducto() {
     producto.tallas.some((t) => t.id_talla === idTalla) &&
     producto.colores.some((c) => c.id_color === idColor),
   );
-  const maximoPorSucursal = Math.max(0, ...(disponibilidad.data ?? []).map(stockDisponible));
+  const maximoPorSucursal = seleccionCompleta ? (enSucursal.get(`${idTalla}:${idColor}`) ?? 0) : 0;
+  const otrasSucursales = (disponibilidad.data ?? []).filter(
+    (i) =>
+      i.id_talla === idTalla && i.id_color === idColor && i.id_sucursal !== idSucursal && stockDisponible(i) > 0,
+  );
+  const tallaConStock = (t: number) =>
+    idColor ? hay(t, idColor) : producto.colores.some((c) => hay(t, c.id_color));
+  const colorConStock = (c: number) =>
+    idTalla ? hay(idTalla, c) : producto.tallas.some((t) => hay(t.id_talla, c));
   const enCarrito =
     carrito.detalles.find(
       (d) => d.id_producto === idProducto && d.id_talla === idTalla && d.id_color === idColor,
@@ -144,88 +159,107 @@ export default function PaginaProducto() {
           <div className="fs-pila" style={{ gap: 10 }}>
             <p className="fs-filtros__titulo">Talla</p>
             <div className="fs-opciones">
-              {producto.tallas.map((t) => (
-                <button
-                  key={t.id_talla}
-                  type="button"
-                  className={`fs-chip${idTalla === t.id_talla ? ' fs-chip--activo' : ''}`}
-                  onClick={() => {
-                    setIdTalla(t.id_talla);
-                    setCantidad(1);
-                  }}
-                >
-                  {t.nombre}
-                </button>
-              ))}
+              {producto.tallas.map((t) => {
+                const libre = !disponibilidad.isSuccess || tallaConStock(t.id_talla);
+                return (
+                  <button
+                    key={t.id_talla}
+                    type="button"
+                    className={`fs-chip${idTalla === t.id_talla ? ' fs-chip--activo' : ''}${libre ? '' : ' fs-chip--agotado'}`}
+                    disabled={!libre}
+                    title={libre ? undefined : 'Agotado en esta sucursal'}
+                    onClick={() => {
+                      setIdTalla(idTalla === t.id_talla ? null : t.id_talla);
+                      setCantidad(1);
+                      setVerOtras(false);
+                    }}
+                  >
+                    {t.nombre}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           <div className="fs-pila" style={{ gap: 10 }}>
             <p className="fs-filtros__titulo">Color</p>
             <div className="fs-opciones">
-              {producto.colores.map((c) => (
-                <button
-                  key={c.id_color}
-                  type="button"
-                  className={`fs-chip fs-chip--color${idColor === c.id_color ? ' fs-chip--activo' : ''}`}
-                  onClick={() => {
-                    setIdColor(c.id_color);
-                    setCantidad(1);
-                  }}
-                >
-                  <span className="fs-punto-color" style={{ background: c.codigo_hex }} />
-                  {c.nombre}
-                </button>
-              ))}
+              {producto.colores.map((c) => {
+                const libre = !disponibilidad.isSuccess || colorConStock(c.id_color);
+                return (
+                  <button
+                    key={c.id_color}
+                    type="button"
+                    className={`fs-chip fs-chip--color${idColor === c.id_color ? ' fs-chip--activo' : ''}${libre ? '' : ' fs-chip--agotado'}`}
+                    disabled={!libre}
+                    title={libre ? undefined : 'Agotado en esta sucursal'}
+                    onClick={() => {
+                      setIdColor(idColor === c.id_color ? null : c.id_color);
+                      setCantidad(1);
+                      setVerOtras(false);
+                    }}
+                  >
+                    <span className="fs-punto-color" style={{ background: c.codigo_hex }} />
+                    {c.nombre}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <div className="fs-panel" style={{ gap: 12 }}>
-            <div className="fs-fila-entre">
-              <p className="fs-filtros__titulo" style={{ margin: 0 }}>
-                Disponibilidad por sucursal
+          <div className="fs-pila" style={{ gap: 8 }}>
+            {disponibilidad.isPending && <p className="fs-sub">Consultando disponibilidad...</p>}
+            {disponibilidad.isError && (
+              <ErrorEstado error={disponibilidad.error} onReintentar={() => disponibilidad.refetch()} />
+            )}
+            {disponibilidad.isSuccess && enSucursal.size === 0 && (
+              <p className="fs-alerta fs-alerta--info">
+                Esta prenda esta agotada en {sucursal?.nombre ?? 'esta sucursal'}.
               </p>
-              {seleccionCompleta && disponibilidad.isSuccess && (
-                <BadgeStock disponible={totalDisponible} />
-              )}
-            </div>
-
-            {!seleccionCompleta && (
-              <p className="fs-sub">Selecciona talla y color para ver el stock de cada tienda.</p>
             )}
-            {seleccionCompleta && disponibilidad.isPending && (
-              <p className="fs-sub">Consultando stock...</p>
+            {disponibilidad.isSuccess && enSucursal.size > 0 && !seleccionCompleta && (
+              <p className="fs-sub">Elige talla y color. Las opciones en gris estan agotadas en {sucursal?.nombre}.</p>
             )}
-            {seleccionCompleta && disponibilidad.isError && (
-              <ErrorEstado
-                error={disponibilidad.error}
-                onReintentar={() => disponibilidad.refetch()}
-              />
+            {seleccionCompleta && disponibilidad.isSuccess && (
+              <div className="fs-fila" style={{ gap: 8, flexWrap: 'wrap' }}>
+                {maximoPorSucursal > 0 ? (
+                  <BadgeStock disponible={maximoPorSucursal} />
+                ) : (
+                  <span className="fs-badge fs-badge--error">Agotado en esta sucursal</span>
+                )}
+                {enCarrito > 0 && <span className="fs-sub">Ya tienes {enCarrito} en el carrito.</span>}
+              </div>
             )}
-            {seleccionCompleta && disponibilidad.data?.length === 0 && (
-              <p className="fs-sub">No hay existencias disponibles para esta combinacion.</p>
-            )}
-            {seleccionCompleta && disponibilidad.data && (
-              <ul className="fs-pila" style={{ gap: 8, listStyle: 'none', padding: 0, margin: 0 }}>
-                {disponibilidad.data.map((inv) => (
-                  <li key={inv.id_inventario} className="fs-fila-entre">
-                    <span>
-                      {inv.sucursal?.nombre}
-                      <span className="fs-sub"> - {inv.sucursal?.ciudad}</span>
-                    </span>
-                    <BadgeStock disponible={stockDisponible(inv)} />
-                  </li>
-                ))}
-              </ul>
+            {disponibilidad.isSuccess && seleccionCompleta && (
+              <div>
+                <button
+                  type="button"
+                  className="fs-btn fs-btn--fantasma fs-btn--s"
+                  aria-expanded={verOtras}
+                  onClick={() => setVerOtras((v) => !v)}
+                >
+                  {verOtras ? 'Ocultar otras sucursales' : '¿Donde mas tenemos esta prenda?'}
+                </button>
+                {verOtras && (
+                  <ul className="fs-pila fs-otras-sucursales">
+                    {otrasSucursales.length === 0 && (
+                      <li className="fs-sub">No hay unidades de esta talla y color en otras sucursales.</li>
+                    )}
+                    {otrasSucursales.map((inv) => (
+                      <li key={inv.id_inventario} className="fs-fila-entre">
+                        <span>
+                          {inv.sucursal?.nombre}
+                          <span className="fs-sub"> · {inv.sucursal?.ciudad}</span>
+                        </span>
+                        <BadgeStock disponible={stockDisponible(inv)} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
           </div>
 
-          {seleccionCompleta && disponibilidad.isSuccess && (
-            <p className="fs-sub">
-              Una misma tienda debe disponer de la cantidad elegida.{' '}
-              {enCarrito > 0 && `Ya tienes ${enCarrito} unidades de esta variante en el carrito.`}
-            </p>
-          )}
           <div className="fs-fila-wrap">
             <div className="fs-cantidad">
               <button
@@ -274,7 +308,7 @@ export default function PaginaProducto() {
           {producto.tiene_recurso_ra && (
             <div className="fs-alerta fs-alerta--info">
               <span>
-                Esta prenda tiene probador virtual. Abre FashionStore en la app movil para verla con
+                Esta prenda tiene probador virtual. Abre la app movil de la tienda para verla con
                 realidad aumentada.
               </span>
             </div>

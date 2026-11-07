@@ -69,6 +69,19 @@ export class AuthService {
     return this.createSession(safeUser);
   }
 
+  /**
+   * Sesion de un usuario ya autorizado por otro medio (F14: el dueño entra a una de sus
+   * empresas). Es la misma sesion que obtendria ese usuario al iniciar sesion.
+   */
+  async sessionForUser(userId: number) {
+    const user = await tenantContext.runAsSystem(() =>
+      this.usersService.findActiveForAuthentication(userId),
+    );
+    if (!user) throw new UnauthorizedException('User is inactive or no longer exists');
+    const { passwordHash: _passwordHash, ...safeUser } = user;
+    return this.createSession(safeUser);
+  }
+
   me(userId: number) {
     return this.usersService.findOne(userId);
   }

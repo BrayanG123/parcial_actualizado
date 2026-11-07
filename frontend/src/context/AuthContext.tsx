@@ -32,6 +32,8 @@ interface ContextoAuth {
   idSucursal: number | null;
   tieneRol: (...roles: string[]) => boolean;
   iniciarSesion: (credenciales: CredencialesLogin) => Promise<Usuario>;
+  /** F14: el dueño entra a una de sus empresas desde "Mis empresas". */
+  entrarAEmpresa: (idEmpresa: number) => Promise<Usuario>;
   registrarse: (datos: DatosRegistro) => Promise<Usuario>;
   cerrarSesion: () => Promise<void>;
   /** Reemplaza los datos de la sesion despues de editar el perfil. */
@@ -122,6 +124,15 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
     return u;
   }, []);
 
+  const entrarAEmpresa = useCallback(async (idEmpresa: number) => {
+    const u = await authService.entrarAEmpresa(idEmpresa);
+    setUsuario(u);
+    setSesionOffline(false);
+    setErrorSesion(null);
+    setCargando(false);
+    return u;
+  }, []);
+
   const registrarse = useCallback(async (datos: DatosRegistro) => {
     const u = await authService.registrar(datos);
     setUsuario(u);
@@ -156,6 +167,7 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       idSucursal: usuario?.id_sucursal ?? null,
       tieneRol: (...requeridos: string[]) => requeridos.some((r) => roles.includes(r)),
       iniciarSesion,
+      entrarAEmpresa,
       registrarse,
       cerrarSesion,
       actualizarUsuario: setUsuario,
@@ -167,6 +179,7 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
     errorSesion,
     reintentarSesion,
     iniciarSesion,
+    entrarAEmpresa,
     registrarse,
     cerrarSesion,
   ]);

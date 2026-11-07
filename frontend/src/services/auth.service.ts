@@ -1,7 +1,7 @@
 /**
  * Autenticacion contra el contrato NestJS. La UI conserva su modelo en español.
  */
-import { api } from '../api/http';
+import { api, apiCuenta } from '../api/http';
 import { guardarToken, revisionSesion } from '../api/sesion';
 import { fijarEmpresa } from '../api/empresa';
 import {
@@ -31,8 +31,13 @@ async function crearSesion(
   url: string,
   datos: CredencialesLogin | RegistroBackend,
 ): Promise<Usuario> {
+  return adoptarSesion(() => api.post<SesionBackend>(url, datos));
+}
+
+/** Valida y adopta una sesion de empresa (login, registro o dueño que entra a su empresa). */
+async function adoptarSesion(obtener: () => Promise<SesionBackend>): Promise<Usuario> {
   const revision = revisionSesion();
-  const sesion = await api.post<SesionBackend>(url, datos);
+  const sesion = await obtener();
   if (revision !== revisionSesion()) {
     throw new ErrorApi('La sesion cambio mientras se procesaba la solicitud. Vuelve a intentarlo.');
   }
@@ -59,6 +64,11 @@ export const authService = {
       ...(datos.telefono?.trim() ? { phone: datos.telefono.trim() } : {}),
       ...(datos.direccion?.trim() ? { address: datos.direccion.trim() } : {}),
     });
+  },
+
+  /** F14: el dueño entra a una de sus empresas con la sesion de su administrador. */
+  entrarAEmpresa(idEmpresa: number): Promise<Usuario> {
+    return adoptarSesion(() => apiCuenta.post<SesionBackend>(endpoints.cuenta.entrar(idEmpresa)));
   },
 
   async perfil(): Promise<Usuario> {

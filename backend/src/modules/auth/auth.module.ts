@@ -25,6 +25,7 @@ import { JwtStrategy } from './strategies/jwt.strategy.js';
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],
-  exports: [AuthService],
+  // JwtModule: la cuenta de dueño (F14) firma sus tokens con el mismo secreto.
+  exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

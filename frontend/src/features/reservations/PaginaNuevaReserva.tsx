@@ -1,7 +1,7 @@
 import { ErrorEstado } from '../../components/ui/Estados';
 import { Paginacion } from '../../components/ui/Paginacion';
-import { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { BadgeStock } from '../../components/ui/Badges';
 import { ImagenProducto } from '../../components/ui/ImagenProducto';
 import { useAuth } from '../../context/AuthContext';
@@ -10,6 +10,7 @@ import { useProducto, useProductos } from '../../hooks/useCatalogo';
 import { useCrearReserva } from '../../hooks/useComercio';
 import { useDisponibilidad, useSucursales } from '../../hooks/useOperaciones';
 import { stockDisponible } from '../../lib/domain';
+import { useSucursalTienda } from '../../lib/sucursal-tienda';
 import type { LineaSeleccion } from '../../services/comercio.service';
 import type { Producto } from '../../types/domain';
 
@@ -41,7 +42,9 @@ export default function PaginaNuevaReserva() {
   const sucursales = useSucursales();
   const crear = useCrearReserva();
 
-  const [idSucursal, setIdSucursal] = useState<number | ''>('');
+  // F17: la reserva es en la sucursal elegida al entrar a la tienda.
+  const sucursal = useSucursalTienda();
+  const idSucursal: number | '' = sucursal?.id_sucursal ?? '';
   const [horario, setHorario] = useState(horarioPorDefecto);
   const [observacion, setObservacion] = useState('');
   const [lineas, setLineas] = useState<LineaReserva[]>([]);
@@ -54,6 +57,22 @@ export default function PaginaNuevaReserva() {
   const [idTalla, setIdTalla] = useState<number | null>(preseleccion?.id_talla ?? null);
   const [idColor, setIdColor] = useState<number | null>(preseleccion?.id_color ?? null);
   const [cantidad, setCantidad] = useState(preseleccion?.cantidad ?? 1);
+
+  // Si el cliente cambia de sucursal, la seleccion anterior ya no aplica.
+  const sucursalPrevia = useRef(idSucursal);
+  useEffect(() => {
+    if (sucursalPrevia.current === idSucursal) return;
+    const habia = sucursalPrevia.current;
+    sucursalPrevia.current = idSucursal;
+    // Conserva la prenda llegada desde el catalogo cuando recien se elige la sucursal.
+    if (!habia) return;
+    setLineas([]);
+    setIdProducto(null);
+    setIdTalla(null);
+    setIdColor(null);
+    setCantidad(1);
+    setPaginaBusqueda(1);
+  }, [idSucursal]);
 
   const resultados = useProductos({
     q: busqueda || undefined, page: paginaBusqueda, page_size: 6,
@@ -144,7 +163,7 @@ export default function PaginaNuevaReserva() {
 
   async function confirmar() {
     if (!idSucursal || !sucursales.data?.some((s) => s.id_sucursal === idSucursal))
-      return setError('Selecciona una sucursal activa.');
+      return setError('Tu sucursal ya no esta disponible. Elige otra.');
     if (lineas.length === 0) return setError('Agrega al menos una prenda a la reserva.');
     if (!horario || !Number.isFinite(Date.parse(horario)) || Date.parse(horario) <= Date.now())
       return setError('Indica una fecha y hora futura para la visita.');
@@ -176,54 +195,25 @@ export default function PaginaNuevaReserva() {
           <p className="fs-eyebrow">Reserva en tienda</p>
           <h1>Aparta prendas para probartelas</h1>
           <p className="fs-sub">
-            Elige la sucursal, arma tu seleccion y pasa a probarte las prendas en el horario que
-            indiques.
+            Arma tu seleccion y pasa a probarte las prendas en {sucursal?.nombre ?? 'tu sucursal'} en
+            el horario que indiques.
           </p>
         </div>
 
         {error && <div className="fs-alerta fs-alerta--error">{error}</div>}
 
         <div className="fs-panel">
-          <h3>1. Sucursal y horario</h3>
+          <h3>1. Horario de tu visita</h3>
           {sucursales.isPending && <p>Cargando sucursales...</p>}
           {sucursales.isError && (
             <ErrorEstado error={sucursales.error} onReintentar={() => sucursales.refetch()} />
           )}
-          {lineas.length > 0 && (
-            <p className="fs-sub">
-              Todas las prendas pertenecen a la misma sucursal. Para cambiarla, quita primero las
-              prendas de la seleccion.
-            </p>
-          )}
+          <p className="fs-sub">
+            Sucursal: <strong>{sucursal?.nombre}</strong>
+            {sucursal?.ciudad ? ` · ${sucursal.ciudad}` : ''} ·{' '}
+            <Link to="/elegir-sucursal?volver=/reservas/nueva">cambiar</Link>
+          </p>
           <div className="fs-rejilla-form">
-            <div className="fs-campo">
-              <label htmlFor="sucursal-reserva">Sucursal</label>
-              <select
-                id="sucursal-reserva"
-                disabled={lineas.length > 0 || crear.isPending}
-                className="fs-select"
-                value={idSucursal}
-                onChange={(e) => {
-                  setIdSucursal(e.target.value ? Number(e.target.value) : '');
-                  setPaginaBusqueda(1);
-                  // Conserva la prenda llegada desde el catalogo al elegir la primera sucursal.
-                  if (idSucursal) {
-                    setIdProducto(null);
-                    setIdTalla(null);
-                    setIdColor(null);
-                    setCantidad(1);
-                  }
-                  setError('');
-                }}
-              >
-                <option value="">Selecciona una sucursal</option>
-                {sucursales.data?.map((s) => (
-                  <option key={s.id_sucursal} value={s.id_sucursal}>
-                    {s.nombre} - {s.ciudad}
-                  </option>
-                ))}
-              </select>
-            </div>
             <div className="fs-campo">
               <label htmlFor="horario">Horario aproximado</label>
               <input

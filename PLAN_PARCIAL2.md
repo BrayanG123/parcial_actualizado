@@ -316,7 +316,7 @@ cierra en F12 con lo realmente implementado.
 - [x] ~~**F9.7** Integración NestJS ↔ ml-service con permisos, tenant y plan.~~ — 2026-10-27, commit `3932a8c` (`MlModule`: `POST /ml/train` y `GET /ml/dashboard`, `mlAnalytics`, roles, encargado limitado a su sucursal, sin datos personales; `test/ml.e2e-spec.ts` 5 casos)
 - [x] ~~**F9.8** Reportes inteligentes (predicciones, patrones, métricas) y **dashboard analítico** en la web.~~ — 2026-10-27, commit `3932a8c` (`/admin/analitica` y `/sucursal/analitica`: predicción con banda, top productos, segmentos con acciones, semanas atípicas y evaluación; verificado con Playwright contra el stack real)
 - [x] ~~**F9.9** `docker-compose` local con el nuevo servicio.~~ — 2026-10-27, commit `3932a8c` (servicio `ml` sin puertos publicados y volumen `ml-models`)
-  - ⏳ Falta construir la imagen en local: el entorno en la nube no tiene demonio de Docker.
+  - ✅ 2026-11-04: imagen construida y probada en local con Docker (entrenamiento sintético 20 s, dashboard OK).
 
 ### F10 — Calidad
 - [x] ~~**F10.1** Pruebas de reglas críticas: aislamiento multitenant, límites de plan, idempotencia, conflictos, integridad de inventario, cambios de prendas.~~ — 2026-10-27, commit `600fce1` (cubiertas en `tenancy`, `sync`, `exchanges`, `ai` y `ml` e2e; nuevas: plan configurado sin reservas/productos/offline bloquea de verdad, y pruebas estáticas de rutas, SQL crudo e índices)
@@ -338,6 +338,49 @@ cierra en F12 con lo realmente implementado.
 - [x] ~~**F12.5** Guion de demostración (2 empresas, plan bloqueando IA, venta/reserva offline, conflicto, cambio de prenda, 4+ reportes, dashboard ML).~~ — 2026-10-28, commit `1214299` (§9: guion de 11 pasos)
 
 ---
+
+### F13 — Ajustes locales posteriores (pedidos del equipo)
+- [x] ~~**F13.1** Landing SaaS en `/` (sin tienda ni ropa): funciones, pasos y planes; botones Iniciar sesión y Registrar empresa.~~ — 2026-11-04
+- [x] ~~**F13.2** Planes públicos Gratuito (USD 0, 1 sucursal), Básico (USD 99) y Profesional (USD 199): migración `20261104000000_saas_public_plans`, configurables desde la plataforma.~~ — 2026-11-04
+- [x] ~~**F13.3** Alta autoservicio de empresa (`GET /saas/plans`, `POST /saas/signup` con límite por IP; pago simulado, 1 mes) y página `/registro-empresa`.~~ — 2026-11-04
+- [x] ~~**F13.4** Login con código de empresa; tienda pública en `/t/:codigo` → `/tienda` con el nombre de la empresa; sin empresa elegida la tienda vuelve a la landing; scroll arriba al cambiar de página.~~ — 2026-11-04
+- [x] ~~**F13.5** Pruebas: e2e de alta autoservicio (planes, código repetido/reservado, aislamiento) y 4 pruebas de UI (landing, registro, login por código, redirección).~~ — 2026-11-04
+- [x] ~~**F13.6** Auditoría local (05/11): suscripciones (cambio de plan, límites, IA bloqueada, suspensión = solo lectura, reactivar, renovar, historial) y compra con Stripe en modo prueba por API y desde la web (tarjeta 4242 → venta COMPLETED, pago APPROVED, stock descontado).~~ — 2026-11-05
+- [x] ~~**F13.7** Correcciones: separador roto "?" en disponibilidad del carrito; `.fs-seccion` borraba el margen lateral de la tienda; menú de la tienda desbordaba entre 860 y 1180 px; texto "1 sucursales"; prueba push dependiente del entorno; e2e en serie (`fileParallelism: false`).~~ — 2026-11-05
+- [x] ~~**F13.8** ICONIX actualizado (RNF12): actor Visitante y CU08 (contratar plan y registrar empresa) con descripción, secuencia, trazabilidad, planes con precio y guion paso 0.~~ — 2026-11-05
+- [x] ~~**F13.9** Móvil alineado con la web SaaS: primer arranque sin tienda por defecto (`PantallaBienvenida` con código o directorio y enlace a registrar empresa en la web vía `EXPO_PUBLIC_WEB_URL`), login con código de tienda, nombre de la empresa en inicio/acceso/modo vendedor, "Cambiar de tienda" sin sesión; `test/tienda.test.mjs`. Verificado en Expo web: código inexistente, entrar a Empresa B, login cambiando a FashionStore → modo vendedor.~~ — 2026-11-06
+
+### F14–F20 — Reorganización pedida por el equipo (06/11): dueño → empresas → sucursales → roles
+> Orden acordado: primero empresa y sucursales (F14); no crear funcionalidades nuevas fuera de la fase en curso.
+
+**F14 — Dueños con varias empresas y sucursales**
+- [x] ~~**F14.1** Cuenta de dueño global (`cuentas_propietario`), vinculada al administrador de cada empresa; migración que crea cuentas para los administradores existentes.~~ — 2026-11-06
+- [x] ~~**F14.2** Login de dueño sin código de empresa y portal "Mis empresas" con datos básicos (plan, estado, sucursales, personal, clientes, prendas, ventas del mes).~~ — 2026-11-06
+- [x] ~~**F14.3** Crear otra empresa desde el portal eligiendo plan (pago simulado); el registro de la landing crea la cuenta de dueño.~~ — 2026-11-06
+- [x] ~~**F14.4** Entrar a una empresa (sesión de su administrador) y ver primero sus sucursales: resumen por sucursal y gestión dentro del límite del plan; volver a "Mis empresas".~~ — 2026-11-06
+- [x] ~~**F14.5** Pruebas (aislamiento entre empresas del mismo dueño y de otros dueños) e ICONIX.~~ — 2026-11-06
+
+**F15 — Usuarios, roles y permisos por empresa**
+- [ ] **F15.1** Catálogo de permisos (vender, abrir/cerrar caja, cobrar, ajustar stock, crear/editar prendas, tallas, colores, reservas, reportes, usuarios…).
+- [ ] **F15.2** Roles por empresa con permisos editables (cajero y encargado predefinidos) y roles personalizados.
+- [ ] **F15.3** El administrador crea personal según el límite del plan, con rol y sucursales; el backend exige el permiso, no solo la interfaz.
+
+**F16 — Personal: entrar a su sucursal**
+- [ ] **F16.1** Un empleado trabaja en una empresa y en una o varias sucursales; tras el login elige sucursal (sin ver empresas).
+- [ ] **F16.2** Panel limitado del cajero: abrir caja con monto inicial, cerrar con monto contado, vender, cobrar (efectivo, QR, tarjeta), confirmar pagos, consultar catálogo.
+
+**F17 — Clientes por empresa y sucursal**
+- [ ] **F17.1** El cliente no lo crea el administrador: se registra, entra a la empresa por código o nombre y elige la sucursal.
+- [x] ~~**F17.2** Ve solo las prendas de esa sucursal, con opción "cambiar de sucursal"; carrito, compra y reserva ya no piden sucursal después.~~ — 2026-11-07
+
+**F18 — Selección de talla y color**
+- [x] ~~**F18.1** Combinaciones sin stock en gris y no seleccionables; elegir talla bloquea los colores sin stock y viceversa; aviso "agotado en esta sucursal".~~ — 2026-11-07
+
+**F19 — Pagos**
+- [ ] **F19.1** Tarjeta (Stripe), efectivo en tienda (aparta la prenda en la sucursal) y QR.
+
+**F20 — Catálogo sin duplicados**
+- [ ] **F20.1** Unificar prendas repetidas que solo difieren en color en una sola prenda con varios colores (migración de variantes e inventario sin perder ventas).
 
 ## 6. Datos de demostración esperados
 
@@ -377,3 +420,9 @@ cierra en F12 con lo realmente implementado.
 |---|---|---|---|
 | 2026-10-27 | Claude Code (local) | Plan creado a partir del enunciado y del estado real del repo. | Empezar F0 en Claude web. |
 | 2026-10-27/28 | Claude Code (web) | F0–F10 y F12 completas (incluido F8.6 opcional: reportes con IA en el móvil): ICONIX §1–9 (análisis revisado contra el código, secuencia, clases, datos, componentes, despliegue, trazabilidad y guion; 26 diagramas Mermaid verificados al renderizar), multitenancy, web SaaS, sync unificado, PWA offline, móvil (expo-sqlite + modo vendedor), cambios de prendas con notas de crédito, reportes con IA, ml-service con dashboard y calidad (auditoría automática de rutas/SQL/índices, banderas de plan corregidas, índice de reportes). Backend unit 242, e2e 144; web 194; móvil 24; ml-service 12. Decisiones confirmadas: se mantienen React/Expo; suscripción vencida = solo lectura. | F11 en espera: el equipo consigue créditos de Azure esta semana. Push a GitHub bloqueado (403, falta acceso de la app de Claude) → commits solo locales en `parcial2`, PRs sin abrir. Bóveda wiki (`D:/…`) no disponible: actualizar notas de multitenancy, sync, PWA/móvil offline, cambios, reportes IA, ML y seguridad. Pendientes: F6.8 (prueba en teléfono, incluir la pestaña Reportes), imagen Docker de ml-service, vulnerabilidades de `firebase` (web) y dependencias de Expo (móvil). |
+| 2026-11-04 | Claude Code (local) | Revisión y ejecución local con `docker compose` (db, backend, ml, web): migraciones multitenant aplicadas sin errores sobre el respaldo real del 01/10 (95 productos, 159 usuarios, 441 ventas → Empresa A), seed de Empresa B y plataforma, stock completo reaplicado. Pruebas: backend 242/242 (arreglo de rutas Windows en `raw-sql.spec.ts`), web 194/194, móvil 24/24. Verificado: aislamiento A/B (404), plan Básico bloquea IA y ML (403), reporte IA real (Gemini), entrenamiento ML. | ⚠️ La suscripción de Azure quedó **deshabilitada** (solo lectura) y la app en Azure no responde: F11 bloqueado hasta reactivar Azure o elegir otro hosting. F6.8 pendiente de prueba en teléfono. |
+| 2026-11-04 | Claude Code (local) | F13: landing SaaS, planes Gratuito/99/199, alta autoservicio de empresas y login por código (verificado en navegador: registro → panel de la empresa nueva, login por código, `/t/fashionstore` → `/tienda`). Backend 242/242 + e2e tenancy 13/13; web 198/198. Se decidió trabajar solo en local (sin despliegue). | — |
+| 2026-11-05 | Claude Code (local) | Auditoría completa contra `Examen2.md`: backend 242/242, e2e 145/145 (en serie), web 198/198, móvil 24/24, ml-service 12/12. Suscripciones y Stripe (API y web) verificados de punta a punta; 6 tipos de reporte IA del enunciado + aclaración y rechazo. Correcciones F13.7 e ICONIX F13.8. | F6.8 (persistencia en teléfono) pendiente de prueba manual; despliegue (F11) se hará en AWS. |
+| 2026-11-06 | Claude Code (local) | F13.9: móvil alineado con la web SaaS (bienvenida/selector de tienda, login con código, marca por empresa). Móvil 26/26, tipos y lint sin avisos nuevos. | Probar en teléfono con Expo Go (incluye F6.8). APK cuando exista la URL de AWS. |
+| 2026-11-06 | Claude Code (local) | F14: cuentas de dueño con varias empresas (migración `owner_accounts`, `/owner/*`), login "Dueño de empresa" / "Personal o cliente", portal Mis empresas con datos y alta de otra empresa, entrar a la empresa y ver sus sucursales primero. Backend 242/242, e2e 148/148 (nuevo `owner.e2e-spec.ts`), web 199/199; verificado en navegador. | Siguiente: F15 (usuarios, roles y permisos). |
+| 2026-11-07 | Claude Code (local) | F17.2 y F18.1 (web): la sucursal se elige al entrar a la tienda y se recuerda por empresa; catalogo, prenda, carrito, compra y reserva usan esa sucursal sin volver a pedirla; si algo se agota antes de pagar se ofrecen las sucursales que si tienen todo. Tallas/colores agotados en gris; "¿Donde mas tenemos esta prenda?" muestra otras sucursales solo a pedido. Login con el codigo de otra tienda entra a esa tienda; `/t/:codigo` cierra la sesion de otra empresa aunque aun se este cargando. Textos sin "Stripe", "prueba" ni "demo". Limpieza de la base local (respaldo previo, gitignored): empresas `moda-andina` y `boutique-altura`, direcciones, proveedores, usuarios y correos sin `.test`/demo/masivo. Web 200/200. | Pendiente: semillas (`demo.ts`, `massive.ts`, `tenant-b.ts`) y movil con la misma regla de sucursal. |

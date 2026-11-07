@@ -14,11 +14,15 @@ import { adaptarProducto } from '../src/api/catalogo.contratos';
 import { prenda, pagina, stock } from './catalogo-fixtures';
 import { reserva } from './reservas-fixtures';
 import { respuesta, rechazo, usuarioBackend } from './fixtures';
+import { fijarEmpresa } from '../src/api/empresa';
+import { fijarSucursalTienda } from '../src/lib/sucursal-tienda';
 let root: Root;
 let container: HTMLDivElement;
 let qc: QueryClient;
 beforeEach(() => {
   guardarToken('cliente');
+  fijarEmpresa({ slug: 'fashionstore' });
+  fijarSucursalTienda(null);
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -56,6 +60,11 @@ async function click(texto: string) {
   await esperar();
 }
 async function select(id: string, valor: string) {
+  // F17: la sucursal ya no se elige en la reserva sino al entrar a la tienda.
+  if (id === 'sucursal-reserva') {
+    await act(async () => fijarSucursalTienda({ id_sucursal: Number(valor), nombre: 'Sucursal ' + valor }));
+    return;
+  }
   await act(async () => {
     const e = document.getElementById(id) as HTMLSelectElement;
     e.value = valor;
@@ -199,7 +208,7 @@ describe('reservas en React', () => {
     expect(botones('Agregar a la reserva')[0].disabled).toBe(false);
   });
 
-  it('crea varias prendas, valida horario y fija la sucursal mientras hay seleccion', async () => {
+  it('crea varias prendas en la sucursal elegida al entrar y valida el horario', async () => {
     catalogo();
     vi.spyOn(qc, 'invalidateQueries').mockResolvedValue();
     let envio: Record<string, unknown> | undefined;
@@ -211,7 +220,8 @@ describe('reservas en React', () => {
     await montar(<PaginaNuevaReserva />);
     await select('sucursal-reserva', '2');
     await agregar('Camisa');
-    expect((document.getElementById('sucursal-reserva') as HTMLSelectElement).disabled).toBe(true);
+    expect(document.getElementById('sucursal-reserva')).toBeNull();
+    expect(document.body.textContent).toContain('Sucursal: Sucursal 2');
     await agregar('Blusa');
     await input('horario', '2000-01-01T12:00');
     await click('Confirmar reserva');

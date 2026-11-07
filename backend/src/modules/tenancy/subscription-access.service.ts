@@ -130,7 +130,7 @@ export class SubscriptionAccessService {
     if (active >= max)
       throw new ForbiddenException({
         code: 'PLAN_LIMIT_REACHED',
-        message: `El plan ${access.plan?.name ?? 'actual'} permite hasta ${max} sucursales activas`,
+        message: `El plan ${access.plan?.name ?? 'actual'} permite hasta ${max} ${max === 1 ? 'sucursal activa' : 'sucursales activas'}`,
       });
   }
 }

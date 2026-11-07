@@ -29,7 +29,9 @@ instancia.interceptors.request.use((config) => {
   if (token && !config.headers.Authorization) config.headers.Authorization = `Bearer ${token}`;
   // Sin sesion, la tienda elegida decide la empresa; con sesion manda el token.
   const empresa = obtenerEmpresa();
-  if (!config.headers.Authorization && empresa) config.headers['X-Tenant'] = empresa.slug;
+  // Una peticion puede fijar su propia tienda (p. ej. verificar un codigo antes de elegirlo).
+  if (!config.headers.Authorization && empresa && !config.headers['X-Tenant'])
+    config.headers['X-Tenant'] = empresa.slug;
   return config;
 });
 
@@ -129,7 +131,8 @@ async function peticion<T>(metodo: Metodo, url: string, datos?: unknown, config?
 }
 
 export const api = {
-  get: <T>(url: string, params?: object) => peticion<T>('GET', url, undefined, { params }),
+  get: <T>(url: string, params?: object, config?: AxiosRequestConfig) =>
+    peticion<T>('GET', url, undefined, { params, ...config }),
   post: <T>(url: string, datos?: unknown, config?: AxiosRequestConfig) => peticion<T>('POST', url, datos, config),
   put: <T>(url: string, datos?: unknown) => peticion<T>('PUT', url, datos),
   patch: <T>(url: string, datos?: unknown) => peticion<T>('PATCH', url, datos),

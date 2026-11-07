@@ -5,26 +5,29 @@ import { Cargando } from '../../components/ui/Estados';
 import { useAuth } from '../../context/AuthContext';
 import { empresaService } from '../../services/empresa.service';
 import { ErrorApi } from '../../types/api';
+import { obtenerToken } from '../../api/sesion';
 
 /**
  * `/t/:slug/...` fija la tienda activa y continua en la ruta normal de la tienda
- * (`/t/empresa-b/catalogo` -> `/catalogo`). Los enlaces internos no cambian y el
+ * (`/t/empresa-b/catalogo` -> `/catalogo`, `/t/empresa-b` -> `/tienda`). Los enlaces internos no cambian y el
  * backend recibe la empresa por el header X-Tenant.
  */
 export default function EntradaEmpresa() {
   const { slug = '' } = useParams();
   const ubicacion = useLocation();
   const navegar = useNavigate();
-  const { autenticado, cerrarSesion } = useAuth();
+  const { cerrarSesion } = useAuth();
   const [error, setError] = useState('');
-  const resto = ubicacion.pathname.replace(/^\/t\/[^/]+/, '') || '/';
+  const resto = ubicacion.pathname.replace(/^\/t\/[^/]+/, '').replace(/^\/?$/, '/tienda');
 
   useEffect(() => {
     if (!esSlugValido(slug)) return;
     let activo = true;
     const anterior = obtenerEmpresa();
     (async () => {
-      if (autenticado && anterior?.slug !== slug) await cerrarSesion();
+      // Se mira el token y no `autenticado`: al abrir el enlace la sesion aun se esta cargando
+      // y una sesion de otra empresa haria que el backend devuelva esa otra tienda.
+      if (obtenerToken() && anterior?.slug !== slug) await cerrarSesion();
       fijarEmpresa({ slug });
       try {
         const empresa = await empresaService.publica();

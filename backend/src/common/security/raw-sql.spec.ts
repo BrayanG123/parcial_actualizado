@@ -7,7 +7,8 @@ import { join } from 'node:path';
  */
 const root = join(__dirname, '../..');
 const sources = readdirSync(root, { recursive: true })
-  .map(String)
+  // En Windows readdirSync devuelve rutas con "\": se normalizan a "/".
+  .map((f) => String(f).replace(/\\/g, '/'))
   .filter(
     (f) =>
       f.endsWith('.ts') &&

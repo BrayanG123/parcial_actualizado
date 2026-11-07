@@ -121,7 +121,7 @@
 .fs-hero__dato span { font-size: 0.82rem; color: rgba(250, 247, 243, 0.72); }
 
 /* ---------- secciones ---------- */
-.fs-seccion { padding: var(--fs-esp-6) 0; }
+.fs-seccion { padding-block: var(--fs-esp-6); }
 .fs-seccion__cabecera {
   display: flex;
   align-items: flex-end;
@@ -365,7 +365,8 @@
   .fs-auth__lado { display: none; }
 }
 
-@media (max-width: 860px) {
+/* Menu de la tienda: con sesion de cliente tiene hasta 6 enlaces y no entra en una fila. */
+@media (max-width: 1180px) {
   .fs-header__hamburguesa { display: inline-flex; }
   .fs-header__nav {
     position: absolute;
@@ -382,6 +383,10 @@
   }
   .fs-header__nav--abierto { display: flex; }
   .fs-header__enlace { width: 100%; padding: 10px 0; border-bottom: 1px solid var(--fs-borde); }
+  .fs-header__acciones { margin-left: auto; }
+}
+
+@media (max-width: 860px) {
   .fs-footer__inner { grid-template-columns: 1fr; gap: var(--fs-esp-5); }
 
   .fs-sidebar {
@@ -417,3 +422,20 @@
   .fs-linea-item { grid-template-columns: 64px 1fr; }
   .fs-linea-item__img { width: 64px; }
 }
+
+/* ---------- sucursales de la empresa en el dashboard (F14) ---------- */
+.fs-sucursales-resumen { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--fs-esp-3); }
+.fs-sucursal--inactiva { opacity: 0.6; }
+
+/* ---------- F17: sucursal del cliente ---------- */
+.fs-sucursales-tienda { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--fs-esp-3); }
+.fs-sucursal-opcion {
+  display: flex; flex-direction: column; gap: 4px; text-align: left; cursor: pointer;
+  border: 1px solid var(--fs-borde); font: inherit; color: inherit;
+  transition: border-color var(--fs-transicion), box-shadow var(--fs-transicion);
+}
+.fs-sucursal-opcion:hover, .fs-sucursal-opcion:focus-visible { border-color: var(--fs-acento); box-shadow: var(--fs-sombra-s); }
+.fs-sucursal-opcion--activa { border: 2px solid var(--fs-acento); }
+.fs-sucursal-opcion__accion { margin-top: 8px; color: var(--fs-acento); font-weight: 600; }
+.fs-otras-sucursales { list-style: none; padding: 0; margin: 8px 0 0; gap: 8px; }
+.fs-chip--agotado { background: var(--fs-crema-2); }

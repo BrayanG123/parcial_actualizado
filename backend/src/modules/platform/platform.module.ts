@@ -6,10 +6,12 @@ import {
   PlatformController,
 } from './platform.controller.js';
 import { PlatformService } from './platform.service.js';
+import { SaasController, SignupRateLimitGuard } from './saas.controller.js';
 
 @Module({
   imports: [AuthModule, PassportModule.register({ defaultStrategy: 'jwt' })],
-  controllers: [PlatformAuthController, PlatformController],
-  providers: [PlatformService],
+  controllers: [PlatformAuthController, PlatformController, SaasController],
+  providers: [PlatformService, SignupRateLimitGuard],
+  exports: [PlatformService],
 })
 export class PlatformModule {}

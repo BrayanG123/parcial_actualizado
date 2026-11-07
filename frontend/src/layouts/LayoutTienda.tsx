@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCarrito } from '../hooks/useComercio';
 import { iniciales } from '../lib/format';
@@ -8,6 +8,12 @@ import { rutaInicialPorRol } from '../routes/permisos';
 import { AsistenteIA } from '../features/ia/AsistenteIA';
 import { useEmpresaActiva } from '../hooks/useEmpresaActiva';
 import { IndicadorConexion } from '../features/offline/IndicadorConexion';
+import ElegirSucursal from '../features/catalog/ElegirSucursal';
+import { useSucursales } from '../hooks/useOperaciones';
+import { fijarSucursalTienda, useSucursalTienda } from '../lib/sucursal-tienda';
+
+/** Paginas de la cuenta que no dependen de la sucursal elegida. */
+const SIN_SUCURSAL = ['/mi-perfil', '/mis-compras', '/mis-reservas', '/offline', '/pendientes', '/sin-permisos', '/elegir-sucursal'];
 
 const ENLACES = [
   { a: '/catalogo', texto: 'Catalogo' },
@@ -23,6 +29,16 @@ export function LayoutTienda() {
   const [asistenteAbierto, setAsistenteAbierto] = useState(false);
   const navegar = useNavigate();
   const empresa = useEmpresaActiva();
+  const sucursal = useSucursalTienda();
+  const sucursales = useSucursales();
+  const { pathname, search } = useLocation();
+
+  // Si la sucursal recordada ya no atiende, se vuelve a elegir.
+  useEffect(() => {
+    if (sucursal && sucursales.data && !sucursales.data.some((s) => s.id_sucursal === sucursal.id_sucursal && s.activa !== false))
+      fijarSucursalTienda(null);
+  }, [sucursal, sucursales.data]);
+  const pideSucursal = !sucursal && !SIN_SUCURSAL.some((p) => pathname.startsWith(p));
 
   const panelInterno = tieneRol(
     RolNombre.ADMINISTRADOR,
@@ -34,8 +50,12 @@ export function LayoutTienda() {
   async function salir() {
     await cerrarSesion();
     setMenuAbierto(false);
-    navegar('/');
+    navegar('/tienda');
   }
+
+  // La plataforma no tiene una tienda por defecto: sin empresa elegida se vuelve a la landing.
+  if (!empresa) return <Navigate to="/" replace />;
+  const nombreTienda = empresa.nombre ?? empresa.slug;
 
   return (
     <div className="fs-app">
@@ -50,12 +70,18 @@ export function LayoutTienda() {
             &#9776;
           </button>
 
-          <Link to="/" className="fs-marca">
-            Fashion<span>Store</span>
+          <Link to="/tienda" className="fs-marca">
+            {nombreTienda}
           </Link>
-          <Link to="/empresas" className="fs-badge fs-badge--acento" title="Cambiar de tienda">
-            {empresa?.nombre ?? empresa?.slug ?? 'FashionStore'} · cambiar
-          </Link>
+          {sucursal && (
+            <Link
+              to={`/elegir-sucursal?volver=${encodeURIComponent(pathname + search)}`}
+              className="fs-badge fs-badge--acento"
+              title="Cambiar de sucursal"
+            >
+              {sucursal.nombre} · cambiar
+            </Link>
+          )}
 
           <nav className={`fs-header__nav${menuAbierto ? ' fs-header__nav--abierto' : ''}`}>
             {ENLACES.map((e) => (
@@ -120,16 +146,14 @@ export function LayoutTienda() {
       </header>
 
       <main className="fs-main">
-        <Outlet />
+        {pideSucursal ? <ElegirSucursal volver={pathname + search} /> : <Outlet />}
       </main>
 
       <footer className="fs-footer">
         <div className="fs-contenedor fs-footer__inner">
           <div>
-            <p className="fs-marca fs-marca--footer">
-              Fashion<span>Store</span>
-            </p>
-            <p className="fs-sub">Moda femenina con presencia nacional. Compra online o reserva para probar en tienda.</p>
+            <p className="fs-marca fs-marca--footer">{nombreTienda}</p>
+            <p className="fs-sub">Compra online o reserva tus prendas para probarlas en tienda.</p>
           </div>
           <div>
             <p className="fs-eyebrow">Tienda</p>
@@ -139,6 +163,7 @@ export function LayoutTienda() {
           </div>
           <div>
             <p className="fs-eyebrow">Cuenta</p>
+            <Link to="/empresas" className="fs-footer__enlace">Cambiar de tienda</Link>
             <Link to="/mi-perfil" className="fs-footer__enlace">Mi perfil</Link>
             <Link to="/mis-compras" className="fs-footer__enlace">Mis compras</Link>
             <Link to="/mis-reservas" className="fs-footer__enlace">Mis reservas</Link>
@@ -146,7 +171,9 @@ export function LayoutTienda() {
           </div>
         </div>
         <div className="fs-contenedor fs-footer__legal">
-          <span className="fs-sub">FashionStore MVP - Sistemas de Informacion II</span>
+          <span className="fs-sub">
+            Tienda impulsada por <Link to="/">FashionStore SaaS</Link>
+          </span>
         </div>
       </footer>
 

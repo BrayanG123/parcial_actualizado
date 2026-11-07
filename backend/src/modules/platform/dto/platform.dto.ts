@@ -74,6 +74,33 @@ export class CreateTenantDto {
   admin: TenantAdminDto;
 }
 
+/**
+ * Alta autoservicio desde la landing SaaS: mismos datos que la plataforma, sin la duracion
+ * (la suscripcion simulada dura 1 mes y se renueva administrativamente).
+ */
+export class SignupTenantDto {
+  @Transform(trim)
+  @IsString()
+  @MinLength(2)
+  @MaxLength(150)
+  name: string;
+
+  @Transform(lower)
+  @Matches(/^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])?$/, {
+    message: 'slug must use lowercase letters, numbers and hyphens',
+  })
+  slug: string;
+
+  @Transform(trim)
+  @IsString()
+  @MaxLength(40)
+  planCode: string;
+
+  @ValidateNested()
+  @Type(() => TenantAdminDto)
+  admin: TenantAdminDto;
+}
+
 export class UpdateTenantDto {
   @IsOptional()
   @Transform(trim)

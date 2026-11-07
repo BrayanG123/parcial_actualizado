@@ -4,6 +4,7 @@
  */
 export const endpoints = {
   push: { estado: '/push/status', tokens: '/push/tokens' },
+  tiendas: { directorio: '/tenant/directory', publica: '/tenant/public' },
   auth: {
     login: '/auth/login',
     registro: '/auth/register',

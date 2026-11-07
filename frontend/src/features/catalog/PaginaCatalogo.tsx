@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ErrorEstado, RejillaSkeleton, Vacio } from '../../components/ui/Estados';
 import { Paginacion } from '../../components/ui/Paginacion';
 import { useCategorias, useColores, useProductos, useTallas } from '../../hooks/useCatalogo';
-import { useSucursales } from '../../hooks/useOperaciones';
+import { useSucursalTienda } from '../../lib/sucursal-tienda';
 import type { FiltrosProducto } from '../../services/catalogo.service';
 import { TarjetaProducto } from './TarjetaProducto';
 
@@ -18,7 +18,7 @@ export default function PaginaCatalogo() {
   const categorias = useCategorias();
   const tallas = useTallas();
   const colores = useColores();
-  const sucursales = useSucursales();
+  const sucursal = useSucursalTienda();
 
   const filtros = useMemo<FiltrosProducto>(() => {
     const num = (clave: string) => (params.get(clave) ? Number(params.get(clave)) : undefined);
@@ -27,13 +27,13 @@ export default function PaginaCatalogo() {
       id_categoria: num('id_categoria'),
       id_talla: num('id_talla'),
       id_color: num('id_color'),
-      id_sucursal: num('id_sucursal'),
+      id_sucursal: sucursal?.id_sucursal,
       solo_promocion: params.get('solo_promocion') === 'true' || undefined,
       orden: (params.get('orden') as FiltrosProducto['orden']) ?? undefined,
       page: num('page') ?? 1,
       page_size: POR_PAGINA,
     };
-  }, [params]);
+  }, [params, sucursal?.id_sucursal]);
 
   const consulta = useProductos({ ...filtros, mayorista: usuario?.mayorista });
 
@@ -53,7 +53,6 @@ export default function PaginaCatalogo() {
     'id_categoria',
     'id_talla',
     'id_color',
-    'id_sucursal',
     'solo_promocion',
     'q',
   ].some((c) => params.get(c));
@@ -61,10 +60,10 @@ export default function PaginaCatalogo() {
   return (
     <div className="fs-contenedor fs-catalogo">
       <aside className="fs-filtros">
-        {[categorias, tallas, colores, sucursales].some((q) => q.isPending) && (
+        {[categorias, tallas, colores].some((q) => q.isPending) && (
           <p>Cargando filtros...</p>
         )}
-        {[categorias, tallas, colores, sucursales].map((q, i) =>
+        {[categorias, tallas, colores].map((q, i) =>
           q.isError ? (
             <ErrorEstado key={i} error={q.error} onReintentar={() => q.refetch()} />
           ) : null,
@@ -137,21 +136,7 @@ export default function PaginaCatalogo() {
         </div>
 
         <div className="fs-filtros__grupo">
-          <p className="fs-filtros__titulo">Disponibilidad</p>
-          <div className="fs-campo">
-            <select
-              className="fs-select"
-              value={params.get('id_sucursal') ?? ''}
-              onChange={(e) => actualizar('id_sucursal', e.target.value || null)}
-            >
-              <option value="">Todas las sucursales</option>
-              {sucursales.data?.map((s) => (
-                <option key={s.id_sucursal} value={s.id_sucursal}>
-                  {s.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
+          <p className="fs-filtros__titulo">Ofertas</p>
           <label className="fs-check">
             <input
               type="checkbox"
@@ -178,7 +163,11 @@ export default function PaginaCatalogo() {
           <div>
             <p className="fs-eyebrow">Catalogo</p>
             <h1>Nueva coleccion</h1>
-            {consulta.data && <p className="fs-sub">{consulta.data.total} prendas encontradas</p>}
+            {consulta.data && (
+              <p className="fs-sub">
+                {consulta.data.total} prendas disponibles{sucursal ? ` en ${sucursal.nombre}` : ''}
+              </p>
+            )}
           </div>
           <div className="fs-campo" style={{ minWidth: 190 }}>
             <label htmlFor="orden">Ordenar por</label>
@@ -205,7 +194,7 @@ export default function PaginaCatalogo() {
         {consulta.data && consulta.data.items.length === 0 && (
           <Vacio
             titulo="No encontramos prendas"
-            mensaje="Prueba con otra categoria, cambia la talla o limpia los filtros aplicados."
+            mensaje="Elige otra categoria, cambia la talla o limpia los filtros aplicados."
             accion={
               <button
                 type="button"

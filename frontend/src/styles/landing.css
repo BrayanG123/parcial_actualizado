@@ -1,0 +1,151 @@
+/* ---------- landing SaaS (ruta /) ---------- */
+.fs-landing { min-height: 100vh; background: var(--fs-crema); }
+/* Los enlaces #funciones/#planes no deben quedar tapados por la barra fija. */
+.fs-landing section[id] { scroll-margin-top: calc(var(--fs-header) + var(--fs-esp-3)); }
+
+.fs-landing__barra {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--fs-blanco);
+  border-bottom: 1px solid var(--fs-borde);
+}
+.fs-landing__barra-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--fs-esp-5);
+  min-height: var(--fs-header);
+}
+.fs-landing__etiqueta {
+  margin-left: var(--fs-esp-2);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--fs-tinta);
+  color: var(--fs-crema);
+  font-family: var(--fs-fuente);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  vertical-align: middle;
+}
+.fs-landing__nav { display: flex; gap: var(--fs-esp-5); margin-left: auto; }
+.fs-landing__nav a { color: var(--fs-tinta-2); font-weight: 500; }
+.fs-landing__nav a:hover { color: var(--fs-acento); }
+.fs-landing__acciones { display: flex; gap: var(--fs-esp-3); }
+
+.fs-landing__titulo { text-align: center; max-width: 60ch; margin: 0 auto var(--fs-esp-6); }
+.fs-landing__titulo h2 { margin-bottom: var(--fs-esp-2); }
+
+.fs-landing__rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--fs-esp-4);
+}
+.fs-landing__funcion h3 { font-size: 1.05rem; margin-bottom: var(--fs-esp-2); }
+.fs-landing__funcion h3::before {
+  content: '';
+  display: block;
+  width: 28px;
+  height: 3px;
+  margin-bottom: var(--fs-esp-3);
+  background: var(--fs-acento);
+  border-radius: 2px;
+}
+
+.fs-landing__franja { background: var(--fs-blanco); }
+.fs-landing__pasos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--fs-esp-5);
+  counter-reset: none;
+}
+.fs-landing__pasos li { text-align: center; padding: 0 var(--fs-esp-3); }
+.fs-landing__pasos h3 { font-size: 1.1rem; margin: var(--fs-esp-3) 0 var(--fs-esp-2); }
+.fs-landing__numero {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--fs-acento);
+  color: var(--fs-blanco);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.fs-landing__planes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--fs-esp-5);
+  align-items: stretch;
+}
+.fs-landing__plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fs-esp-3);
+  padding: var(--fs-esp-6) var(--fs-esp-5);
+  position: relative;
+}
+.fs-landing__plan > .fs-badge { position: absolute; top: var(--fs-esp-4); right: var(--fs-esp-4); }
+.fs-landing__plan--destacado { border: 2px solid var(--fs-acento); box-shadow: var(--fs-sombra-l); }
+.fs-landing__precio { font-family: var(--fs-fuente-titulo); font-size: 2.4rem; font-weight: 600; line-height: 1; }
+.fs-landing__precio small { font-family: var(--fs-fuente); font-size: 0.9rem; font-weight: 400; color: var(--fs-tinta-3); }
+.fs-landing__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--fs-esp-2); flex: 1; }
+.fs-landing__lista li { padding-left: 26px; position: relative; font-size: 0.92rem; }
+.fs-landing__lista li::before { position: absolute; left: 0; font-weight: 700; }
+.fs-landing__si::before { content: '\2713'; color: var(--fs-exito); }
+.fs-landing__no { color: var(--fs-tinta-3); text-decoration: line-through; }
+.fs-landing__no::before { content: '\2715'; color: var(--fs-tinta-3); }
+
+.fs-landing__pie { background: var(--fs-tinta); color: var(--fs-crema); padding: var(--fs-esp-6) 0; }
+.fs-landing__pie .fs-sub { color: rgba(250, 247, 243, 0.7); }
+.fs-landing__pie .fs-marca { color: var(--fs-crema); }
+.fs-landing__pie-inner { display: flex; justify-content: space-between; gap: var(--fs-esp-5); flex-wrap: wrap; }
+.fs-landing__pie-enlaces { display: flex; gap: var(--fs-esp-5); flex-wrap: wrap; align-items: center; }
+.fs-landing__pie-enlaces a { color: var(--fs-crema); opacity: 0.85; }
+.fs-landing__pie-enlaces a:hover { opacity: 1; color: var(--fs-oro); }
+
+/* ---------- registro de empresa ---------- */
+.fs-registro-planes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--fs-esp-3); }
+.fs-registro-plan {
+  text-align: left;
+  border: 1px solid var(--fs-borde);
+  border-radius: var(--fs-radio-m);
+  background: var(--fs-blanco);
+  padding: var(--fs-esp-3) var(--fs-esp-4);
+  cursor: pointer;
+  transition: border-color var(--fs-transicion), box-shadow var(--fs-transicion);
+}
+.fs-registro-plan strong { display: block; }
+.fs-registro-plan--activo { border: 2px solid var(--fs-acento); box-shadow: var(--fs-sombra-s); }
+
+@media (max-width: 860px) {
+  .fs-landing__nav { display: none; }
+  .fs-landing__acciones { margin-left: auto; }
+  .fs-landing__pasos { grid-template-columns: 1fr; gap: var(--fs-esp-6); }
+}
+@media (max-width: 560px) {
+  .fs-landing__barra-inner { flex-wrap: wrap; padding-block: var(--fs-esp-3); }
+  .fs-landing__acciones { width: 100%; }
+  .fs-landing__acciones .fs-btn { flex: 1; }
+}
+
+/* ---------- portal del dueño: Mis empresas (F14) ---------- */
+.fs-portal__resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--fs-esp-3); }
+.fs-portal__resumen .fs-tarjeta { display: flex; flex-direction: column; gap: 2px; }
+.fs-portal__numero { font-family: var(--fs-fuente-titulo); font-size: 1.6rem; }
+.fs-portal__empresas { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: var(--fs-esp-4); }
+.fs-portal__empresa { display: flex; flex-direction: column; gap: var(--fs-esp-3); }
+.fs-portal__datos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--fs-esp-3); margin: 0; }
+.fs-portal__datos dd { margin: 0; font-weight: 600; }
+@media (max-width: 560px) {
+  .fs-portal__empresas { grid-template-columns: 1fr; }
+  .fs-portal__datos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------- selector de tipo de acceso (login) ---------- */
+.fs-segmento { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--fs-crema-2); border-radius: var(--fs-radio-m); }
+.fs-segmento__opcion { border: 0; background: transparent; padding: 10px 8px; border-radius: var(--fs-radio-s); font-weight: 500; color: var(--fs-tinta-2); cursor: pointer; }
+.fs-segmento__opcion--activa { background: var(--fs-blanco); color: var(--fs-tinta); box-shadow: var(--fs-sombra-s); }

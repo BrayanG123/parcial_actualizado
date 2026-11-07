@@ -43,6 +43,11 @@ classDiagram
   class PlataformaSaaS {
     <<concepto>>
   }
+  class OwnerAccount {
+    nombre
+    email (único global)
+    activa
+  }
   class Tenant {
     nombre
     slug (único)
@@ -50,8 +55,9 @@ classDiagram
     plazoCambioDias
   }
   class Plan {
-    codigo (BASIC, PROFESSIONAL, configurables)
+    codigo (FREE, BASIC, PROFESSIONAL, configurables)
     nombre
+    precioMensual (USD 0 / 99 / 199)
     maxSucursalesActivas
     funcionalidades (products, sales, reservations, offline, conventionalReports, aiReports, mlAnalytics)
   }
@@ -182,12 +188,14 @@ Reglas del dominio:
 
 ## 2. Modelo de casos de uso
 
-Actores: **Administrador de plataforma**, **Administrador de empresa** (rol `ADMINISTRATOR` del
+Actores: **Visitante** (empresa interesada que llega a la landing), **Dueño** (cuenta global con una o varias empresas), **Administrador de plataforma**, **Administrador de empresa** (rol `ADMINISTRATOR` del
 parcial 1, ahora acotado a su tenant), **Encargado de sucursal**, **Cajero**, **Cliente** y
 **Servicio ML** (actor sistema, consultado por el backend).
 
 ```mermaid
 flowchart LR
+  VI(["«actor» Visitante"])
+  DU(["«actor» Dueño"])
   AP(["«actor» Admin plataforma"])
   AE(["«actor» Admin empresa"])
   EN(["«actor» Encargado"])
@@ -203,6 +211,8 @@ flowchart LR
     UC5((CU05 Consultar plan, límites y uso))
     UC6((CU06 Verificar funcionalidad / límite))
     UC7((CU07 Vencer suscripción))
+    UC8((CU08 Contratar plan y registrar empresa))
+    UC9((CU09 Administrar mis empresas))
   end
   subgraph Offline
     UC10((CU10 Descargar datos offline))
@@ -224,6 +234,8 @@ flowchart LR
     UC33((CU33 Entrenar / evaluar modelos))
   end
 
+  VI --- UC8
+  DU --- UC9 & UC8
   AP --- UC1 & UC2 & UC3 & UC4
   AE --- UC5 & UC30 & UC32 & UC33
   EN --- UC5 & UC15 & UC20 & UC30 & UC32
@@ -237,6 +249,7 @@ flowchart LR
   UC32 -. "«include»" .-> UC6
   UC14 -. "«include»" .-> UC6
   UC6 -. "«include»" .-> UC7
+  UC8 -. "«include» (misma transacción)" .-> UC1
   UC15 -. "«extend»" .-> UC14
   UC31 -. "«extend»" .-> UC30
   UC21 -. "«extend»" .-> UC20
@@ -246,7 +259,7 @@ flowchart LR
 CU07 no tiene actor: el vencimiento se detecta y registra (`EXPIRE`) la primera vez que una
 petición de la empresa verifica la suscripción después de la fecha de vencimiento (CU06).
 
-Casos del parcial 1 que se **modifican**: iniciar sesión (ahora por empresa), registrar cliente
+Casos del parcial 1 que se **modifican**: iniciar sesión (ahora con código de empresa), registrar cliente
 (por empresa), CRUD de sucursales (límite del plan), toda escritura de negocio (bloqueada en solo
 lectura), reportes convencionales, POS, reservas y catálogo (restringidos al tenant y a las
 funcionalidades del plan).
@@ -262,6 +275,35 @@ funcionalidades del plan).
   con su estado y uso.
 - **Alternativos:** 3a) Slug repetido → 409. 3b) Plan inexistente o inactivo → error de validación.
   4a) Falla cualquier paso → se revierte todo (transacción).
+
+### CU08 Contratar plan y registrar empresa (autoservicio)
+- **Actor:** Visitante. **Precondición:** ninguna (landing pública `/`, sin tienda de ninguna empresa).
+- **Flujo básico:** 1) El visitante ve funciones y planes (`GET /saas/plans`: Gratuito USD 0,
+  Básico USD 99, Profesional USD 199 por mes). 2) Elige un plan y abre `/registro-empresa`.
+  3) Ingresa nombre de la empresa, código (sugerido a partir del nombre) y sus datos de
+  administrador. 4) El sistema ejecuta CU01 sin administrador de plataforma (`POST /saas/signup`):
+  suscripción de 1 mes con pago simulado, historial `ASSIGN` sin usuario responsable.
+  5) La web inicia sesión con el código de la empresa y abre el panel `/admin`.
+- **Alternativos:** 4a) Código repetido → 409; código reservado → 400; plan inexistente o inactivo
+  → error. 4b) Más de 5 altas por IP en 15 minutos → 429 (`SignupRateLimitGuard`).
+- **Reglas:** no hay cobro real (permitido por el enunciado, 9.5); los precios y límites siguen
+  configurables desde la plataforma. El login de personal y clientes pide el código de empresa;
+  la tienda pública solo se abre en `/t/:codigo` (→ `/tienda`).
+
+### CU09 Administrar mis empresas (dueño)
+- **Actor:** Dueño. **Precondición:** cuenta de dueño (creada en CU08 o, para empresas previas,
+  por la migración `owner_accounts` a partir de sus administradores).
+- **Flujo básico:** 1) Inicia sesión sin código de empresa (`POST /owner/auth/login`, token
+  `kind: owner`). 2) Ve "Mis empresas" (`GET /owner/tenants`): plan, estado de la suscripción y
+  datos básicos de cada empresa (sucursales activas frente al límite, personal, clientes, prendas,
+  ventas del mes, reservas abiertas), calculados dentro de cada empresa. 3a) Crea otra empresa con
+  su propio plan (`POST /owner/tenants`, pago simulado): queda como su administrador con la misma
+  cuenta. 3b) Entra a una empresa (`POST /owner/tenants/:id/session`): recibe la sesión del
+  administrador de esa empresa vinculado a su cuenta y ve primero sus sucursales.
+- **Alternativos:** 3b) Empresa de otro dueño → 404. El token de dueño no opera dentro de una
+  empresa (401) y un token de empresa no abre el portal (401).
+- **Reglas:** cada empresa conserva su aislamiento y su plan; la cuenta de dueño es global (sin
+  `id_empresa`) y no tiene acceso directo a datos de negocio.
 
 ### CU03 Asignar / cambiar plan
 - **Actor:** Admin plataforma.
@@ -572,6 +614,35 @@ sequenceDiagram
   PS->>DB: COMMIT
   PS-->>UI: empresa con suscripción y uso
   UI-->>AP: empresa creada
+```
+
+### 5.2b CU08 Contratar plan y registrar empresa (autoservicio)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor VI as Visitante
+  participant UI as PaginaLanding / PaginaRegistroEmpresa (web)
+  participant SC as SaasController
+  participant PS as PlatformService
+  participant AU as AuthController
+  participant DB as PostgreSQL
+
+  VI->>UI: abre / y elige un plan
+  UI->>SC: GET /saas/plans
+  SC->>PS: publicPlans() en runAsSystem
+  PS-->>UI: planes activos (codigo, precio, límites, funcionalidades)
+  VI->>UI: nombre, código de empresa y datos del administrador
+  UI->>SC: POST /saas/signup (sin sesión, SignupRateLimitGuard)
+  SC->>PS: signup(dto) → createTenant(dto, months=1, performedBy=null)
+  alt código repetido o reservado
+    PS-->>UI: 409 / 400
+  end
+  PS->>DB: BEGIN · empresa + suscripción ACTIVE + historial ASSIGN + usuario ADMINISTRATOR · COMMIT
+  PS-->>UI: { slug, name }
+  UI->>AU: POST /auth/login (X-Tenant: slug)
+  AU-->>UI: token de la empresa nueva
+  UI-->>VI: panel /admin de su empresa (vacío, aislado)
 ```
 
 ### 5.3 CU03 Cambiar plan
@@ -1417,6 +1488,8 @@ web `frontend/test/`; móvil `mobile/test/`; ML `ml-service/tests/`.
 | V. ML: datos sintéticos, supervisado, no supervisado, evaluación | CU33 | `ml-service/app/{synthetic,features,demand,segmentation,anomalies}.py` | `ml-service/tests/test_models.py`, `test_synthetic.py` |
 | V. Integración ML y dashboard | CU32, CU33 | `MlService`, `HttpMlClient`, `PaginaAnalitica` | `ml.e2e-spec.ts`, `ml-service/tests/test_api.py`, `analitica.test.tsx` |
 | VI. Empresas, ≥2 tenants | CU01, CU02 | `PlatformService`, seed `tenant-b.ts` | `tenancy.e2e-spec.ts` |
+| VI. Dueño con varias empresas (cada una con su plan) | CU09, CU08 | `OwnerAccount`, `OwnerService`, `OwnerJwtGuard`, `PaginaMisEmpresas`, `SucursalesEmpresa` | `owner.e2e-spec.ts`, `saas.test.tsx` (Mis empresas → entrar) |
+| VI. Contratación de planes y alta de empresas (landing SaaS) | CU08, CU01 | `SaasController` (`/saas/plans`, `/saas/signup`), `PaginaLanding`, `PaginaRegistroEmpresa`, migración `saas_public_plans` | `tenancy.e2e-spec.ts` (alta autoservicio), `saas.test.tsx` (landing, registro, login por código), `route-access.spec.ts` |
 | VI. Planes configurables, límites y funcionalidades | CU03, CU05, CU06 | `planes.funcionalidades`, `SubscriptionAccessService`, `TenantAccessInterceptor` | `tenancy.e2e-spec.ts` (límite de sucursales, plan sin reservas), `route-access.spec.ts`, `saas.test.tsx` |
 | VI. Suscripción: asignar, renovar, vencer, restringir | CU03, CU04, CU07 | `SubscriptionHistory`, modo solo lectura | `tenancy.e2e-spec.ts` (vencida = solo lectura), `ai.e2e-spec.ts` (reportes en solo lectura) |
 | VI. Seguridad multitenant en backend | CU06 | `TenantMiddleware`, extensión de aislamiento, `$queryRaw` con `id_empresa` | `tenancy.e2e-spec.ts` (404 entre empresas, `TENANT_MISMATCH`), `tenant-isolation.extension.spec.ts`, `raw-sql.spec.ts`, `ai.e2e-spec.ts` (ventas de otra empresa excluidas), `ml-service/tests/test_api.py` |
@@ -1445,8 +1518,11 @@ web `frontend/test/`; móvil `mobile/test/`; ML `ml-service/tests/`.
 Duración aproximada: 20 minutos. Preparación: base con seed principal + `npm run prisma:seed:tenant-b`
 (contraseñas en `.env`, nunca en el guion), backend, web, `ml-service` y la APK instalada.
 
-1. **Dos empresas y aislamiento (Desafío VI).** Abrir `/empresas`, entrar a FashionStore y a
-   Empresa B: catálogos distintos. Con la sesión de A, abrir la URL de un producto de B → 404.
+0. **Landing SaaS y contratación (Desafío VI).** Abrir `/`: funciones y planes Gratuito, Básico
+   (USD 99) y Profesional (USD 199). "Registrar empresa" → elegir plan → crear la Empresa D y entrar
+   a su panel vacío. Cerrar sesión e iniciar sesión con su código de empresa.
+1. **Dos empresas y aislamiento (Desafío VI).** Abrir `/t/fashionstore` y `/t/empresa-b` (o el
+   directorio `/empresas` del pie de la landing): catálogos distintos. Con la sesión de A, abrir la URL de un producto de B → 404.
    Mostrar en "Plan y suscripción" el plan Profesional (A) y Básico (B).
 2. **Plataforma.** Iniciar sesión en `/plataforma`, crear la Empresa C con plan Básico y su
    administrador; intentar pasar A a Básico → `PLAN_LIMIT_EXCEEDED`.

@@ -1,16 +1,20 @@
 import { Link } from 'react-router-dom';
 import { ErrorEstado, RejillaSkeleton } from '../../components/ui/Estados';
 import { useAuth } from '../../context/AuthContext';
+import { useEmpresaActiva } from '../../hooks/useEmpresaActiva';
 import { useCategorias, useProductos } from '../../hooks/useCatalogo';
-import { useRecomendaciones, useSucursales } from '../../hooks/useOperaciones';
+import { useRecomendaciones } from '../../hooks/useOperaciones';
+import { useSucursalTienda } from '../../lib/sucursal-tienda';
 import { TarjetaProducto } from './TarjetaProducto';
 
 export default function PaginaInicio() {
-  const novedades = useProductos({ page_size: 8 });
-  const promociones = useProductos({ page_size: 4, solo_promocion: true, orden: 'descuento' });
+  const sucursal = useSucursalTienda();
+  const id_sucursal = sucursal?.id_sucursal;
+  const novedades = useProductos({ page_size: 8, id_sucursal });
+  const promociones = useProductos({ page_size: 4, solo_promocion: true, orden: 'descuento', id_sucursal });
   const categorias = useCategorias();
-  const sucursales = useSucursales();
   const { autenticado, esCliente } = useAuth();
+  const empresa = useEmpresaActiva();
   const recomendaciones = useRecomendaciones({ limite: 4 }, autenticado && esCliente);
 
   return (
@@ -19,12 +23,12 @@ export default function PaginaInicio() {
         <div className="fs-contenedor fs-hero__inner">
           <div>
             <p className="fs-eyebrow" style={{ color: 'rgba(250,247,243,.7)' }}>
-              Colecciones FashionStore
+              Colecciones {empresa?.nombre ?? empresa?.slug}
             </p>
             <h1>Encuentra tu prenda, pruebatela en tienda</h1>
             <p>
-              Compra en linea o reserva tus prendas favoritas y pasa a probarlas en la sucursal que
-              elijas. Stock en tiempo real de todas nuestras tiendas.
+              Compra en linea o reserva tus prendas favoritas y pasa a probarlas en tu sucursal.
+              Te mostramos solo lo que hay disponible en ella.
             </p>
             <div className="fs-hero__acciones">
               <Link to="/catalogo" className="fs-btn fs-btn--acento">
@@ -38,10 +42,8 @@ export default function PaginaInicio() {
 
           <div className="fs-hero__panel">
             <div className="fs-hero__dato">
-              <strong>
-                {sucursales.data ? `${sucursales.data.length} sucursales` : 'Nuestras tiendas'}
-              </strong>
-              <span>Consulta la disponibilidad de cada prenda por sucursal.</span>
+              <strong>{sucursal ? sucursal.nombre : 'Tu sucursal'}</strong>
+              <span>{sucursal?.ciudad ? `${sucursal.ciudad} · ` : ''}retira tus compras y pruebate tus reservas aqui.</span>
             </div>
             <div className="fs-hero__dato">
               <strong>Reserva y prueba</strong>

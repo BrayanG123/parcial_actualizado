@@ -28,6 +28,7 @@ import { SyncModule } from './modules/sync/sync.module.js';
 import { ExchangesModule } from './modules/exchanges/exchanges.module.js';
 import { MlModule } from './modules/ml/ml.module.js';
 import { PlatformModule } from './modules/platform/platform.module.js';
+import { OwnerModule } from './modules/owner/owner.module.js';
 import { TenancyModule } from './modules/tenancy/tenancy.module.js';
 import { TenantMiddleware } from './modules/tenancy/tenant.middleware.js';
 
@@ -59,6 +60,7 @@ import { TenantMiddleware } from './modules/tenancy/tenant.middleware.js';
     VirtualFittingModule,
     PushModule,
     PlatformModule,
+    OwnerModule,
     SyncModule,
     ExchangesModule,
     MlModule,

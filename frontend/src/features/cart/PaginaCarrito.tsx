@@ -11,6 +11,7 @@ import {
 } from '../../hooks/useComercio';
 import { moneda } from '../../lib/format';
 import { subtotal } from '../../lib/domain';
+import { useSucursalTienda } from '../../lib/sucursal-tienda';
 
 export default function PaginaCarrito() {
   const carrito = useCarrito();
@@ -20,6 +21,9 @@ export default function PaginaCarrito() {
   const vaciar = useVaciarCarrito();
   const toast = useToast();
   const navegar = useNavigate();
+  const sucursal = useSucursalTienda();
+  const enSucursal = (d: { disponibilidad?: { sucursal: { id_sucursal: number }; cantidad_disponible: number }[] }) =>
+    d.disponibilidad?.find((x) => x.sucursal.id_sucursal === sucursal?.id_sucursal)?.cantidad_disponible ?? 0;
 
   if (carrito.isPending) return <Cargando texto="Cargando tu carrito..." />;
   if (carrito.isError)
@@ -40,6 +44,10 @@ export default function PaginaCarrito() {
       </div>
     );
   }
+
+  const faltante = carrito.detalles.some(
+    (d) => Boolean(d.problema) || (d.disponibilidad ? enSucursal(d) < d.cantidad : false),
+  );
 
   async function accion(promesa: Promise<unknown>, mensajeExito: string) {
     try {
@@ -96,17 +104,17 @@ export default function PaginaCarrito() {
                       VARIANT_UNAVAILABLE:
                         'Esta combinacion de talla y color ya no esta disponible.',
                       INSUFFICIENT_STOCK:
-                        'Ninguna sucursal tiene suficientes unidades. Reduce la cantidad o quita la prenda.',
+                        'No quedan suficientes unidades. Reduce la cantidad o quita la prenda.',
                     }[d.problema]
                   }
                 </p>
               )}
-              {d.disponibilidad && d.disponibilidad.length > 0 && (
-                <p className="fs-sub">
-                  Disponible por tienda:{' '}
-                  {d.disponibilidad
-                    .map((a) => `${a.sucursal.nombre}: ${a.cantidad_disponible}`)
-                    .join(' ? ')}
+              {!d.problema && d.disponibilidad && enSucursal(d) < d.cantidad && (
+                <p className="fs-alerta fs-alerta--error">
+                  {enSucursal(d) === 0
+                    ? `Se agoto en ${sucursal?.nombre}.`
+                    : `Solo quedan ${enSucursal(d)} en ${sucursal?.nombre}.`}{' '}
+                  <Link to="/elegir-sucursal?volver=/carrito">Cambiar de sucursal</Link>
                 </p>
               )}
 
@@ -141,13 +149,7 @@ export default function PaginaCarrito() {
                     }
                     disabled={
                       ocupado ||
-                      d.cantidad >=
-                        Math.min(
-                          100,
-                          d.disponibilidad
-                            ? Math.max(0, ...d.disponibilidad.map((a) => a.cantidad_disponible))
-                            : 100,
-                        )
+                      d.cantidad >= Math.min(100, d.disponibilidad ? enSucursal(d) : 100)
                     }
                   >
                     +
@@ -175,19 +177,11 @@ export default function PaginaCarrito() {
 
       <aside className="fs-panel fs-resumen">
         <h3>Resumen</h3>
-        <p className="fs-sub">
-          Agregar prendas al carrito no reserva existencias. Los precios y el stock se comprueban
-          nuevamente al comprar.
-        </p>
-        {carrito.data?.tiene_disponibilidad === false && (
+        {sucursal && <p className="fs-sub">Retiras en {sucursal.nombre}.</p>}
+        {faltante && (
           <p className="fs-alerta fs-alerta--error">
-            No hay una sucursal que pueda atender todo el carrito. Revisa las prendas y cantidades.
-          </p>
-        )}
-        {carrito.data?.sucursales_disponibles && carrito.data.sucursales_disponibles.length > 0 && (
-          <p>
-            Sucursales que pueden atender el carrito:{' '}
-            {carrito.data.sucursales_disponibles.map((s) => s.nombre).join(', ')}.
+            Algunas prendas ya no alcanzan en {sucursal?.nombre}. Ajusta las cantidades o{' '}
+            <Link to="/elegir-sucursal?volver=/carrito">cambia de sucursal</Link>.
           </p>
         )}
         <div className="fs-resumen__linea">
@@ -206,7 +200,7 @@ export default function PaginaCarrito() {
         <button
           type="button"
           className="fs-btn fs-btn--acento fs-btn--bloque"
-          disabled={ocupado || carrito.data?.tiene_disponibilidad === false}
+          disabled={ocupado || faltante}
           onClick={() => navegar('/checkout')}
         >
           Continuar con la compra

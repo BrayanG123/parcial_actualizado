@@ -68,7 +68,7 @@ export default function PaginaRegistro() {
         telefono: campos.telefono.trim(),
         direccion: campos.direccion.trim(),
       });
-      navegar('/', { replace: true });
+      navegar('/tienda', { replace: true });
     } catch (error) {
       setErrorGeneral(error instanceof ErrorApi ? error.mensajes.join(' ') : error instanceof Error ? error.message : 'No pudimos crear tu cuenta.');
     } finally {

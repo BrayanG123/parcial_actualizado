@@ -11,6 +11,7 @@ import {
 import { etiqueta, moneda } from '../../lib/format';
 import { EstadoReserva } from '../../types/domain';
 import { BarraComparativa, GraficoSucursales, GraficoVentas, TarjetaKPI } from '../reports/componentes';
+import { SucursalesEmpresa } from './SucursalesEmpresa';
 
 const UMBRAL_CRITICO = 5;
 const RESERVAS_ACTIVAS: string[] = [
@@ -44,6 +45,8 @@ export default function PaginaDashboard() {
           Ver reportes
         </Link>
       </header>
+
+      <SucursalesEmpresa />
 
       {ventas.isPending && <FilasSkeleton filas={2} />}
       {ventas.isError && <ErrorEstado error={ventas.error} onReintentar={() => ventas.refetch()} />}

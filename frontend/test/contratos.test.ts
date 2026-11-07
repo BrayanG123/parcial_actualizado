@@ -26,7 +26,7 @@ describe('contratos NestJS y permisos de la UI', () => {
     ['ADMINISTRATOR', '/admin'],
     ['BRANCH_MANAGER', '/sucursal/reservas'],
     ['CASHIER', '/caja'],
-    ['CUSTOMER', '/'],
+    ['CUSTOMER', '/tienda'],
     ['SUPPLIER', '/proveedor/productos'],
   ] as Array<[RolBackend, string]>)('adapta %s y lo dirige a su area', (name, ruta) => {
     const u = adaptarUsuario({

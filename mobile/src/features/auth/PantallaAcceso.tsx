@@ -20,6 +20,9 @@ import { Pantalla } from '../../components/Pantalla';
 import { useAvisos } from '../../context/AvisosContext';
 import { useSesion } from '../../context/SesionContext';
 import { USAR_MOCKS } from '../../api/http';
+import { fijarEmpresa } from '../../api/empresa';
+import { normalizarCodigo, validarCodigo } from '../../lib/tienda';
+import { tiendaService } from '../../services/tienda.service';
 import { useEmpresaActiva } from '../../hooks/useEmpresa';
 import { hayErrores, validarLogin, validarRegistro, type Errores } from '../../lib/validacion';
 import type { PropsStack } from '../../navigation/tipos';
@@ -39,18 +42,20 @@ export function PantallaAcceso({ navigation, route }: PropsStack<'Acceso'>) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={estilos.contenido} keyboardShouldPersistTaps="handled">
-          <Text style={estilos.marca}>FashionStore</Text>
+          <Text style={estilos.marca}>{empresa?.nombre ?? empresa?.slug ?? 'FashionStore'}</Text>
           <Text style={estilos.subtitulo}>
             {modo === 'login' ? 'Ingresa a tu cuenta' : 'Crea tu cuenta de clienta'}
           </Text>
 
           {motivo ? <AvisoEnLinea texto={motivo} tipo="info" /> : null}
 
-          <Pressable onPress={() => navigation.navigate('Tiendas')} accessibilityRole="button">
-            <Text style={estilos.omitirTexto}>
-              Tienda: {empresa?.nombre ?? empresa?.slug ?? 'FashionStore'} · cambiar
-            </Text>
-          </Pressable>
+          {modo === 'registro' ? (
+            <Pressable onPress={() => navigation.navigate('Tiendas')} accessibilityRole="button">
+              <Text style={estilos.omitirTexto}>
+                Tu cuenta sera de la tienda {empresa?.nombre ?? empresa?.slug} · cambiar
+              </Text>
+            </Pressable>
+          ) : null}
 
           <View style={estilos.conmutador}>
             <Opcion texto="Iniciar sesion" activo={modo === 'login'} onPress={() => setModo('login')} />
@@ -88,6 +93,9 @@ function Opcion({ texto: contenido, activo, onPress }: { texto: string; activo: 
 function FormularioLogin({ onListo }: { onListo: () => void }) {
   const { iniciarSesion } = useSesion();
   const { avisar, avisarError } = useAvisos();
+  const empresa = useEmpresaActiva();
+  const [codigo, setCodigo] = useState(empresa?.slug ?? '');
+  const [errorCodigo, setErrorCodigo] = useState<string>();
   const [datos, setDatos] = useState({ email: '', password: '' });
   const [errores, setErrores] = useState<Errores<typeof datos>>({});
   const [enviando, setEnviando] = useState(false);
@@ -95,11 +103,24 @@ function FormularioLogin({ onListo }: { onListo: () => void }) {
   async function enviar() {
     if (enviando) return;
     const validacion = validarLogin(datos);
+    const problemaCodigo = USAR_MOCKS ? undefined : validarCodigo(codigo);
     setErrores(validacion);
-    if (hayErrores(validacion)) return;
+    setErrorCodigo(problemaCodigo);
+    if (hayErrores(validacion) || problemaCodigo) return;
 
     setEnviando(true);
     try {
+      // El codigo define la empresa (X-Tenant) del login, igual que en la web.
+      const slug = normalizarCodigo(codigo);
+      if (!USAR_MOCKS && slug !== empresa?.slug) {
+        try {
+          const tienda = await tiendaService.verificar(slug);
+          fijarEmpresa({ slug: tienda.slug, nombre: tienda.nombre });
+        } catch {
+          setErrorCodigo('No encontramos una tienda activa con ese codigo.');
+          return;
+        }
+      }
       const usuario = await iniciarSesion(datos);
       avisar(`Hola, ${usuario.nombre.split(' ')[0]}`);
       onListo();
@@ -112,6 +133,20 @@ function FormularioLogin({ onListo }: { onListo: () => void }) {
 
   return (
     <View style={estilos.formulario}>
+      {USAR_MOCKS ? null : (
+        <Campo
+          etiqueta="Codigo de la tienda"
+          value={codigo}
+          onChangeText={(v) => {
+            setCodigo(v.toLowerCase());
+            setErrorCodigo(undefined);
+          }}
+          placeholder="ej. mi-tienda"
+          autoCapitalize="none"
+          autoCorrect={false}
+          error={errorCodigo}
+        />
+      )}
       <Campo
         etiqueta="Correo"
         value={datos.email}

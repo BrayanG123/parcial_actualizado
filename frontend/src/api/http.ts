@@ -34,8 +34,8 @@ const MENSAJES: Record<number, string> = {
 };
 
 const TRADUCCIONES: Record<string, string> = {
-  'Stripe is not configured': 'Stripe todavia no esta configurado en el servidor.',
-  'Stripe is unavailable; retry the same operation': 'Stripe no responde. Reintenta el mismo pago para consultar su resultado.',
+  'Stripe is not configured': 'El pago con tarjeta no esta disponible en este momento.',
+  'Stripe is unavailable; retry the same operation': 'El servicio de pago no responde. Reintenta el mismo pago para consultar su resultado.',
   'Cart or prices changed; request a new checkout preview': 'El carrito o los precios cambiaron. Revisa la nueva cotizacion antes de confirmar.',
   'Sale is no longer awaiting payment': 'El pedido ya no esta pendiente de pago. Actualiza su estado.',
   'Only unpaid digital sales can be cancelled; paid sales require a refund': 'Solo se pueden cancelar pedidos digitales pendientes de pago.',
@@ -209,54 +209,69 @@ export const api = {
   delete: <T>(url: string, datos?: unknown) => peticion<T>('DELETE', url, datos),
 };
 
-/* --- sesion del administrador de plataforma --- */
+/* --- sesiones aparte: administrador de plataforma y cuenta de dueño --- */
 
 /**
- * El administrador de plataforma no pertenece a ninguna empresa: su token se guarda
- * aparte para no mezclarse con la sesion de la tienda ni con el contexto de empresa.
+ * El administrador de plataforma y la cuenta de dueño (F14) no pertenecen a una empresa: su
+ * token se guarda aparte para no mezclarse con la sesion de la tienda ni con el contexto de
+ * empresa. Un 401 cierra solo esa sesion.
  */
-export const CLAVE_TOKEN_PLATAFORMA = `fashionstore.plataforma:${USAR_MOCKS ? 'mock' : BASE_URL}`;
-
-export function tokenPlataforma(): string | null {
-  try {
-    return localStorage.getItem(CLAVE_TOKEN_PLATAFORMA);
-  } catch {
-    return null;
-  }
-}
-
-export function guardarTokenPlataforma(token: string | null): void {
-  try {
-    if (token) localStorage.setItem(CLAVE_TOKEN_PLATAFORMA, token);
-    else localStorage.removeItem(CLAVE_TOKEN_PLATAFORMA);
-  } catch {
-    /* Sin almacenamiento la sesion de plataforma no persiste. */
-  }
-}
-
-async function peticionPlataforma<T>(metodo: Metodo, url: string, datos?: unknown): Promise<T> {
-  const token = tokenPlataforma();
-  try {
-    if (USAR_MOCKS) {
-      const { mockRequest } = await import('../mocks');
-      return await mockRequest<T>(metodo, url, datos);
+function sesionAparte(clave: string, rutaLogin: string) {
+  const leer = (): string | null => {
+    try {
+      return localStorage.getItem(clave);
+    } catch {
+      return null;
     }
-    const respuesta = await instancia.request<RespuestaBackend<T>>({
-      method: metodo,
-      url,
-      data: datos,
-      headers: token && url !== endpoints.plataforma.login ? { Authorization: `Bearer ${token}` } : {},
-    });
-    return desenvolverRespuesta(respuesta.data);
-  } catch (error) {
-    const normalizado = normalizarError(error);
-    if (normalizado.status === 401 && url !== endpoints.plataforma.login) guardarTokenPlataforma(null);
-    throw normalizado;
+  };
+  const guardar = (token: string | null): void => {
+    try {
+      if (token) localStorage.setItem(clave, token);
+      else localStorage.removeItem(clave);
+    } catch {
+      /* Sin almacenamiento la sesion no persiste. */
+    }
+  };
+  async function peticionAparte<T>(metodo: Metodo, url: string, datos?: unknown): Promise<T> {
+    const token = leer();
+    try {
+      if (USAR_MOCKS) {
+        const { mockRequest } = await import('../mocks');
+        return await mockRequest<T>(metodo, url, datos);
+      }
+      const respuesta = await instancia.request<RespuestaBackend<T>>({
+        method: metodo,
+        url,
+        data: datos,
+        headers: token && url !== rutaLogin ? { Authorization: `Bearer ${token}` } : {},
+      });
+      return desenvolverRespuesta(respuesta.data);
+    } catch (error) {
+      const normalizado = normalizarError(error);
+      if (normalizado.status === 401 && url !== rutaLogin) guardar(null);
+      throw normalizado;
+    }
   }
+  return {
+    leer,
+    guardar,
+    api: {
+      get: <T>(url: string) => peticionAparte<T>('GET', url),
+      post: <T>(url: string, datos?: unknown) => peticionAparte<T>('POST', url, datos),
+      patch: <T>(url: string, datos?: unknown) => peticionAparte<T>('PATCH', url, datos),
+    },
+  };
 }
 
-export const apiPlataforma = {
-  get: <T>(url: string) => peticionPlataforma<T>('GET', url),
-  post: <T>(url: string, datos?: unknown) => peticionPlataforma<T>('POST', url, datos),
-  patch: <T>(url: string, datos?: unknown) => peticionPlataforma<T>('PATCH', url, datos),
-};
+export const CLAVE_TOKEN_PLATAFORMA = `fashionstore.plataforma:${USAR_MOCKS ? 'mock' : BASE_URL}`;
+const plataforma = sesionAparte(CLAVE_TOKEN_PLATAFORMA, endpoints.plataforma.login);
+export const tokenPlataforma = plataforma.leer;
+export const guardarTokenPlataforma = plataforma.guardar;
+export const apiPlataforma = plataforma.api;
+
+/** Cuenta de dueño (F14): elige y crea sus empresas; para operar entra a una de ellas. */
+export const CLAVE_TOKEN_CUENTA = `fashionstore.cuenta:${USAR_MOCKS ? 'mock' : BASE_URL}`;
+const cuenta = sesionAparte(CLAVE_TOKEN_CUENTA, endpoints.cuenta.login);
+export const tokenCuenta = cuenta.leer;
+export const guardarTokenCuenta = cuenta.guardar;
+export const apiCuenta = cuenta.api;

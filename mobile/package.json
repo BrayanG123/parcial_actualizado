@@ -47,7 +47,8 @@
     "test:reservas": "node --test test/stock-reserva.test.mjs",
     "test:push": "node --test test/push.test.mjs",
     "test:offline": "node --test test/offline-movil.test.mjs",
-    "test:reportes": "node --test test/reportes-ia.test.mjs"
+    "test:reportes": "node --test test/reportes-ia.test.mjs",
+    "test:tienda": "node --test test/tienda.test.mjs"
   },
   "private": true
 }

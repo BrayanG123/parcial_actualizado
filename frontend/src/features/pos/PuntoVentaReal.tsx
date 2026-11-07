@@ -562,7 +562,7 @@ function Caja({
                 {productos.data?.items.length === 0 && (
                   <Vacio
                     titulo="Sin prendas disponibles"
-                    mensaje="Prueba otra busqueda o sucursal."
+                    mensaje="Intenta otra busqueda o sucursal."
                   />
                 )}
                 {productos.data && (

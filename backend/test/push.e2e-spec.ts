@@ -23,7 +23,9 @@ describe.skipIf(!databaseUrl)('Push tokens (HTTP and PostgreSQL)', () => {
           .set(admin())
           .expect(200)
       ).body.data,
-    ).toEqual({ enabled: false });
+      // Depende de si el entorno tiene FIREBASE_* (p. ej. backend/.env local);
+      // la regla de "las tres variables o ninguna" se prueba en push.service.spec.
+    ).toEqual({ enabled: expect.any(Boolean) });
 
     await request(server())
       .post('/api/v1/push/tokens')

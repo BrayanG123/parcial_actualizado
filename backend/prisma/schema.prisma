@@ -231,6 +231,9 @@ model User {
   tenant            Tenant?            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   supplierId        Int?               @map("id_proveedor")
   supplier          Supplier?          @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  /// Dueño (cuenta global) al que pertenece este administrador de empresa (F14).
+  ownerAccountId    Int?               @map("id_cuenta_propietario")
+  ownerAccount      OwnerAccount?      @relation(fields: [ownerAccountId], references: [id], onDelete: SetNull)
   id                Int                @id @default(autoincrement()) @map("id_usuario")
   name              String             @map("nombre") @db.VarChar(120)
   email             String             @db.VarChar(180)
@@ -251,7 +254,23 @@ model User {
   @@unique([tenantId, email])
   @@index([supplierId])
   @@index([tenantId])
+  @@index([ownerAccountId])
   @@map("usuarios")
+}
+
+/// Cuenta global de un dueño de empresas (F14): no pertenece a ninguna empresa. Un dueño puede
+/// tener varias empresas, cada una con su propio administrador (usuario de esa empresa).
+model OwnerAccount {
+  id           Int      @id @default(autoincrement()) @map("id_cuenta")
+  name         String   @map("nombre") @db.VarChar(120)
+  email        String   @unique @db.VarChar(180)
+  passwordHash String   @map("password_hash")
+  active       Boolean  @default(true) @map("activa")
+  createdAt    DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
+  users        User[]
+
+  @@map("cuentas_propietario")
 }
 
 model Client {

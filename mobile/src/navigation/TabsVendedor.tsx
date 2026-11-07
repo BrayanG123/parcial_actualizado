@@ -27,7 +27,7 @@ function PerfilVendedor() {
       <ScrollView contentContainerStyle={{ padding: esp.l, gap: esp.m }}>
         <Text style={texto.titulo}>{usuario?.nombre}</Text>
         <Text style={texto.cuerpo}>{usuario?.roles.map((r) => String(r.nombre).toLowerCase()).join(', ')}</Text>
-        <Text style={texto.cuerpo}>Tienda: {empresa?.nombre ?? empresa?.slug ?? 'FashionStore'}</Text>
+        <Text style={texto.cuerpo}>Tienda: {empresa?.nombre ?? empresa?.slug ?? 'sin elegir'}</Text>
         {sesionOffline && <Text style={texto.cuerpo}>Sesion sin conexion: solo venta offline y pendientes.</Text>}
         <Boton
           titulo="Cerrar sesion"

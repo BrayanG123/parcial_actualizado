@@ -59,6 +59,15 @@ export function PantallaPerfil({ navigation }: PropsTab<'Perfil'>) {
           detalle="Inicia sesion para ver tus datos, compras y reservas."
           onAcceder={() => navigation.navigate('Acceso')}
         />
+        <View style={{ paddingHorizontal: esp.l, paddingBottom: esp.xl }}>
+          <Boton
+            titulo="Cambiar de tienda"
+            icono="storefront-outline"
+            variante="secundario"
+            ancho
+            onPress={() => navigation.navigate('Tiendas')}
+          />
+        </View>
       </Pantalla>
     );
   }

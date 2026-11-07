@@ -10,6 +10,7 @@ import { navegacionPorRol } from '../routes/navegacion';
 import { usePlanEmpresa } from '../hooks/usePlanEmpresa';
 import { AvisoSuscripcion } from '../features/saas/AvisoSuscripcion';
 import { IndicadorConexion } from '../features/offline/IndicadorConexion';
+import { tokenCuenta } from '../api/http';
 
 export function LayoutPanel() {
   const { usuario, roles, cerrarSesion, tieneRol } = useAuth();
@@ -28,13 +29,14 @@ export function LayoutPanel() {
 
   async function salir() {
     await cerrarSesion();
-    navegar('/login');
+    // El dueño vuelve a "Mis empresas"; su cuenta sigue abierta.
+    navegar(tokenCuenta() ? '/cuenta' : '/login');
   }
 
   return (
     <div className="fs-panel-shell">
       <aside className={`fs-sidebar${abierto ? ' fs-sidebar--abierto' : ''}`}>
-        <Link to="/" className="fs-marca fs-marca--panel">
+        <Link to="/tienda" className="fs-marca fs-marca--panel">
           Fashion<span>Store</span>
         </Link>
 
@@ -58,7 +60,10 @@ export function LayoutPanel() {
         </nav>
 
         <div className="fs-sidebar__pie">
-          <Link to="/" className="fs-sidebar__enlace">Ir a la tienda</Link>
+          {tokenCuenta() && (
+            <Link to="/cuenta" className="fs-sidebar__enlace">Mis empresas</Link>
+          )}
+          <Link to="/tienda" className="fs-sidebar__enlace">Ir a la tienda</Link>
         </div>
       </aside>
 

@@ -33,6 +33,9 @@ import { PantallaTiendas } from '../features/offline/PantallaTiendas';
 import { PantallaTiendaOffline } from '../features/offline/PantallaTiendaOffline';
 import { PantallaPendientes } from '../features/offline/PantallaPendientes';
 import { RolNombre } from '../types/domain';
+import { PantallaBienvenida } from '../features/tienda/PantallaBienvenida';
+import { useEmpresaActiva } from '../hooks/useEmpresa';
+import { USAR_MOCKS } from '../api/http';
 
 /** Personal que vende en tienda: la app abre el modo vendedor (F6.6). */
 const ROLES_VENDEDOR: string[] = [RolNombre.CAJERO, RolNombre.ENCARGADO_SUCURSAL, RolNombre.ADMINISTRADOR];
@@ -62,6 +65,9 @@ export function Navegacion() {
   const [lista, setLista] = useState(false);
   const { usuario, restaurando } = useSesion();
   const vendedor = Boolean(usuario?.roles.some((r) => ROLES_VENDEDOR.includes(String(r.nombre))));
+  // Plataforma SaaS: sin tienda elegida (ni sesion de una) no se abre ninguna tienda por defecto.
+  const empresa = useEmpresaActiva();
+  const sinTienda = !USAR_MOCKS && !empresa && !usuario;
   const { pendiente, consumir } = usePush();
   const accesoPedido = useRef<string | null>(null);
   useEffect(() => {
@@ -91,7 +97,11 @@ export function Navegacion() {
           contentStyle: { backgroundColor: colores.crema },
         }}
       >
-        <Stack.Screen name="Tabs" component={vendedor ? TabsVendedor : Tabs} options={{ headerShown: false }} />
+        {sinTienda ? (
+          <Stack.Screen name="Bienvenida" component={PantallaBienvenida} options={{ headerShown: false }} />
+        ) : (
+          <Stack.Screen name="Tabs" component={vendedor ? TabsVendedor : Tabs} options={{ headerShown: false }} />
+        )}
         <Stack.Screen name="Tiendas" component={PantallaTiendas} options={{ title: 'Elegir tienda' }} />
         <Stack.Screen name="TiendaOffline" component={PantallaTiendaOffline} options={{ title: 'Tienda sin conexion' }} />
         <Stack.Screen name="Pendientes" component={PantallaPendientes} options={{ title: 'Pendientes' }} />

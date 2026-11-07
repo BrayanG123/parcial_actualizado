@@ -8,6 +8,18 @@ export const endpoints = {
     publica: '/tenant/public',
     suscripcion: '/tenant/subscription',
   },
+  /** Landing SaaS publica: planes y alta autoservicio de empresas. */
+  saas: {
+    planes: '/saas/plans',
+    registro: '/saas/signup',
+  },
+  /** Cuenta de dueño con varias empresas (F14). */
+  cuenta: {
+    login: '/owner/auth/login',
+    perfil: '/owner/me',
+    empresas: '/owner/tenants',
+    entrar: (id: number) => `/owner/tenants/${id}/session`,
+  },
   plataforma: {
     login: '/platform/auth/login',
     planes: '/platform/plans',

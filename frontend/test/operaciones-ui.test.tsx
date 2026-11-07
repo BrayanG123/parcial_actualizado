@@ -19,12 +19,16 @@ import { guardarToken } from '../src/api/sesion';
 import { inventario, movimiento, carrito } from './operaciones-fixtures';
 import { prenda, pagina } from './catalogo-fixtures';
 import { respuesta, usuarioBackend } from './fixtures';
+import { fijarEmpresa } from '../src/api/empresa';
+import { fijarSucursalTienda } from '../src/lib/sucursal-tienda';
 
 let root: Root;
 let container: HTMLDivElement;
 let qc: QueryClient;
 beforeEach(() => {
   guardarToken(null);
+  fijarEmpresa({ slug: 'fashionstore' });
+  fijarSucursalTienda({ id_sucursal: 2, nombre: 'Centro' });
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -193,17 +197,20 @@ describe('pantallas de inventario y carrito', () => {
     );
     await montar(<PaginaCarrito />);
     expect(document.body.textContent).toContain('El precio cambio');
-    expect(document.body.textContent).toContain(
-      'No hay una sucursal que pueda atender todo el carrito',
-    );
+    expect(document.body.textContent).toContain('Algunas prendas ya no alcanzan en Centro');
+    expect(document.body.textContent).toContain('cambia de sucursal');
     expect(document.body.textContent).toContain('Reduce la cantidad');
     expect(boton('Continuar con la compra').disabled).toBe(true);
   });
-  it('limita cantidades por tienda sin sumar stock repartido entre sucursales', async () => {
+  it('limita la cantidad al stock de la sucursal elegida, sin sumar otras sucursales', async () => {
     qc.setQueryData(['producto', 1], adaptarProducto(prenda));
+    const variante = { id_producto: 1, id_talla: 9, id_color: 10 };
     qc.setQueryData(
-      ['disponibilidad', { id_producto: 1, id_talla: 9, id_color: 10 }],
-      [{ cantidad_disponible: 1 }, { cantidad_disponible: 1 }],
+      ['disponibilidad', { id_producto: 1 }],
+      [
+        { ...variante, id_inventario: 1, id_sucursal: 2, cantidad_disponible: 1, sucursal: { id_sucursal: 2, nombre: 'Centro', ciudad: 'La Paz', activa: true } },
+        { ...variante, id_inventario: 2, id_sucursal: 3, cantidad_disponible: 4, sucursal: { id_sucursal: 3, nombre: 'Norte', ciudad: 'El Alto', activa: true } },
+      ],
     );
     await montar(
       <Routes>
@@ -211,10 +218,15 @@ describe('pantallas de inventario y carrito', () => {
       </Routes>,
       '/producto/1',
     );
+    // La lista de otras sucursales no aparece de entrada.
+    expect(document.body.textContent).not.toContain('Norte');
     await click('M');
     await click('Azul');
     expect(boton('+').disabled).toBe(true);
     expect(boton('Agregar al carrito').disabled).toBe(false);
+    expect(document.body.textContent).not.toContain('Norte');
+    await click('¿Donde mas tenemos esta prenda?');
+    expect(document.body.textContent).toContain('Norte');
   });
   it('el checkout requiere una sesion antes de consultar o crear pedidos', async () => {
     const adapter = vi.fn();

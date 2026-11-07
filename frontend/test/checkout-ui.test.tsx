@@ -14,6 +14,8 @@ import { respuesta, rechazo, usuarioBackend } from "./fixtures";
 import { carrito } from "./operaciones-fixtures";
 import { cotizacion, venta } from "./pos-fixtures";
 import { turno } from "./turnos-fixtures";
+import { fijarEmpresa } from "../src/api/empresa";
+import { fijarSucursalTienda } from "../src/lib/sucursal-tienda";
 
 vi.mock("../src/features/checkout/PagoStripe", () => ({
   default: () => <p>Formulario seguro Stripe</p>,
@@ -38,6 +40,9 @@ const datos: PedidoCheckout = {
 beforeEach(() => {
   sessionStorage.clear();
   guardarToken("checkout-test");
+  // F17: la sucursal se elige al entrar a la tienda, no en el pago.
+  fijarEmpresa({ slug: "fashionstore" });
+  fijarSucursalTienda({ id_sucursal: 2, nombre: "Centro" });
   modo = "ok";
   enviados = [];
   staff = false;
@@ -169,11 +174,9 @@ async function click(texto: string) {
   await esperar();
 }
 async function seleccionar() {
-  const select = container.querySelector("select")!;
-  await act(async () => {
-    select.value = "2";
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  // Sin selector de sucursal en el pago: se usa la elegida al entrar.
+  expect(container.querySelector("select")).toBeNull();
+  expect(container.textContent).toContain("Sucursal: Centro");
   await esperar();
 }
 async function submit() {
@@ -256,7 +259,7 @@ it("contra entrega permanece disponible sin Stripe y envia los datos del destina
 });
 it("el pedido pendiente permite retomar Stripe sin generar otra venta ni aprobarla desde React", async () => {
   await montar(true);
-  await click("Abrir pago con Stripe");
+  await click("Pagar con tarjeta");
   await esperar();
   expect(container.textContent).toContain("Formulario seguro Stripe");
   expect(container.textContent).toContain("Pago pendiente");
@@ -279,6 +282,14 @@ it("el empleado confirma contra entrega solo tras aceptar el importe en su turno
   await click("Confirmar efectivo recibido");
   expect(entregas).toEqual([{ shiftId: turno.id, expectedTotal: 160 }]);
   expect(container.textContent).toContain("Entregado y cobrado");
+});
+it("si la prenda se agota en la sucursal antes de pagar ofrece cambiar a otra", async () => {
+  fijarSucursalTienda({ id_sucursal: 9, nombre: "Norte" });
+  await montar();
+  expect(container.textContent).toContain("se agotaron en Norte");
+  await click("Cambiar a Centro");
+  expect(container.textContent).toContain("Sucursal: Centro");
+  expect(container.textContent).not.toContain("se agotaron");
 });
 it("los pedidos guardados pertenecen a la cuenta que los creo", () => {
   guardarPedido(12, datos);

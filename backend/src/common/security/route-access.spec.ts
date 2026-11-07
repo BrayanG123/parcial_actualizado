@@ -30,6 +30,9 @@ const PUBLIC_ROUTES = [
   'POST /auth/login',
   'POST /auth/register',
   'POST /platform/auth/login',
+  'POST /owner/auth/login', // cuenta de dueño (sin empresa)
+  'GET /saas/plans', // planes activos de la landing (sin datos de empresas)
+  'POST /saas/signup', // alta autoservicio de empresa: limitado por SignupRateLimitGuard
   'POST /payments/stripe/webhook', // autenticado por la firma de Stripe
   'GET /tenant/directory', // empresas activas (nombre y codigo)
   'GET /tenant/public',
@@ -55,7 +58,9 @@ const PUBLIC_ROUTES = [
 const key = (r: RouteInfo) => `${r.method} ${r.path}`;
 const authenticated = (r: RouteInfo) =>
   r.guards.includes('JwtAuthGuard') ||
-  r.guards.includes('OptionalJwtAuthGuard');
+  r.guards.includes('OptionalJwtAuthGuard') ||
+  // Cuenta de dueño (F14): token propio, validado contra cuentas_propietario.
+  r.guards.includes('OwnerJwtGuard');
 
 /** Funcionalidad de plan exigida por prefijo de ruta. */
 const FEATURE_BY_PREFIX: Array<[RegExp, string[], (r: RouteInfo) => boolean]> =
@@ -90,14 +95,16 @@ describe('autorizacion de las rutas', () => {
   it('toda ruta sin JWT esta en la lista publica revisada', () => {
     const open = routes.filter((r) => !authenticated(r)).map(key);
     expect(open.sort()).toEqual([...PUBLIC_ROUTES].sort());
-    // Las rutas publicas solo leen, salvo login, registro, webhook y asistente.
+    // Las rutas publicas solo leen, salvo login, registro, webhook, asistente y alta de empresa.
     const writes = open.filter((k) => !k.startsWith('GET '));
     expect(writes.sort()).toEqual([
       'POST /ai/assistant',
       'POST /auth/login',
       'POST /auth/register',
+      'POST /owner/auth/login',
       'POST /payments/stripe/webhook',
       'POST /platform/auth/login',
+      'POST /saas/signup',
     ]);
   });
 
@@ -155,13 +162,15 @@ describe('autorizacion de las rutas', () => {
   });
 
   it('solo consultas y operaciones sin efecto de negocio se permiten en modo solo lectura', () => {
-    // La plataforma no pertenece a ninguna empresa: el modo solo lectura no le aplica.
+    // La plataforma y la cuenta de dueño no pertenecen a una empresa: el modo solo lectura
+    // (de una empresa) no les aplica.
     const readOnlyWrites = routes
       .filter(
         (r) =>
           r.method !== 'GET' &&
           r.allowWhenReadOnly &&
-          !r.path.startsWith('/platform/'),
+          !r.path.startsWith('/platform/') &&
+          !r.path.startsWith('/owner/'),
       )
       .map(key);
     expect(readOnlyWrites.sort()).toEqual([

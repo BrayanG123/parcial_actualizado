@@ -72,7 +72,7 @@ function FormularioStripe({
       onConsultar();
     } catch {
       setError(
-        "No se pudo obtener la respuesta de Stripe. Consulta el estado antes de volver a pagar.",
+        "No se pudo confirmar la respuesta del pago. Consulta el estado antes de volver a pagar.",
       );
       onConsultar();
     } finally {
@@ -88,7 +88,7 @@ function FormularioStripe({
         void pagar();
       }}
     >
-      <h3>Pago seguro con Stripe · modo prueba</h3>
+      <h3>Pago seguro con tarjeta</h3>
       {!listo && (
         <p>
           Cargando el formulario seguro. Si no aparece, comprueba la conexion y
@@ -99,7 +99,7 @@ function FormularioStripe({
         onReady={() => setListo(true)}
         onLoadError={() =>
           setError(
-            "No se pudo cargar el formulario de Stripe. Comprueba tu conexion.",
+            "No se pudo cargar el formulario de pago. Comprueba tu conexion.",
           )
         }
       />
@@ -118,7 +118,7 @@ function FormularioStripe({
           className="fs-btn fs-btn--acento"
           disabled={!stripe || !elements || !listo || ocupado}
         >
-          {ocupado ? "Procesando pago..." : "Pagar con tarjeta de prueba"}
+          {ocupado ? "Procesando pago..." : "Pagar"}
         </button>
       )}
     </form>

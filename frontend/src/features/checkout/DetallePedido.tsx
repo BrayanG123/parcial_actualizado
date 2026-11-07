@@ -196,10 +196,10 @@ function Pedido({ id, operacion }: { id: number; operacion: boolean }) {
                 onClick={() => void ejecutar("pagar")}
               >
                 {ocupado
-                  ? "Consultando Stripe..."
+                  ? "Consultando el pago..."
                   : intento?.clientSecret
                     ? "Consultar estado del pago"
-                    : "Abrir pago con Stripe"}
+                    : "Pagar con tarjeta"}
               </button>
               {intento?.clientSecret && (
                 <Suspense fallback={<Cargando />}>
@@ -225,7 +225,7 @@ function Pedido({ id, operacion }: { id: number; operacion: boolean }) {
       )}
       {venta.status === "CANCELLED" && (
         <p>
-          Pedido cancelado. Las prendas se liberaron. Si Stripe llego a cobrar,
+          Pedido cancelado. Las prendas se liberaron. Si el pago llego a cobrarse,
           la tienda conciliara y reembolsara ese pago.
         </p>
       )}
@@ -247,7 +247,7 @@ function Pedido({ id, operacion }: { id: number; operacion: boolean }) {
         mensaje={
           accion === "entregar"
             ? `Se registraran ${moneda(venta.total, venta.currency)} en efectivo en tu turno. Confirma que la entrega y el cobro se realizaron.`
-            : "Se liberaran las prendas apartadas. Si el pago ya se proceso, se conciliara con Stripe."
+            : "Se liberaran las prendas apartadas. Si el pago ya se proceso, se revertira automaticamente."
         }
         textoConfirmar={
           accion === "entregar"

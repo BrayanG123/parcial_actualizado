@@ -13,6 +13,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { USAR_MOCKS } from './src/api/http';
+import { hidratarEmpresa } from './src/api/empresa';
 import { restaurarEstado } from './src/mocks';
 import { ProveedorAvisos } from './src/context/AvisosContext';
 import { ProveedorSesion } from './src/context/SesionContext';
@@ -36,11 +37,12 @@ const clienteQuery = new QueryClient({
 });
 
 export default function App() {
-  const [listo, setListo] = useState(!USAR_MOCKS);
+  const [listo, setListo] = useState(false);
 
   useEffect(() => {
-    if (!USAR_MOCKS) return;
-    restaurarEstado().finally(() => setListo(true));
+    // La tienda elegida se recupera antes de dibujar: sin ella la app abre el selector
+    // de tiendas, nunca la tienda de otra empresa por defecto.
+    Promise.all([USAR_MOCKS ? restaurarEstado() : null, hidratarEmpresa()]).finally(() => setListo(true));
   }, []);
 
   // Al volver a la app se refrescan reservas y compras: el personal pudo

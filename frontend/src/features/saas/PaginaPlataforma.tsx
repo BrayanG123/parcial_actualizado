@@ -51,7 +51,7 @@ export default function PaginaPlataforma() {
         <div>
           <p className="fs-eyebrow">FashionStore SaaS</p>
           <h1>Plataforma</h1>
-          <p className="fs-sub">Empresas contratantes, planes y suscripciones (contratacion simulada, sin cobro).</p>
+          <p className="fs-sub">Empresas contratantes, planes y suscripciones.</p>
         </div>
         <div className="fs-fila">
           <button type="button" className="fs-btn fs-btn--acento fs-btn--s" onClick={() => setCreando(true)}>

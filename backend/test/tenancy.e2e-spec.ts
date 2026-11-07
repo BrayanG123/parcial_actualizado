@@ -230,6 +230,71 @@ describe.skipIf(!databaseUrl)('SaaS multitenant (HTTP + PostgreSQL)', () => {
     ]);
   });
 
+  it('lista los planes publicos y permite el alta autoservicio de una empresa', async () => {
+    const plans = await http().get('/api/v1/saas/plans').expect(200);
+    const byCode = Object.fromEntries(
+      (plans.body.data as Array<{ code: string; monthlyPrice: string }>).map(
+        (p) => [p.code, Number(p.monthlyPrice)],
+      ),
+    );
+    expect(byCode).toMatchObject({ FREE: 0, BASIC: 99, PROFESSIONAL: 199 });
+
+    const signup = await http()
+      .post('/api/v1/saas/signup')
+      .send({
+        name: 'Boutique Autoservicio',
+        slug: 'boutique-auto',
+        planCode: 'FREE',
+        admin: {
+          name: 'Duena Boutique',
+          email: 'duena@boutique.test',
+          password: 'Password123',
+        },
+      })
+      .expect(201);
+    expect(signup.body.data).toEqual({
+      slug: 'boutique-auto',
+      name: 'Boutique Autoservicio',
+    });
+    // El administrador entra con el codigo de su empresa y ve su plan.
+    const token = await login(
+      'duena@boutique.test',
+      'Password123',
+      'boutique-auto',
+    );
+    const subscription = await http()
+      .get('/api/v1/tenant/subscription')
+      .set(bearer(token))
+      .expect(200);
+    expect(subscription.body.data.plan.code).toBe('FREE');
+    // Codigo repetido, reservado o plan inexistente: no se crea nada.
+    const again = {
+      name: 'Otra',
+      planCode: 'FREE',
+      admin: { name: 'Xavier', email: 'x@otra.test', password: 'Password123' },
+    };
+    await http()
+      .post('/api/v1/saas/signup')
+      .send({ ...again, slug: 'boutique-auto' })
+      .expect(409);
+    await http()
+      .post('/api/v1/saas/signup')
+      .send({ ...again, slug: 'admin' })
+      .expect(400);
+    await http()
+      .post('/api/v1/saas/signup')
+      .send({ ...again, slug: 'otra-tienda', planCode: 'NO-EXISTE' })
+      .expect((r) => expect([400, 404]).toContain(r.status));
+    // No expone datos de otras empresas: el usuario nuevo no ve el catalogo de A.
+    const productOfA = await tenantContext.runInTenant(1, () =>
+      ctx.prisma.product.findFirstOrThrow({ orderBy: { id: 'asc' } }),
+    );
+    await http()
+      .get(`/api/v1/products/${productOfA.id}`)
+      .set(bearer(token))
+      .expect(404);
+  });
+
   it('lets the platform admin register tenants and change plans within limits', async () => {
     const created = await http()
       .post('/api/v1/platform/tenants')

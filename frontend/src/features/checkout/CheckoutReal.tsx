@@ -16,6 +16,10 @@ import {
 import { resultadoIncierto } from "../../lib/pos";
 import { revisionSesion } from "../../api/sesion";
 import { moneda } from "../../lib/format";
+import {
+  fijarSucursalTienda,
+  useSucursalTienda,
+} from "../../lib/sucursal-tienda";
 
 export default function CheckoutReal() {
   const { usuario } = useAuth();
@@ -27,7 +31,8 @@ function FormularioCheckout({ userId }: { userId: number }) {
   const carrito = useCarrito();
   const qc = useQueryClient();
   const navegar = useNavigate();
-  const [sucursal, setSucursal] = useState(0);
+  const elegida = useSucursalTienda();
+  const sucursal = elegida?.id_sucursal ?? 0;
   const [metodo, setMetodo] =
     useState<PedidoCheckout["paymentOption"]>("STRIPE");
   const [nombre, setNombre] = useState("");
@@ -59,6 +64,19 @@ function FormularioCheckout({ userId }: { userId: number }) {
     queryFn: checkoutService.configuracion,
     retry: false,
   });
+
+  // Si algo se agoto en la sucursal del cliente justo antes de pagar, se ofrecen las
+  // sucursales que pueden atender todo el carrito (sin pedir elegir sucursal de antemano).
+  const faltaEnSucursal =
+    carrito.detalles.length > 0 &&
+    carrito.data?.sucursales_disponibles !== undefined &&
+    !carrito.data.sucursales_disponibles.some((s) => s.id_sucursal === sucursal);
+  const sinStock =
+    faltaEnSucursal ||
+    (cotizacion.isError && /stock|existencia|disponib|insufficient/i.test(String(cotizacion.error?.message)));
+  const otras = (carrito.data?.sucursales_disponibles ?? []).filter(
+    (s) => s.id_sucursal !== sucursal,
+  );
 
   async function confirmar() {
     if (bloqueo.current || recuperado.error) return;
@@ -166,27 +184,35 @@ function FormularioCheckout({ userId }: { userId: number }) {
         )}
         <fieldset className="fs-panel fs-pila" disabled={ocupado}>
           <legend>Entrega y pago</legend>
-          <label className="fs-campo">
-            Sucursal que atiende el pedido
-            <select
-              className="fs-select"
-              required
-              value={sucursal || ""}
-              onChange={(e) => setSucursal(Number(e.target.value))}
-            >
-              <option value="">Selecciona una sucursal</option>
-              {carrito.data?.sucursales_disponibles?.map((s) => (
-                <option value={s.id_sucursal} key={s.id_sucursal}>
-                  {s.nombre}
-                </option>
-              ))}
-            </select>
-          </label>
-          {carrito.data?.tiene_disponibilidad === false && (
-            <p role="alert">
-              Ninguna sucursal tiene todo el carrito disponible. Ajusta las
-              cantidades.
-            </p>
+          <p>
+            Sucursal: <strong>{elegida?.nombre}</strong>
+            {elegida?.ciudad ? ` · ${elegida.ciudad}` : ""}
+          </p>
+          {sinStock && (
+            <div role="alert" className="fs-alerta fs-alerta--error fs-pila">
+              <span>
+                Algunas prendas se agotaron en {elegida?.nombre} mientras
+                comprabas.
+                {otras.length > 0
+                  ? " Puedes completar tu compra en otra sucursal que si las tiene:"
+                  : " Ajusta las cantidades en tu carrito."}
+              </span>
+              {otras.length > 0 && (
+                <div className="fs-fila" style={{ gap: 8, flexWrap: "wrap" }}>
+                  {otras.map((s) => (
+                    <button
+                      key={s.id_sucursal}
+                      type="button"
+                      className="fs-btn fs-btn--contorno fs-btn--s"
+                      onClick={() => fijarSucursalTienda(s)}
+                    >
+                      Cambiar a {s.nombre}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <Link to="/carrito">Revisar mi carrito</Link>
+            </div>
           )}
           <label>
             <input
@@ -195,7 +221,7 @@ function FormularioCheckout({ userId }: { userId: number }) {
               checked={metodo === "STRIPE"}
               onChange={() => setMetodo("STRIPE")}
             />{" "}
-            Tarjeta con Stripe (prueba) · retiro en sucursal
+            Tarjeta de credito o debito · retiro en sucursal
           </label>
           <label>
             <input
@@ -209,20 +235,20 @@ function FormularioCheckout({ userId }: { userId: number }) {
           {metodo === "STRIPE" ? (
             <>
               <p>
-                Introduce tu tarjeta en el formulario seguro de Stripe despues
-                de revisar y crear el pedido. El pedido vence si no se paga a
-                tiempo.
+                Ingresas los datos de tu tarjeta en el siguiente paso, en un
+                formulario de pago seguro. Si el pago no se completa a tiempo,
+                el pedido se cancela y las prendas se liberan.
               </p>
               {stripe.isError && (
                 <p role="alert">
-                  Stripe no esta disponible. Puedes reintentar o elegir contra
-                  entrega.{" "}
+                  El pago con tarjeta no esta disponible en este momento.
+                  Reintenta en unos minutos o paga contra entrega.{" "}
                   <button
                     type="button"
                     className="fs-btn fs-btn--s"
                     onClick={() => void stripe.refetch()}
                   >
-                    Revisar Stripe
+                    Reintentar
                   </button>
                 </p>
               )}
@@ -230,8 +256,7 @@ function FormularioCheckout({ userId }: { userId: number }) {
           ) : (
             <>
               <p>
-                Envio sin costo para la demostracion, dentro de la ciudad de la
-                sucursal. Coordinamos la entrega por telefono. Pagas en efectivo
+                Envio sin costo dentro de la ciudad de la sucursal. Coordinamos la entrega por telefono. Pagas en efectivo
                 al recibir; el pedido queda pendiente hasta confirmar entrega y
                 cobro.
               </p>
@@ -279,13 +304,10 @@ function FormularioCheckout({ userId }: { userId: number }) {
       </section>
       <aside className="fs-panel fs-resumen fs-pila">
         <h2>Revisa tu pedido</h2>
-        {!sucursal && (
-          <p>Selecciona una sucursal para confirmar precios y existencias.</p>
+        {cotizacion.isFetching && (
+          <Cargando texto="Verificando precios y existencias..." />
         )}
-        {sucursal > 0 && cotizacion.isFetching && (
-          <Cargando texto="Verificando precios y stock..." />
-        )}
-        {cotizacion.isError && (
+        {cotizacion.isError && !sinStock && (
           <ErrorEstado
             error={cotizacion.error}
             onReintentar={() => cotizacion.refetch()}
@@ -308,6 +330,7 @@ function FormularioCheckout({ userId }: { userId: number }) {
           className="fs-btn fs-btn--acento"
           disabled={
             ocupado ||
+            sinStock ||
             !cotizacion.data ||
             cotizacion.isFetching ||
             cotizacion.isError ||

@@ -23,6 +23,7 @@ export type RootStackParamList = {
   Asistente: undefined;
   Acceso: { modo?: 'login' | 'registro'; motivo?: string } | undefined;
   Tiendas: undefined;
+  Bienvenida: undefined;
   TiendaOffline: undefined;
   Pendientes: undefined;
 };

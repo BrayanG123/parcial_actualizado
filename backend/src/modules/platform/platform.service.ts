@@ -16,6 +16,7 @@ import {
   CreatePlanDto,
   CreateTenantDto,
   RenewSubscriptionDto,
+  SignupTenantDto,
   SubscriptionNoteDto,
   TenantAdminDto,
   UpdatePlanDto,
@@ -97,8 +98,16 @@ export class PlatformService {
     );
   }
 
-  /** CU01: empresa + suscripcion + historial + administrador, en una transaccion. */
-  createTenant(dto: CreateTenantDto, performedById: number) {
+  /**
+   * CU01: empresa + suscripcion + historial + administrador, en una transaccion.
+   * F14: el administrador queda vinculado a una cuenta de dueño: la indicada en `owner`
+   * (sus datos y contraseña), la cuenta existente con su correo o una nueva con su contraseña.
+   */
+  createTenant(
+    dto: CreateTenantDto,
+    performedById: number | null,
+    owner?: { accountId: number },
+  ) {
     if (RESERVED_SLUGS.has(dto.slug))
       throw new BadRequestException('El codigo de empresa esta reservado');
     return tenantContext.runAsSystem(async () => {
@@ -112,7 +121,20 @@ export class PlatformService {
         throw new BadRequestException(
           'Database roles are not initialized; execute the seed first',
         );
-      const passwordHash = await hash(dto.admin.password, this.saltRounds);
+      const account = owner
+        ? await this.prisma.ownerAccount.findUnique({
+            where: { id: owner.accountId },
+          })
+        : null;
+      if (owner && !account?.active)
+        throw new NotFoundException('Cuenta de dueño no encontrada');
+      const adminEmail = (account?.email ?? dto.admin.email)
+        .trim()
+        .toLowerCase();
+      const adminName = account?.name ?? dto.admin.name;
+      const passwordHash =
+        account?.passwordHash ??
+        (await hash(dto.admin.password, this.saltRounds));
       const startsAt = new Date();
       const endsAt = addMonths(startsAt, dto.months ?? 12);
       const tenant = await this.prisma.$transaction(async (tx) => {
@@ -139,12 +161,20 @@ export class PlatformService {
             },
           },
         });
+        const ownerAccount =
+          account ??
+          (await tx.ownerAccount.upsert({
+            where: { email: adminEmail },
+            update: {},
+            create: { name: adminName, email: adminEmail, passwordHash },
+          }));
         await tx.user.create({
           data: {
             tenantId: created.id,
-            name: dto.admin.name,
-            email: dto.admin.email,
+            name: adminName,
+            email: adminEmail,
             passwordHash,
+            ownerAccountId: ownerAccount.id,
             roles: { create: { roleId: adminRole.id } },
           },
         });
@@ -153,6 +183,43 @@ export class PlatformService {
       this.tenants.invalidate();
       return this.getTenant(tenant.id);
     });
+  }
+
+  /** Planes activos para la landing publica (sin datos de empresas). */
+  publicPlans() {
+    return tenantContext.runAsSystem(() =>
+      this.prisma.plan.findMany({
+        where: { active: true },
+        orderBy: [{ monthlyPrice: 'asc' }, { id: 'asc' }],
+        select: {
+          code: true,
+          name: true,
+          description: true,
+          maxActiveBranches: true,
+          features: true,
+          monthlyPrice: true,
+        },
+      }),
+    );
+  }
+
+  /**
+   * Alta autoservicio (landing SaaS): crea empresa, suscripcion de 1 mes con pago simulado y
+   * su administrador. Responde solo lo necesario para iniciar sesion, sin datos internos.
+   */
+  async signup(dto: SignupTenantDto) {
+    // Un correo con cuenta de dueño ya existente agrega empresas desde "Mis empresas".
+    const email = dto.admin.email.trim().toLowerCase();
+    if (
+      await tenantContext.runAsSystem(() =>
+        this.prisma.ownerAccount.findUnique({ where: { email } }),
+      )
+    )
+      throw new ConflictException(
+        'Ya existe una cuenta con ese correo: inicia sesion y crea la empresa desde Mis empresas',
+      );
+    const tenant = await this.createTenant({ ...dto, months: 1 }, null);
+    return { slug: tenant.slug, name: tenant.name };
   }
 
   updateTenant(id: number, dto: UpdateTenantDto) {
