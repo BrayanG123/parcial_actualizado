@@ -22,6 +22,7 @@ import {
   useVaciarCarrito,
 } from '../../hooks/useComercio';
 import { subtotal, totalLineas } from '../../lib/domain';
+import { useSucursalTienda } from '../../lib/sucursal-tienda';
 import { moneda, plural } from '../../lib/format';
 import type { DetalleCarrito } from '../../types/domain';
 import type { PropsTab } from '../../navigation/tipos';
@@ -44,6 +45,12 @@ export function PantallaCarrito({ navigation }: PropsTab<'Carrito'>) {
   const detalles = carrito.data?.detalles ?? SIN_LINEAS;
   const total = useMemo(() => totalLineas(detalles), [detalles]);
   const unidades = useMemo(() => detalles.reduce((acc, d) => acc + d.cantidad, 0), [detalles]);
+  const sucursal = useSucursalTienda();
+  // F17: el carrito se atiende en la sucursal del cliente; si ya no alcanza, se ofrece cambiarla.
+  const faltaEnSucursal =
+    detalles.length > 0 &&
+    carrito.data?.sucursales_disponibles !== undefined &&
+    !carrito.data.sucursales_disponibles.some((s) => s.id_sucursal === sucursal?.id_sucursal);
 
   if (!autenticado) {
     return (
@@ -151,11 +158,21 @@ export function PantallaCarrito({ navigation }: PropsTab<'Carrito'>) {
             <Text style={estilos.totalEtiqueta}>Total</Text>
             <Text style={estilos.totalValor}>{moneda(total)}</Text>
           </View>
-          <Text style={estilos.aviso}>El stock se confirma al finalizar la compra.</Text>
+          {faltaEnSucursal ? (
+            <Pressable accessibilityRole="button" onPress={() => navigation.navigate('CambiarSucursal')}>
+              <Text style={estilos.alerta}>
+                Algunas prendas ya no alcanzan en {sucursal?.nombre}. Ajusta las cantidades o{' '}
+                <Text style={estilos.enlace}>cambia de sucursal</Text>.
+              </Text>
+            </Pressable>
+          ) : (
+            <Text style={estilos.aviso}>Retiras en {sucursal?.nombre ?? 'tu sucursal'}.</Text>
+          )}
           <Boton
             titulo="Continuar compra"
             icono="arrow-forward"
             ancho
+            deshabilitado={faltaEnSucursal}
             onPress={() => navigation.navigate('Checkout')}
           />
         </View>
@@ -213,6 +230,8 @@ function LineaCarrito({ linea, ocupada, onCantidad, onQuitar, onAbrir }: PropsLi
 }
 
 const estilos = StyleSheet.create({
+  alerta: { ...texto.menor, color: colores.error },
+  enlace: { color: colores.acento, fontWeight: '600', textDecorationLine: 'underline' },
   encabezado: {
     flexDirection: 'row',
     alignItems: 'center',

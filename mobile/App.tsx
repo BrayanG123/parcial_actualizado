@@ -13,7 +13,8 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { USAR_MOCKS } from './src/api/http';
-import { hidratarEmpresa } from './src/api/empresa';
+import { hidratarEmpresa, obtenerEmpresa, suscribirEmpresa } from './src/api/empresa';
+import { hidratarSucursales } from './src/lib/sucursal-tienda';
 import { restaurarEstado } from './src/mocks';
 import { ProveedorAvisos } from './src/context/AvisosContext';
 import { ProveedorSesion } from './src/context/SesionContext';
@@ -42,7 +43,20 @@ export default function App() {
   useEffect(() => {
     // La tienda elegida se recupera antes de dibujar: sin ella la app abre el selector
     // de tiendas, nunca la tienda de otra empresa por defecto.
-    Promise.all([USAR_MOCKS ? restaurarEstado() : null, hidratarEmpresa()]).finally(() => setListo(true));
+    Promise.all([USAR_MOCKS ? restaurarEstado() : null, hidratarEmpresa(), hidratarSucursales()]).finally(() => setListo(true));
+  }, []);
+
+  // Los datos en cache (sucursales, catalogo, tallas...) son de una tienda: al cambiar de
+  // tienda se descartan para no mostrar las sucursales o prendas de la anterior.
+  useEffect(() => {
+    let slug = obtenerEmpresa()?.slug;
+    return suscribirEmpresa(() => {
+      const nuevo = obtenerEmpresa()?.slug;
+      if (nuevo === slug) return;
+      slug = nuevo;
+      clienteQuery.removeQueries({ type: 'inactive' });
+      void clienteQuery.resetQueries({ type: 'active' });
+    });
   }, []);
 
   // Al volver a la app se refrescan reservas y compras: el personal pudo

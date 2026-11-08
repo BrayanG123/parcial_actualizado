@@ -24,6 +24,8 @@ export type RootStackParamList = {
   Acceso: { modo?: 'login' | 'registro'; motivo?: string } | undefined;
   Tiendas: undefined;
   Bienvenida: undefined;
+  ElegirSucursal: undefined;
+  CambiarSucursal: undefined;
   TiendaOffline: undefined;
   Pendientes: undefined;
 };

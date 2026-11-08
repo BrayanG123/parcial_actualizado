@@ -181,7 +181,7 @@ export function ProbadorCamara({ urlPrenda, nombre }: Props) {
         return;
       }
       await galeria.saveToLibraryAsync(uri);
-      avisar('Guardamos tu prueba en la galeria.');
+      avisar('Guardamos tu foto del probador en la galeria.');
     } catch (error) {
       avisarError(error);
     } finally {

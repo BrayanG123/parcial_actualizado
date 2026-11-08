@@ -58,8 +58,17 @@ function stockDe(inventario: Inventario[], filtro: Filtro): number {
   }, 0);
 }
 
-export function useSeleccion(producto: Producto | undefined, inventario: Inventario[] = []): EstadoSeleccion {
-  const [seleccion, setSeleccion] = useState<Filtro>({});
+/**
+ * `sucursalFija` (F17): sucursal elegida al entrar a la tienda. Con ella las tallas y colores
+ * habilitados y la cantidad maxima son los de esa sucursal; el cliente ya no la elige aqui.
+ */
+export function useSeleccion(
+  producto: Producto | undefined,
+  inventario: Inventario[] = [],
+  sucursalFija?: number,
+): EstadoSeleccion {
+  const [estado, setSeleccion] = useState<Filtro>({});
+  const seleccion: Filtro = sucursalFija ? { ...estado, idSucursal: sucursalFija } : estado;
   const [cantidadPedida, setCantidadPedida] = useState(1);
   const { idTalla, idColor, idSucursal } = seleccion;
 
@@ -98,8 +107,8 @@ export function useSeleccion(producto: Producto | undefined, inventario: Inventa
   );
 
   const agotado = useMemo(
-    () => inventario.length > 0 && inventario.every((i) => stockDisponible(i) <= 0),
-    [inventario],
+    () => inventario.length > 0 && stockDe(inventario, { idSucursal }) <= 0,
+    [inventario, idSucursal],
   );
 
   /**
@@ -108,7 +117,8 @@ export function useSeleccion(producto: Producto | undefined, inventario: Inventa
    */
   const cambiar = useCallback(
     (campo: keyof Filtro, id: number) => {
-      setSeleccion((actual) => {
+      setSeleccion((previo) => {
+        const actual: Filtro = sucursalFija ? { ...previo, idSucursal: sucursalFija } : previo;
         const propuesta: Filtro = { ...actual, [campo]: actual[campo] === id ? undefined : id };
         if (propuesta.idTalla && stockDe(inventario, { ...propuesta, idColor: undefined }) <= 0) {
           propuesta.idTalla = undefined;
@@ -125,7 +135,7 @@ export function useSeleccion(producto: Producto | undefined, inventario: Inventa
         return propuesta;
       });
     },
-    [inventario],
+    [inventario, sucursalFija],
   );
 
   const elegirTalla = useCallback((id: number) => cambiar('idTalla', id), [cambiar]);

@@ -13,7 +13,6 @@ import { Pantalla } from '../../components/Pantalla';
 import { RequiereSesion } from '../../components/RequiereSesion';
 import { useAvisos } from '../../context/AvisosContext';
 import { useSesion } from '../../context/SesionContext';
-import { USAR_MOCKS } from '../../api/http';
 import { fecha, iniciales } from '../../lib/format';
 import type { PropsTab } from '../../navigation/tipos';
 import { colores, esp, radio, texto } from '../../theme';
@@ -59,7 +58,14 @@ export function PantallaPerfil({ navigation }: PropsTab<'Perfil'>) {
           detalle="Inicia sesion para ver tus datos, compras y reservas."
           onAcceder={() => navigation.navigate('Acceso')}
         />
-        <View style={{ paddingHorizontal: esp.l, paddingBottom: esp.xl }}>
+        <View style={{ paddingHorizontal: esp.l, paddingBottom: esp.xl, gap: esp.s }}>
+          <Boton
+            titulo="Cambiar de sucursal"
+            icono="location-outline"
+            variante="secundario"
+            ancho
+            onPress={() => navigation.navigate('CambiarSucursal')}
+          />
           <Boton
             titulo="Cambiar de tienda"
             icono="storefront-outline"
@@ -174,6 +180,12 @@ export function PantallaPerfil({ navigation }: PropsTab<'Perfil'>) {
             onPress={() => navigation.navigate('Pendientes')}
           />
           <Acceso
+            icono="location-outline"
+            titulo="Cambiar de sucursal"
+            detalle="Ver prendas y retirar en otra sucursal"
+            onPress={() => navigation.navigate('CambiarSucursal')}
+          />
+          <Acceso
             icono="storefront-outline"
             titulo="Cambiar de tienda"
             detalle="Elige otra empresa de la plataforma"
@@ -183,12 +195,7 @@ export function PantallaPerfil({ navigation }: PropsTab<'Perfil'>) {
 
         <View style={estilos.tarjeta}>
           <Text style={estilos.tituloBloque}>Aplicacion</Text>
-          <Dato icono="phone-portrait-outline" etiqueta="Version" valor="1.0.0 (MVP)" />
-          <Dato
-            icono="server-outline"
-            etiqueta="Origen de datos"
-            valor={USAR_MOCKS ? 'Datos de prueba locales' : 'Backend NestJS'}
-          />
+          <Dato icono="phone-portrait-outline" etiqueta="Version" valor="1.0.0" />
         </View>
 
         <AvisosPush />

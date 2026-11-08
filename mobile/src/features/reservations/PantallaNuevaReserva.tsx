@@ -1,7 +1,9 @@
 /**
  * Nueva reserva para probar prendas en sucursal.
  *
- *   prendas -> sucursal -> horario -> revision -> confirmacion
+ *   prendas -> horario -> revision -> confirmacion
+ *
+ * F17: la sucursal es la elegida al entrar a la tienda (se cambia desde Inicio o aqui).
  *
  * El horario se elige con dia + franja horaria en lugar de un selector nativo:
  * evita una dependencia mas y se ajusta al horario real de atencion.
@@ -17,10 +19,10 @@ import { RequiereSesion } from '../../components/RequiereSesion';
 import { Chip, Contador } from '../../components/Selectores';
 import { useAvisos } from '../../context/AvisosContext';
 import { useSesion } from '../../context/SesionContext';
-import { useSucursales } from '../../hooks/useCatalogo';
 import { useStockReserva } from '../../hooks/useStockReserva';
 import { useCrearReserva } from '../../hooks/useComercio';
 import { fechaRelativa, plural } from '../../lib/format';
+import { useSucursalTienda } from '../../lib/sucursal-tienda';
 import type { PropsStack } from '../../navigation/tipos';
 import { colores, esp, radio, texto } from '../../theme';
 import { useBorradorReserva } from './BorradorReserva';
@@ -43,13 +45,13 @@ export function PantallaNuevaReserva({ navigation }: PropsStack<'NuevaReserva'>)
   const { autenticado } = useSesion();
   const { avisar, avisarError } = useAvisos();
   const borrador = useBorradorReserva();
-  const { data: sucursales } = useSucursales();
   const crear = useCrearReserva();
 
   const dias = useMemo(() => proximosDias(), []);
   const [dia, setDia] = useState<Date>(dias[0]);
   const [franja, setFranja] = useState<string>();
-  const [idSucursal, setIdSucursal] = useState<number>();
+  const sucursal = useSucursalTienda();
+  const idSucursal = sucursal?.id_sucursal;
   const [observacion, setObservacion] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -60,7 +62,7 @@ export function PantallaNuevaReserva({ navigation }: PropsStack<'NuevaReserva'>)
       <Pantalla bordes={['bottom']}>
         <RequiereSesion
           titulo="Reserva para probarte"
-          detalle="Inicia sesion para apartar prendas en la sucursal que elijas."
+          detalle="Inicia sesion para apartar prendas en tu sucursal."
           onAcceder={() => navigation.navigate('Acceso', { motivo: 'Inicia sesion para reservar prendas.' })}
         />
       </Pantalla>
@@ -83,7 +85,7 @@ export function PantallaNuevaReserva({ navigation }: PropsStack<'NuevaReserva'>)
   const unidades = borrador.lineas.reduce((acc, l) => acc + l.cantidad, 0);
 
   async function confirmar() {
-    if (!idSucursal) return setError('Elige la sucursal donde te probaras las prendas.');
+    if (!idSucursal) return setError('Elige tu sucursal para reservar.');
     if (!franja) return setError('Elige un horario aproximado de visita.');
     if (!stock.confirmable) return setError('Revisa la disponibilidad de las prendas antes de confirmar.');
     setError(null);
@@ -171,23 +173,18 @@ export function PantallaNuevaReserva({ navigation }: PropsStack<'NuevaReserva'>)
 
         <View style={estilos.bloque}>
           <Text style={estilos.titulo}>Sucursal</Text>
-          <View style={estilos.opciones}>
-            {(sucursales ?? []).map((s) => (
-              <Chip
-                key={s.id_sucursal}
-                texto={`${s.nombre.replace('FashionStore ', '')} - ${s.ciudad}`}
-                activo={idSucursal === s.id_sucursal}
-                onPress={() => { setIdSucursal(s.id_sucursal); setError(null); }}
-              />
-            ))}
-          </View>
+          <Text style={estilos.detalle}>
+            {sucursal ? `${sucursal.nombre}${sucursal.ciudad ? ` - ${sucursal.ciudad}` : ''}` : 'Sin sucursal elegida'}
+          </Text>
+          <Boton titulo="Cambiar de sucursal" variante="plano" tamano="compacto"
+            onPress={() => { setError(null); navigation.navigate('CambiarSucursal'); }} />
           {idSucursal ? (
             <Boton titulo={stock.error ? 'Reintentar disponibilidad' : 'Actualizar disponibilidad'}
               variante="plano" tamano="compacto" cargando={stock.consultando}
               onPress={() => { void stock.refrescar(); }} />
           ) : null}
           <Text style={estilos.detalle}>
-            Solo se reservan las prendas con stock disponible en la sucursal elegida.
+            Solo se reservan las prendas con stock disponible en tu sucursal.
           </Text>
         </View>
 
@@ -233,7 +230,7 @@ export function PantallaNuevaReserva({ navigation }: PropsStack<'NuevaReserva'>)
         <Text style={estilos.resumen}>
           {idSucursal && franja
             ? `${fechaRelativa(dia)} a las ${franja}`
-            : 'Elige sucursal y horario para confirmar'}
+            : 'Elige el horario para confirmar'}
         </Text>
         <Boton titulo="Confirmar reserva" ancho onPress={confirmar} cargando={crear.isPending} deshabilitado={!stock.confirmable || !franja} />
       </View>

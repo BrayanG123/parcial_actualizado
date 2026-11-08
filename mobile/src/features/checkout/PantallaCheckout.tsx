@@ -1,7 +1,10 @@
 /**
  * Compra desde el movil (canal MOBILE).
  *
- *   Resumen -> Sucursal con stock -> Cotizacion del servidor -> Pago -> Resultado
+ *   Resumen -> Cotizacion del servidor en la sucursal del cliente -> Pago -> Resultado
+ *
+ * F17: la sucursal es la elegida al entrar a la tienda; solo si algo se agota en ella
+ * antes de pagar se ofrecen las sucursales que tienen todo el carrito.
  *
  * El total lo calcula NestJS (quoteHash). Con tarjeta, la venta queda pendiente
  * y Stripe confirma el cobro; con contra entrega, se paga en efectivo al recibir.
@@ -21,6 +24,7 @@ import { useAvisos } from '../../context/AvisosContext';
 import { useSesion } from '../../context/SesionContext';
 import { useCarrito, useConfirmarCheckout } from '../../hooks/useComercio';
 import { moneda, plural } from '../../lib/format';
+import { fijarSucursalTienda, useSucursalTienda } from '../../lib/sucursal-tienda';
 import type { PropsStack } from '../../navigation/tipos';
 import {
   checkoutService,
@@ -44,7 +48,8 @@ export function PantallaCheckout({ navigation }: PropsStack<'Checkout'>) {
   const confirmar = useConfirmarCheckout();
   const queryClient = useQueryClient();
 
-  const [idSucursal, setIdSucursal] = useState<number>();
+  const sucursal = useSucursalTienda();
+  const idSucursal = sucursal?.id_sucursal;
   const [opcion, setOpcion] = useState<OpcionPago>('STRIPE');
   // La sesion ya esta restaurada al llegar aqui: se precargan los datos del cliente.
   const [entrega, setEntrega] = useState(() => ({
@@ -69,6 +74,8 @@ export function PantallaCheckout({ navigation }: PropsStack<'Checkout'>) {
 
   const detalles = carrito.data?.detalles ?? SIN_LINEAS;
   const sucursales = carrito.data?.sucursales_disponibles ?? [];
+  const sinStock = detalles.length > 0 && carrito.data?.sucursales_disponibles !== undefined && !sucursales.some((s) => s.id_sucursal === idSucursal);
+  const otras = sucursales.filter((s) => s.id_sucursal !== idSucursal);
   const unidades = detalles.reduce((acc, d) => acc + d.cantidad, 0);
 
   if (carrito.isLoading) return <Cargando mensaje="Preparando tu compra..." />;
@@ -77,7 +84,7 @@ export function PantallaCheckout({ navigation }: PropsStack<'Checkout'>) {
   if (resultado) return <Resultado resultado={resultado} navigation={navigation} />;
 
   if (pago) {
-    if (confirmando) return <Cargando mensaje="Confirmando tu pago con Stripe..." />;
+    if (confirmando) return <Cargando mensaje="Confirmando tu pago..." />;
     return (
       <Pantalla bordes={['bottom']}>
         <PagoStripeWeb
@@ -105,7 +112,8 @@ export function PantallaCheckout({ navigation }: PropsStack<'Checkout'>) {
   }
 
   function validar(): string | null {
-    if (!idSucursal) return 'Elige la sucursal desde donde se prepara tu pedido.';
+    if (!idSucursal) return 'Elige tu sucursal para continuar.';
+    if (sinStock) return `Algunas prendas se agotaron en ${sucursal?.nombre}.`;
     if (!cotizacion.data) return 'Espera a que el servidor calcule el total.';
     if (opcion === 'CASH_ON_DELIVERY') {
       if (entrega.nombre.trim().length < 2) return 'Indica quien recibe el pedido.';
@@ -227,26 +235,35 @@ export function PantallaCheckout({ navigation }: PropsStack<'Checkout'>) {
           ))}
         </Paso>
 
-        <Paso numero={2} titulo="Sucursal" detalle="Solo aparecen las que tienen stock de todo tu carrito">
-          {sucursales.length === 0 ? (
-            <AvisoEnLinea texto="Ninguna sucursal tiene stock para todo el carrito. Ajusta las cantidades." />
-          ) : (
-            <View style={estilos.opciones}>
-              {sucursales.map((s) => (
-                <Chip
-                  key={s.id_sucursal}
-                  texto={`${s.nombre} - ${s.ciudad}`}
-                  activo={idSucursal === s.id_sucursal}
-                  onPress={() => setIdSucursal(s.id_sucursal)}
-                />
-              ))}
+        <Paso numero={2} titulo="Retiro" detalle={sucursal ? `${sucursal.nombre}${sucursal.ciudad ? ` - ${sucursal.ciudad}` : ''}` : undefined}>
+          {sinStock ? (
+            <View style={estilos.formulario}>
+              <AvisoEnLinea
+                texto={
+                  otras.length > 0
+                    ? `Algunas prendas se agotaron en ${sucursal?.nombre} mientras comprabas. Puedes completar tu compra en otra sucursal que si las tiene:`
+                    : `Algunas prendas se agotaron en ${sucursal?.nombre}. Ajusta las cantidades en tu carrito.`
+                }
+              />
+              <View style={estilos.opciones}>
+                {otras.map((s) => (
+                  <Chip
+                    key={s.id_sucursal}
+                    texto={`Cambiar a ${s.nombre}`}
+                    activo={false}
+                    onPress={() => fijarSucursalTienda({ id_sucursal: s.id_sucursal, nombre: s.nombre, ciudad: s.ciudad })}
+                  />
+                ))}
+              </View>
             </View>
+          ) : (
+            <Text style={estilos.nota}>Preparamos tu pedido en tu sucursal.</Text>
           )}
         </Paso>
 
         <Paso numero={3} titulo="Forma de pago">
           <View style={estilos.opciones}>
-            <Chip texto="Tarjeta (Stripe)" activo={opcion === 'STRIPE'} onPress={() => setOpcion('STRIPE')} />
+            <Chip texto="Tarjeta de credito o debito" activo={opcion === 'STRIPE'} onPress={() => setOpcion('STRIPE')} />
             <Chip
               texto="Contra entrega"
               activo={opcion === 'CASH_ON_DELIVERY'}
@@ -255,7 +272,7 @@ export function PantallaCheckout({ navigation }: PropsStack<'Checkout'>) {
           </View>
           {opcion === 'STRIPE' ? (
             <Text style={estilos.nota}>
-              Pagas en el formulario seguro de Stripe (modo prueba). Tienes unos minutos para completar el pago antes de que
+              Ingresas tu tarjeta en un formulario de pago seguro. Tienes unos minutos para completar el pago antes de que
               se liberen las prendas.
             </Text>
           ) : (
@@ -278,7 +295,7 @@ export function PantallaCheckout({ navigation }: PropsStack<'Checkout'>) {
           )}
         </Paso>
 
-        {cotizacion.isError ? <AvisoEnLinea texto={cotizacion.error.message} /> : null}
+        {cotizacion.isError && !sinStock ? <AvisoEnLinea texto={cotizacion.error.message} /> : null}
         {error ? <AvisoEnLinea texto={error} /> : null}
       </ScrollView>
 
@@ -295,7 +312,7 @@ export function PantallaCheckout({ navigation }: PropsStack<'Checkout'>) {
           ancho
           onPress={pedirConfirmacion}
           cargando={confirmar.isPending}
-          deshabilitado={!cotizacion.data}
+          deshabilitado={!cotizacion.data || sinStock}
         />
       </View>
     </Pantalla>
@@ -336,7 +353,7 @@ function Resultado({ resultado, navigation }: { resultado: ResultadoCheckout; na
       ? `El pedido #${venta.id_venta} fue anulado y las prendas volvieron al stock.`
       : venta.contra_entrega
         ? `Tu pedido #${venta.id_venta} por ${moneda(venta.total)} se pagara en efectivo al recibirlo. La tienda te llamara para coordinar.`
-        : `Stripe todavia no confirma el pedido #${venta.id_venta}. Revisa su estado en Mis compras en unos minutos.`;
+        : `El pago del pedido #${venta.id_venta} aun no se confirma. Revisa su estado en Mis compras en unos minutos.`;
 
   return (
     <Pantalla bordes={['bottom']}>

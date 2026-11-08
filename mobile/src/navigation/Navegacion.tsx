@@ -36,6 +36,9 @@ import { RolNombre } from '../types/domain';
 import { PantallaBienvenida } from '../features/tienda/PantallaBienvenida';
 import { useEmpresaActiva } from '../hooks/useEmpresa';
 import { USAR_MOCKS } from '../api/http';
+import { PantallaCambiarSucursal, PantallaElegirSucursal } from '../features/tienda/PantallaSucursal';
+import { useSucursales } from '../hooks/useCatalogo';
+import { fijarSucursalTienda, useSucursalTienda } from '../lib/sucursal-tienda';
 
 /** Personal que vende en tienda: la app abre el modo vendedor (F6.6). */
 const ROLES_VENDEDOR: string[] = [RolNombre.CAJERO, RolNombre.ENCARGADO_SUCURSAL, RolNombre.ADMINISTRADOR];
@@ -68,6 +71,15 @@ export function Navegacion() {
   // Plataforma SaaS: sin tienda elegida (ni sesion de una) no se abre ninguna tienda por defecto.
   const empresa = useEmpresaActiva();
   const sinTienda = !USAR_MOCKS && !empresa && !usuario;
+  // F17: el cliente elige su sucursal al entrar; el personal usa la suya en el modo vendedor.
+  const sucursal = useSucursalTienda();
+  const sucursales = useSucursales();
+  const sinSucursal = !sinTienda && !vendedor && !sucursal;
+  useEffect(() => {
+    // Si la sucursal recordada ya no atiende, se vuelve a elegir.
+    if (sucursal && sucursales.data && !sucursales.data.some((s) => s.id_sucursal === sucursal.id_sucursal && s.activa !== false))
+      fijarSucursalTienda(null);
+  }, [sucursal, sucursales.data]);
   const { pendiente, consumir } = usePush();
   const accesoPedido = useRef<string | null>(null);
   useEffect(() => {
@@ -99,10 +111,13 @@ export function Navegacion() {
       >
         {sinTienda ? (
           <Stack.Screen name="Bienvenida" component={PantallaBienvenida} options={{ headerShown: false }} />
+        ) : sinSucursal ? (
+          <Stack.Screen name="ElegirSucursal" component={PantallaElegirSucursal} options={{ headerShown: false }} />
         ) : (
           <Stack.Screen name="Tabs" component={vendedor ? TabsVendedor : Tabs} options={{ headerShown: false }} />
         )}
         <Stack.Screen name="Tiendas" component={PantallaTiendas} options={{ title: 'Elegir tienda' }} />
+        <Stack.Screen name="CambiarSucursal" component={PantallaCambiarSucursal} options={{ title: 'Sucursal' }} />
         <Stack.Screen name="TiendaOffline" component={PantallaTiendaOffline} options={{ title: 'Tienda sin conexion' }} />
         <Stack.Screen name="Pendientes" component={PantallaPendientes} options={{ title: 'Pendientes' }} />
         <Stack.Screen name="Producto" component={PantallaProducto} options={{ title: 'Producto' }} />

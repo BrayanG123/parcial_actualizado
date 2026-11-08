@@ -1,15 +1,15 @@
 /**
- * Detalle del producto: imagen, promocion, seleccion de talla/color,
- * disponibilidad por sucursal y las tres acciones del cliente
+ * Detalle del producto: imagen, promocion, seleccion de talla/color con el stock de la
+ * sucursal del cliente (otras sucursales solo a pedido) y las tres acciones del cliente
  * (carrito, reserva y probador virtual).
  */
-import { useLayoutEffect } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Boton } from '../../components/Boton';
 import { AvisoEnLinea, Cargando, ErrorVista } from '../../components/Estados';
 import { ImagenProducto } from '../../components/ImagenProducto';
-import { InsigniaDescuento, InsigniaStock } from '../../components/Insignias';
+import { InsigniaDescuento } from '../../components/Insignias';
 import { Precio } from '../../components/Precio';
 import { Contador, SelectorColor, SelectorTalla } from '../../components/Selectores';
 import { useAvisos } from '../../context/AvisosContext';
@@ -17,6 +17,7 @@ import { useSesion } from '../../context/SesionContext';
 import { useDisponibilidad, useProducto } from '../../hooks/useCatalogo';
 import { useAgregarAlCarrito } from '../../hooks/useComercio';
 import { promocionVigente } from '../../lib/domain';
+import { useSucursalTienda } from '../../lib/sucursal-tienda';
 import { fecha } from '../../lib/format';
 import type { PropsStack } from '../../navigation/tipos';
 import { colores, esp, radio, texto } from '../../theme';
@@ -34,7 +35,10 @@ export function PantallaProducto({ navigation, route }: PropsStack<'Producto'>) 
   const agregar = useAgregarAlCarrito();
   const borradorReserva = useBorradorReserva();
 
-  const seleccion = useSeleccion(producto.data, disponibilidad.data ?? []);
+  const sucursal = useSucursalTienda();
+  const seleccion = useSeleccion(producto.data, disponibilidad.data ?? [], sucursal?.id_sucursal);
+  const [verOtras, setVerOtras] = useState(false);
+  const otras = seleccion.porSucursal.filter((s) => s.id_sucursal !== sucursal?.id_sucursal && s.disponible > 0);
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: route.params.nombre ?? 'Producto' });
@@ -85,7 +89,7 @@ export function PantallaProducto({ navigation, route }: PropsStack<'Producto'>) 
     if (!talla || !color) return;
 
     // La reserva se arma en varios pasos: la prenda entra al borrador y el
-    // cliente elige sucursal y horario en la pantalla siguiente.
+    // cliente elige el horario en la pantalla siguiente (la sucursal ya es la suya).
     borradorReserva.agregar(p, talla, color, seleccion.cantidad);
     navigation.navigate('NuevaReserva');
   }
@@ -134,7 +138,7 @@ export function PantallaProducto({ navigation, route }: PropsStack<'Producto'>) 
 
         {seleccion.agotado ? (
           <View style={estilos.bloque}>
-            <AvisoEnLinea texto="Esta prenda esta agotada en todas nuestras sucursales." />
+            <AvisoEnLinea texto={`Esta prenda esta agotada en ${sucursal?.nombre ?? 'esta sucursal'}.`} />
           </View>
         ) : null}
 
@@ -147,7 +151,10 @@ export function PantallaProducto({ navigation, route }: PropsStack<'Producto'>) 
                 nombre={t.nombre}
                 activo={seleccion.idTalla === t.id_talla}
                 agotada={!seleccion.tallasHabilitadas.has(t.id_talla)}
-                onPress={() => seleccion.elegirTalla(t.id_talla)}
+                onPress={() => {
+                  setVerOtras(false);
+                  seleccion.elegirTalla(t.id_talla);
+                }}
               />
             ))}
           </View>
@@ -165,42 +172,54 @@ export function PantallaProducto({ navigation, route }: PropsStack<'Producto'>) 
                 nombre={c.nombre}
                 activo={seleccion.idColor === c.id_color}
                 agotado={!seleccion.coloresHabilitados.has(c.id_color)}
-                onPress={() => seleccion.elegirColor(c.id_color)}
+                onPress={() => {
+                  setVerOtras(false);
+                  seleccion.elegirColor(c.id_color);
+                }}
               />
             ))}
           </View>
         </View>
 
         <View style={estilos.bloque}>
-          <Text style={estilos.tituloBloque}>Disponibilidad</Text>
           {disponibilidad.isLoading ? (
-            <Text style={estilos.meta}>Consultando sucursales...</Text>
+            <Text style={estilos.meta}>Consultando disponibilidad...</Text>
           ) : !seleccion.completa ? (
-            <Text style={estilos.meta}>Elige talla y color para ver el stock por sucursal.</Text>
-          ) : seleccion.porSucursal.every((s) => s.disponible <= 0) ? (
-            <AvisoEnLinea texto="Esa combinacion no esta disponible por ahora." />
-          ) : (
-            <View style={estilos.sucursales}>
-              {seleccion.porSucursal.map((s) => (
-                <Pressable
-                  key={s.id_sucursal}
-                  onPress={() => s.disponible > 0 && seleccion.elegirSucursal(s.id_sucursal)}
-                  accessibilityRole="button"
-                  style={[
-                    estilos.sucursal,
-                    seleccion.idSucursal === s.id_sucursal && estilos.sucursalActiva,
-                    s.disponible <= 0 && estilos.sucursalInactiva,
-                  ]}
-                >
-                  <View style={estilos.sucursalTextos}>
-                    <Text style={estilos.sucursalNombre}>{s.nombre}</Text>
-                    <Text style={estilos.meta}>{s.ciudad}</Text>
+            seleccion.agotado ? null : (
+              <Text style={estilos.meta}>
+                Elige talla y color. Las opciones tachadas estan agotadas en {sucursal?.nombre ?? 'tu sucursal'}.
+              </Text>
+            )
+          ) : seleccion.disponible <= 0 ? (
+            <AvisoEnLinea texto="Agotado en esta sucursal." />
+          ) : null}
+          {seleccion.completa ? (
+            <Pressable accessibilityRole="button" onPress={() => setVerOtras((v) => !v)} style={estilos.enlace}>
+              <Ionicons name="location-outline" size={16} color={colores.acento} />
+              <Text style={estilos.enlaceTexto}>
+                {verOtras ? 'Ocultar otras sucursales' : '¿Donde mas tenemos esta prenda?'}
+              </Text>
+            </Pressable>
+          ) : null}
+          {seleccion.completa && verOtras ? (
+            otras.length === 0 ? (
+              <Text style={estilos.meta}>No hay unidades de esta talla y color en otras sucursales.</Text>
+            ) : (
+              <View style={estilos.sucursales}>
+                {otras.map((s) => (
+                  <View key={s.id_sucursal} style={estilos.sucursal}>
+                    <View style={estilos.sucursalTextos}>
+                      <Text style={estilos.sucursalNombre}>{s.nombre}</Text>
+                      <Text style={estilos.meta}>{s.ciudad}</Text>
+                    </View>
+                    <Text style={estilos.cantidadOtra}>
+                      {s.disponible} {s.disponible === 1 ? 'disponible' : 'disponibles'}
+                    </Text>
                   </View>
-                  <InsigniaStock disponible={s.disponible} />
-                </Pressable>
-              ))}
-            </View>
-          )}
+                ))}
+              </View>
+            )
+          ) : null}
         </View>
 
         {seleccion.completa && seleccion.disponible > 0 ? (
@@ -208,8 +227,7 @@ export function PantallaProducto({ navigation, route }: PropsStack<'Producto'>) 
             <View>
               <Text style={estilos.tituloBloque}>Cantidad</Text>
               <Text style={estilos.meta}>
-                {seleccion.disponible} disponibles
-                {seleccion.idSucursal ? ' en la sucursal elegida' : ' en total'}
+                {seleccion.disponible} disponibles en {sucursal?.nombre ?? 'tu sucursal'}
               </Text>
             </View>
             <Contador
@@ -291,8 +309,9 @@ const estilos = StyleSheet.create({
     borderColor: colores.borde,
     backgroundColor: colores.blanco,
   },
-  sucursalActiva: { borderColor: colores.acento, backgroundColor: colores.acentoSuave },
-  sucursalInactiva: { opacity: 0.55 },
+  cantidadOtra: { ...texto.cuerpo, fontWeight: '600', color: colores.exito },
+  enlace: { flexDirection: 'row', alignItems: 'center', gap: esp.xs, paddingVertical: esp.xs },
+  enlaceTexto: { ...texto.cuerpo, color: colores.acento, fontWeight: '600' },
   sucursalTextos: { flex: 1, gap: 1 },
   sucursalNombre: { ...texto.cuerpo, fontWeight: '600', color: colores.tinta },
   filaCantidad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

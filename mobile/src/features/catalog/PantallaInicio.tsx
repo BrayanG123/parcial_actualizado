@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Cargando, ErrorVista } from '../../components/Estados';
 import { Pantalla, TituloSeccion } from '../../components/Pantalla';
 import { useCategorias, useProductos } from '../../hooks/useCatalogo';
+import { useSucursalTienda } from '../../lib/sucursal-tienda';
 import { useRecomendaciones } from '../../hooks/useIA';
 import { useSesion } from '../../context/SesionContext';
 import { useEmpresaActiva } from '../../hooks/useEmpresa';
@@ -29,8 +30,10 @@ export function PantallaInicio({ navigation }: PropsTab<'Inicio'>) {
   const { usuario } = useSesion();
   const empresa = useEmpresaActiva();
 
-  const novedades = useProductos({ orden: 'nombre', solo_disponibles: true });
-  const promociones = useProductos({ solo_promocion: true, orden: 'descuento' });
+  const sucursal = useSucursalTienda();
+  const id_sucursal = sucursal?.id_sucursal;
+  const novedades = useProductos({ orden: 'nombre', solo_disponibles: true, id_sucursal });
+  const promociones = useProductos({ solo_promocion: true, orden: 'descuento', id_sucursal });
   const { data: categorias } = useCategorias();
   const { data: recomendaciones } = useRecomendaciones({ limite: 6 });
 
@@ -74,8 +77,13 @@ export function PantallaInicio({ navigation }: PropsTab<'Inicio'>) {
           </Text>
           <Text style={estilos.marca}>{empresa?.nombre ?? empresa?.slug ?? 'FashionStore'}</Text>
           <Text style={estilos.lema}>
-            Coleccion de temporada, disponible en sus sucursales y lista para probar.
+            Coleccion de temporada disponible en {sucursal?.nombre ?? 'tu sucursal'}, lista para probar.
           </Text>
+          <Pressable accessibilityRole="button" onPress={() => navigation.navigate('CambiarSucursal')}>
+            <Text style={estilos.cambiarSucursal}>
+              {sucursal ? `${sucursal.nombre} · cambiar de sucursal` : 'Elegir sucursal'}
+            </Text>
+          </Pressable>
           <Pressable
             style={estilos.botonHero}
             accessibilityRole="button"
@@ -138,7 +146,7 @@ export function PantallaInicio({ navigation }: PropsTab<'Inicio'>) {
         ) : null}
 
         <View style={estilos.seccion}>
-          <TituloSeccion titulo="Novedades" detalle="Prendas con stock en sucursales" />
+          <TituloSeccion titulo="Novedades" detalle={`Prendas con stock en ${sucursal?.nombre ?? 'tu sucursal'}`} />
           <Carrusel productos={listaNovedades} onPress={abrirProducto} />
         </View>
 
@@ -151,7 +159,7 @@ export function PantallaInicio({ navigation }: PropsTab<'Inicio'>) {
                 style={estilos.acceso}
                 accessibilityRole="button"
                 onPress={() => {
-                  if (i === 0) navigation.navigate('Catalogo', { filtros: { solo_disponibles: true } });
+                  if (i === 0) navigation.navigate('Catalogo', { filtros: {} });
                   else if (i === 1) navigation.navigate('NuevaReserva');
                   else navigation.navigate('Asistente');
                 }}
@@ -193,6 +201,7 @@ function Carrusel({ productos, onPress }: { productos: Producto[]; onPress: (p: 
 
 const estilos = StyleSheet.create({
   contenido: { paddingBottom: esp.xxl },
+  cambiarSucursal: { ...texto.menor, color: colores.blanco, textDecorationLine: 'underline', marginTop: esp.xs },
   hero: {
     marginHorizontal: esp.l,
     marginTop: esp.s,

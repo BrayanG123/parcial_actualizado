@@ -219,7 +219,7 @@ export function ProbadorEnVivo({ idProducto, urlPrenda, nombre, categoria }: Pro
         return;
       }
       await galeria.saveToLibraryAsync(uri);
-      avisar('Guardamos tu prueba en la galeria.');
+      avisar('Guardamos tu foto del probador en la galeria.');
     } catch (e) {
       avisarError(e);
     } finally {

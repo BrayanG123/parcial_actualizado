@@ -21,7 +21,8 @@ import { Cargando, ErrorVista, Vacio } from '../../components/Estados';
 import { Hoja } from '../../components/Hoja';
 import { Pantalla } from '../../components/Pantalla';
 import { Chip } from '../../components/Selectores';
-import { useCategorias, useColores, useProductos, useSucursales, useTallas } from '../../hooks/useCatalogo';
+import { useCategorias, useColores, useProductos, useTallas } from '../../hooks/useCatalogo';
+import { useSucursalTienda } from '../../lib/sucursal-tienda';
 import { useDebounce } from '../../hooks/useDebounce';
 import type { FiltrosProducto, OrdenCatalogo } from '../../services/catalogo.service';
 import type { Producto } from '../../types/domain';
@@ -44,9 +45,7 @@ function contarFiltros(f: FiltrosPanel): number {
     f.id_categoria,
     f.id_talla,
     f.id_color,
-    f.id_sucursal,
     f.solo_promocion || undefined,
-    f.solo_disponibles || undefined,
     f.orden,
   ].filter(Boolean).length;
 }
@@ -75,9 +74,11 @@ export function PantallaCatalogo({ navigation, route }: PropsTab<'Catalogo'>) {
   const columnas = width >= 620 ? 3 : 2;
   const anchoTarjeta = (width - esp.l * 2 - esp.m * (columnas - 1)) / columnas;
 
+  // F17: el catalogo es el de la sucursal elegida al entrar (solo prendas con stock en ella).
+  const sucursal = useSucursalTienda();
   const consulta = useMemo<FiltrosProducto>(
-    () => ({ ...filtros, q: busquedaDiferida.trim() || undefined }),
-    [filtros, busquedaDiferida],
+    () => ({ ...filtros, id_sucursal: sucursal?.id_sucursal, q: busquedaDiferida.trim() || undefined }),
+    [filtros, busquedaDiferida, sucursal?.id_sucursal],
   );
 
   const { data, isLoading, isError, error, refetch, isRefetching, fetchNextPage, hasNextPage, isFetchingNextPage } =
@@ -89,7 +90,6 @@ export function PantallaCatalogo({ navigation, route }: PropsTab<'Catalogo'>) {
   const { data: categorias } = useCategorias();
   const { data: tallas } = useTallas();
   const { data: coloresCatalogo } = useColores();
-  const { data: sucursales } = useSucursales();
 
   const abrirProducto = useCallback(
     (producto: Producto) =>
@@ -186,7 +186,8 @@ export function PantallaCatalogo({ navigation, route }: PropsTab<'Catalogo'>) {
         ListHeaderComponent={
           productos.length > 0 ? (
             <Text style={estilos.resumen}>
-              {total} {total === 1 ? 'prenda encontrada' : 'prendas encontradas'}
+              {total} {total === 1 ? 'prenda disponible' : 'prendas disponibles'}
+              {sucursal ? ` en ${sucursal.nombre}` : ''}
             </Text>
           ) : null
         }
@@ -194,7 +195,7 @@ export function PantallaCatalogo({ navigation, route }: PropsTab<'Catalogo'>) {
           <Vacio
             icono="search-outline"
             titulo="Sin resultados"
-            detalle="Prueba con otra busqueda o quita algunos filtros."
+            detalle="Intenta otra busqueda o quita algunos filtros."
             accion={activos > 0 || busqueda ? { titulo: 'Limpiar filtros', onPress: limpiar } : undefined}
           />
         }
@@ -269,32 +270,11 @@ export function PantallaCatalogo({ navigation, route }: PropsTab<'Catalogo'>) {
           ))}
         </GrupoFiltro>
 
-        <GrupoFiltro titulo="Disponible en sucursal">
-          {(sucursales ?? []).map((s) => (
-            <Chip
-              key={s.id_sucursal}
-              texto={s.nombre.replace('FashionStore ', '')}
-              activo={borrador.id_sucursal === s.id_sucursal}
-              onPress={() =>
-                setBorrador((f) => ({
-                  ...f,
-                  id_sucursal: f.id_sucursal === s.id_sucursal ? undefined : s.id_sucursal,
-                }))
-              }
-            />
-          ))}
-        </GrupoFiltro>
-
         <GrupoFiltro titulo="Otros">
           <Chip
             texto="Solo promociones"
             activo={Boolean(borrador.solo_promocion)}
             onPress={() => setBorrador((f) => ({ ...f, solo_promocion: !f.solo_promocion || undefined }))}
-          />
-          <Chip
-            texto="Solo con stock"
-            activo={Boolean(borrador.solo_disponibles)}
-            onPress={() => setBorrador((f) => ({ ...f, solo_disponibles: !f.solo_disponibles || undefined }))}
           />
         </GrupoFiltro>
       </Hoja>

@@ -1,5 +1,5 @@
 /**
- * Pago con tarjeta en modo prueba.
+ * Pago con tarjeta (formulario seguro del proveedor de pagos).
  *
  * Se usa Stripe.js (Payment Element) dentro de un WebView en lugar del SDK
  * nativo: @stripe/stripe-react-native necesita un build de desarrollo para el
@@ -47,7 +47,6 @@ function pagina(publishableKey: string, clientSecret: string, monto: string) {
   <div id="payment-element"></div>
   <button id="pagar" type="submit" disabled>Pagar ${monto.replace(/[<>&]/g, '')}</button>
   <div id="error" role="alert"></div>
-  <div id="nota">Modo prueba de Stripe: usa la tarjeta 4242 4242 4242 4242, fecha futura y cualquier CVC.</div>
 </form>
 <script>
   const enviar = (dato) => window.ReactNativeWebView.postMessage(JSON.stringify(dato));
@@ -76,7 +75,7 @@ function pagina(publishableKey: string, clientSecret: string, monto: string) {
       }
     });
   } catch (e) {
-    enviar({ tipo: 'fallo', mensaje: 'No se pudo cargar Stripe.' });
+    enviar({ tipo: 'fallo', mensaje: 'No se pudo cargar el formulario de pago.' });
   }
 </script>
 </body>
@@ -91,7 +90,7 @@ export function PagoStripeWeb({ publishableKey, clientSecret, monto, onPagado, o
   if (Platform.OS === 'web') {
     return (
       <View style={estilos.centro}>
-        <AvisoEnLinea tipo="info" texto="El pago con tarjeta se prueba en el telefono con Expo Go." />
+        <AvisoEnLinea tipo="info" texto="El pago con tarjeta se completa desde la app en tu telefono." />
         <Boton titulo="Volver" variante="secundario" onPress={onCancelar} />
       </View>
     );
@@ -110,7 +109,7 @@ export function PagoStripeWeb({ publishableKey, clientSecret, monto, onPagado, o
 
   return (
     <View style={estilos.contenedor}>
-      <Text style={estilos.titulo}>Pago seguro con Stripe</Text>
+      <Text style={estilos.titulo}>Pago seguro con tarjeta</Text>
       {fallo ? <AvisoEnLinea texto={fallo} /> : null}
       <View style={estilos.web}>
         <WebView
@@ -119,7 +118,7 @@ export function PagoStripeWeb({ publishableKey, clientSecret, monto, onPagado, o
           onMessage={alMensaje}
           javaScriptEnabled
           domStorageEnabled
-          onError={() => setFallo('No pudimos conectar con Stripe. Revisa tu conexion.')}
+          onError={() => setFallo('No pudimos conectar con el servicio de pago. Revisa tu conexion.')}
           onShouldStartLoadWithRequest={(req) => {
             if (req.url.startsWith(RETORNO)) {
               onPagado();
