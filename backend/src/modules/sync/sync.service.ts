@@ -159,7 +159,7 @@ export class SyncService {
           'PAYLOAD_HASH_MISMATCH',
           'Los datos recibidos no coinciden con su hash; la operacion pudo alterarse',
         );
-      outcome = { status: 'CONFIRMED', ...(await this.execute(dto, user)) };
+      outcome = { status: 'CONFIRMED', ...(await this.execute(dto, user, deviceId)) };
     } catch (error) {
       outcome = classify(error);
       if (outcome.status === 'ERROR')
@@ -216,7 +216,11 @@ export class SyncService {
       throw rejected('INVALID_DATE', 'La fecha local esta en el futuro');
   }
 
-  private async execute(dto: SyncOperationDto, user: AuthenticatedUser) {
+  private async execute(
+    dto: SyncOperationDto,
+    user: AuthenticatedUser,
+    deviceId: string,
+  ) {
     switch (dto.type) {
       case 'SALE_CASH': {
         const payload = await this.payload(SaleCashPayloadDto, dto.payload);
@@ -225,6 +229,7 @@ export class SyncService {
             operationId: dto.operationId,
             branchId: dto.branchId,
             recordedAt: new Date(dto.createdAtLocal),
+            deviceId,
             payload,
           },
           user,

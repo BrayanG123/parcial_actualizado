@@ -7,7 +7,8 @@ import { Vacio } from '../../components/Estados';
 import { useAvisos } from '../../context/AvisosContext';
 import { useSesion } from '../../context/SesionContext';
 import { useAlcanceOffline, useDatosOffline, useSincronizacion } from '../../hooks/useOffline';
-import { moneda } from '../../lib/format';
+import { fechaHora, moneda } from '../../lib/format';
+import { cupoVencido } from '../../offline/nucleo';
 import { offlineService } from '../../offline/servicio';
 import type { ItemSeleccion } from '../../offline/tipos';
 import { colores, esp, texto } from '../../theme';
@@ -28,6 +29,7 @@ export function PantallaVender() {
   const [recibido, setRecibido] = useState('');
   const [clienteId, setClienteId] = useState<number | undefined>();
   const [ocupado, setOcupado] = useState(false);
+  const [porVariante, setPorVariante] = useState<number | undefined>(2);
   const candado = useRef(false);
 
   async function accion(fn: () => Promise<void>) {
@@ -64,13 +66,63 @@ export function PantallaVender() {
         <Text style={texto.cuerpo}>
           {sinConexion ? 'Sin conexion: las ventas se guardan en el telefono.' : 'Las ventas se envian automaticamente.'}
         </Text>
+        <Text style={texto.cuerpo}>
+          Antes de quedarte sin internet aparta el stock que venderas. Lo apartado queda reservado para este telefono:
+          ni otra caja ni la tienda en linea pueden venderlo, asi una prenda nunca se vende dos veces.
+        </Text>
+        <Text style={texto.menor}>Apartar por talla y color</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: esp.s }}>
+          {([1, 2, 5, undefined] as const).map((n) => (
+            <Pressable
+              key={n ?? 0}
+              onPress={() => setPorVariante(n)}
+              accessibilityRole="button"
+              style={{
+                paddingHorizontal: esp.m,
+                paddingVertical: esp.xs,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: porVariante === n ? colores.acento : colores.borde,
+              }}
+            >
+              <Text style={texto.cuerpo}>{n ? `Hasta ${n}` : 'Todo el stock libre'}</Text>
+            </Pressable>
+          ))}
+        </View>
         <Boton
-          titulo={descarga ? 'Actualizar datos de mi sucursal' : 'Descargar datos de mi sucursal'}
+          titulo={descarga?.cupo_id ? 'Volver a apartar y descargar' : 'Apartar stock y descargar'}
           icono="cloud-download-outline"
           variante="secundario"
           cargando={ocupado}
-          onPress={() => accion(async () => void (await offlineService.descargar(alcance)))}
+          deshabilitado={sinConexion}
+          onPress={() => accion(async () => void (await offlineService.apartarCupo(alcance, porVariante)))}
         />
+        {descarga?.cupo_id && !cupoVencido(descarga) ? (
+          <Text style={[texto.cuerpo, { color: colores.info }]}>
+            Cupo de este telefono: {descarga.cupo_unidades ?? 0} prendas apartadas hasta{' '}
+            {fechaHora(descarga.cupo_vence ?? '')}. Solo esta caja puede venderlas.
+          </Text>
+        ) : null}
+        {descarga?.cupo_id && cupoVencido(descarga) ? (
+          <Text style={[texto.cuerpo, { color: colores.error }]}>
+            El cupo offline vencio. Conectate, sincroniza y vuelve a apartar stock para seguir vendiendo.
+          </Text>
+        ) : null}
+        {descarga?.turno_id && !descarga.cupo_id ? (
+          <Text style={[texto.cuerpo, { color: colores.error }]}>
+            Sin cupo apartado: otra caja o la tienda en linea podrian vender las mismas prendas y la venta quedaria en
+            conflicto al sincronizar.
+          </Text>
+        ) : null}
+        {descarga?.cupo_id ? (
+          <Boton
+            titulo="Liberar cupo"
+            variante="plano"
+            tamano="compacto"
+            deshabilitado={sinConexion || pendientes.length > 0}
+            onPress={() => accion(async () => void (await offlineService.liberarCupo(alcance, descarga.cupo_id!)))}
+          />
+        ) : null}
         {descarga && <AvisoDescarga descarga={descarga} />}
         {descarga && !descarga.turno_id && (
           <Text style={[texto.cuerpo, { color: colores.error }]}>

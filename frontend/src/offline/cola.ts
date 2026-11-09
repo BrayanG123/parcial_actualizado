@@ -4,7 +4,7 @@
  */
 import { hashPayload } from './hash';
 import { guardarOperaciones, listarOperaciones, stockLocal } from './repositorio';
-import { claveVariante, type OperacionLocal, type SnapshotOffline, type TipoOperacion } from './tipos';
+import { claveVariante, cupoVencido, type OperacionLocal, type SnapshotOffline, type TipoOperacion } from './tipos';
 
 export interface ItemSeleccion {
   productId: number;
@@ -77,6 +77,8 @@ export async function registrarVenta(
   datos: { items: ItemSeleccion[]; recibido: number; clienteId?: number; usuarioId?: number },
 ) {
   if (!snapshot.openShift) throw new Error('Abre tu turno con conexion y vuelve a descargar los datos.');
+  if (cupoVencido(snapshot))
+    throw new Error('Tu cupo offline vencio. Conectate, sincroniza y vuelve a apartar stock para seguir vendiendo.');
   const lineas = validarItems(snapshot, await listarOperaciones(alcance), datos.items);
   const total = totalSeleccion(snapshot, datos.items);
   if (!Number.isFinite(datos.recibido) || datos.recibido < total)

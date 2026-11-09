@@ -13,6 +13,11 @@ import {
 } from '../sales/sale-pricing.js';
 import { SaleCashPayloadDto } from './dto/sync.dto.js';
 import { conflict, rejected } from './sync-outcome.js';
+import {
+  findQuotaForSale,
+  quotaRemaining,
+  useQuota,
+} from './offline-quota.store.js';
 
 const STAFF = [Role.ADMINISTRATOR, Role.BRANCH_MANAGER, Role.CASHIER];
 
@@ -20,6 +25,8 @@ export interface SaleCashContext {
   operationId: string;
   branchId: number;
   recordedAt: Date;
+  /** Dispositivo que registro la venta: consume su cupo offline si lo tiene. */
+  deviceId?: string;
   payload: SaleCashPayloadDto;
 }
 
@@ -41,7 +48,7 @@ export class SyncSalesService {
         'ROLE_NOT_ALLOWED',
         'Solo el personal de caja puede registrar ventas',
       );
-    const { payload, branchId, operationId, recordedAt } = context;
+    const { payload, branchId, operationId, recordedAt, deviceId } = context;
     let items: SaleCashPayloadDto['items'];
     try {
       items = sortedItems(payload.items);
@@ -161,7 +168,19 @@ export class SyncSalesService {
           { expected: total.toNumber(), received: payload.total },
         );
 
+      // Cupo offline del dispositivo: lo apartado para esta caja se vende primero; solo
+      // el resto compite con el stock libre (y puede quedar en conflicto).
+      const quota = deviceId
+        ? await findQuotaForSale(tx, {
+            userId: user.id,
+            shiftId: shift.id,
+            branchId,
+            deviceId,
+            recordedAt,
+          })
+        : null;
       const stocks = [];
+      const fromQuota: number[] = [];
       const shortages: unknown[] = [];
       for (const item of items) {
         const stock = await this.repository.findStock(
@@ -170,18 +189,23 @@ export class SyncSalesService {
           tx,
           false,
         );
+        const own = stock
+          ? Math.min(quotaRemaining(quota, stock.id), item.quantity)
+          : 0;
         const available = stock
           ? stock.physicalQuantity - stock.reservedQuantity
           : 0;
-        if (!stock || available < item.quantity)
+        if (!stock || available < item.quantity - own)
           shortages.push({
             productId: item.productId,
             sizeId: item.sizeId,
             colorId: item.colorId,
             requested: item.quantity,
-            available,
+            available: available + own,
+            ...(quota ? { quota: own } : {}),
           });
         stocks.push(stock);
+        fromQuota.push(own);
       }
       if (shortages.length)
         throw conflict(
@@ -232,7 +256,9 @@ export class SyncSalesService {
       );
       for (const [index, item] of items.entries()) {
         const stock = stocks[index]!;
-        await this.repository.changeStock(stock, -item.quantity, 0, tx);
+        const own = fromQuota[index]!;
+        await this.repository.changeStock(stock, -item.quantity, -own, tx);
+        if (quota) await useQuota(tx, quota.id, stock.id, own);
         await this.repository.movement(
           {
             inventoryId: stock.id,

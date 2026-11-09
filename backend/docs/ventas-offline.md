@@ -190,6 +190,23 @@ La respuesta trae un resultado por operación:
 Los estados `LOCAL`, `SENDING` y `RETRY` existen solo en los clientes. Nunca se borra
 una operación local por haber intentado enviarla.
 
+### Cupo offline (prevención de doble venta)
+
+Dos cajas sin conexión no saben lo que vende la otra. Para que la última prenda no se venda dos
+veces, antes de quedarse sin internet la caja aparta stock:
+
+- `POST /sync/quota` `{ deviceId, perVariant?, branchId? }` (personal con turno abierto): mueve a
+  `cantidad_reservada` hasta `perVariant` unidades libres de cada variante de la sucursal (todo el
+  stock libre si se omite) y responde la misma descarga que `/sync/snapshot`, con
+  `quota: { id, expiresAt, units }` y `available` = lo apartado. Un dispositivo tiene un solo cupo:
+  pedir otro libera el anterior.
+- `GET /sync/snapshot?deviceId=` devuelve el cupo activo de ese dispositivo.
+- Al sincronizar un `SALE_CASH`, la venta consume primero el cupo del mismo usuario, turno,
+  sucursal y dispositivo (registrada antes del vencimiento); solo el excedente usa stock libre.
+- `POST /sync/quota/:id/release`, el cierre del turno o el vencimiento (12 h + 12 h de margen,
+  revisado cada 10 minutos) devuelven lo no vendido al stock libre.
+- La tienda en línea, las reservas y las demás cajas ven lo apartado como reservado.
+
 Códigos: `STOCK_INSUFFICIENT`, `PRICE_CHANGED`, `PRODUCT_INACTIVE`,
 `BRANCH_NOT_AUTHORIZED`, `BRANCH_INACTIVE`, `SHIFT_CLOSED`, `SUBSCRIPTION_INVALID`,
 `RESERVATION_TIME_PASSED`, `CONCURRENT_UPDATE` (conflictos) y `INVALID_DATA`,

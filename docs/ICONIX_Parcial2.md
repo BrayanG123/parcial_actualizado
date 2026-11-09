@@ -346,6 +346,21 @@ funcionalidades del plan).
   4b) Datos inválidos o hash alterado → `REJECTED`. 1a) Error de red o 5xx → `RETRY` con espera
   creciente de 5 s a 5 min (RNF06).
 
+### CU21 Apartar cupo offline (prevención de doble venta)
+- **Actor:** Cajero / Encargado. **Precondición:** turno abierto, con conexión.
+- **Flujo básico:** 1) En la caja offline elige cuánto apartar por talla y color (1, 2, 5 o todo el
+  stock libre). 2) `POST /sync/quota` mueve esas unidades a `cantidad_reservada` y registra el cupo
+  (`cupos_offline` + `detalles_cupo_offline`) para su usuario, turno, sucursal y dispositivo, con
+  vencimiento de 12 h. 3) La descarga devuelve como disponible solo lo apartado. 4) Sin conexión,
+  la caja vende hasta su cupo. 5) Al sincronizar, cada venta consume primero el cupo de ese
+  dispositivo (reduce físico y reservado a la vez); solo el excedente compite con el stock libre.
+- **Alternativos:** 2a) Sin turno abierto → 409. 5a) Otra caja u otro dispositivo vende la misma
+  unidad → no hay stock libre: `CONFLICT STOCK_INSUFFICIENT` (la unidad apartada nunca se vende dos
+  veces). 6) Liberar cupo, cerrar el turno o vencer (+12 h de margen para sincronizar) devuelve lo
+  no vendido al stock libre. 7) Con el cupo vencido el dispositivo no registra más ventas.
+- **Regla:** la tienda en línea y las demás cajas ven lo apartado como reservado; nunca se crea
+  stock ficticio.
+
 ### CU15 Resolver conflicto
 - **Actor:** Cajero / Encargado.
 - **Flujo básico:** 1) Abre "Pendientes" y filtra `CONFLICT`. 2) Ve el código y su explicación
@@ -1479,6 +1494,7 @@ web `frontend/test/`; móvil `mobile/test/`; ML `ml-service/tests/`.
 | II/III. Reserva offline | CU13 | `registrarReserva`, `ReservationPayloadDto` | `offline-sync.test.ts`, `sync.e2e-spec.ts` |
 | II/III. Pendientes, resultados, conservar al reiniciar | CU16 | `PaginaPendientes`, `PantallaPendientes`, IndexedDB / SQLite | `offline-ui.test.tsx` (cerrar y reabrir), `offline-movil.test.mjs` (reabrir archivo) |
 | II/III. Sincronización con estados, reintentos, sin duplicar | CU14 | `sincronizador.ts`, `nucleo.ts`, `SyncService`, `SyncOperation` | `offline-sync.test.ts`, `sync.e2e-spec.ts`, `sync-outcome.spec.ts` |
+| IV. Prevención de doble venta (cupo offline) | CU21 | `OfflineQuotaService`, `offline-quota.store.ts`, `apartarCupo` (web y móvil) | `offline-quota.e2e-spec.ts`, `offline-sync.test.ts`, `offline-movil.test.mjs` |
 | IV. Conflictos de inventario | CU15 | `classify`, `PaginaPendientes` | `sync.e2e-spec.ts`, `exchanges.e2e-spec.ts` (venta offline vs online por la última unidad) |
 | IV. Cambios de prendas en un plazo | CU20 | `ExchangesService`, `/exchanges`, `PaginaCambios`, operación `EXCHANGE` | `exchanges.e2e-spec.ts` (plazo, doble cambio concurrente, kardex) |
 | IV. Aporte propio | CU21 | `CreditNote`, `/credit-notes/:code/redeem` | `exchanges.e2e-spec.ts` |
@@ -1534,8 +1550,11 @@ Duración aproximada: 20 minutos. Preparación: base con seed principal + `npm r
    navegador sin conexión (DevTools), registrar una venta de contado y, como cliente, una reserva.
    Cerrar y reabrir el navegador: siguen en "Pendientes".
 6. **Sincronización y conflicto.** Volver a conectar: la venta queda `CONFIRMED` con su número.
-   Preparar un conflicto: vender offline la última unidad y venderla online desde otra caja antes de
-   reconectar → `CONFLICT STOCK_INSUFFICIENT` con detalle; descartarla (queda visible).
+   **Prevención (cupo offline, CU21):** con una sola unidad libre, la caja 1 pulsa "Apartar stock y
+   descargar"; la tienda en línea y la caja 2 ya la ven agotada. La caja 1 la vende sin conexión y al
+   reconectar se confirma; si la caja 2 la hubiera vendido offline sin cupo → `CONFLICT
+   STOCK_INSUFFICIENT` con detalle; descartarla (queda visible). Al cerrar el turno lo no vendido
+   vuelve al stock.
 7. **Móvil.** En la APK, modo vendedor: descargar, vender sin conexión, cerrar la app, reabrir y
    sincronizar.
 8. **Cambio de prenda.** En "Cambios de prendas", cambiar una prenda de la venta confirmada por otra

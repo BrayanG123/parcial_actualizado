@@ -9,6 +9,7 @@ import { tenantContext } from '../../common/tenant/tenant-context.js';
 import { PrismaService } from '../../database/prisma/prisma.service.js';
 import { priceLine, presentLine } from '../sales/sale-pricing.js';
 import { TenantsService } from '../tenancy/tenants.service.js';
+import { quotaRemaining } from './offline-quota.store.js';
 
 /** Limite de la descarga: evita volcados masivos (RNF09). */
 const MAX_VARIANTS = 2000;
@@ -26,7 +27,11 @@ export class SyncSnapshotService {
     private readonly tenants: TenantsService,
   ) {}
 
-  async snapshot(user: AuthenticatedUser, requestedBranchId?: number) {
+  async snapshot(
+    user: AuthenticatedUser,
+    requestedBranchId?: number,
+    deviceId?: string,
+  ) {
     const staff = user.roles.some((r) =>
       [Role.ADMINISTRATOR, Role.BRANCH_MANAGER, Role.CASHIER].includes(r),
     );
@@ -53,6 +58,20 @@ export class SyncSnapshotService {
       throw new NotFoundException('Sucursal no disponible para operar offline');
 
     const now = new Date();
+    // Cupo offline activo de este dispositivo: lo que puede vender sin conexion es su cupo.
+    const quota =
+      staff && deviceId
+        ? await this.prisma.offlineQuota.findFirst({
+            where: {
+              userId: user.id,
+              deviceId,
+              branchId: branch.id,
+              status: 'ACTIVE',
+              expiresAt: { gt: now },
+            },
+            include: { items: true },
+          })
+        : null;
     const rows = await this.prisma.inventory.findMany({
       where: { branchId: branch.id, product: { active: true } },
       include: {
@@ -101,7 +120,9 @@ export class SyncSnapshotService {
         unitPrice: line.unitPrice,
         discount: line.discount,
         netUnitPrice: line.netUnitPrice,
-        available: Math.max(0, r.physicalQuantity - r.reservedQuantity),
+        available: quota
+          ? quotaRemaining(quota, r.id)
+          : Math.max(0, r.physicalQuantity - r.reservedQuantity),
       };
     });
     // Clientes minimos (id y nombre) solo para el personal que vende.
@@ -143,6 +164,11 @@ export class SyncSnapshotService {
       branches,
       currency: shift?.currency ?? 'BOB',
       openShift: shift,
+      quota: quota && {
+        id: quota.id,
+        expiresAt: quota.expiresAt,
+        units: quota.items.reduce((s, i) => s + i.allocated - i.used, 0),
+      },
       variants,
       clients,
       truncated: rows.length === MAX_VARIANTS,

@@ -53,6 +53,29 @@ describe('repositorio local en IndexedDB', () => {
     await expect(registrarVenta(ALCANCE, snap, { items: [item(1)], recibido: 10 })).rejects.toThrow('efectivo');
   });
 
+  it('con el cupo offline vencido no deja registrar mas ventas hasta volver a apartar', async () => {
+    const vigente = { ...snapshot(), quota: { id: 4, expiresAt: new Date(Date.now() + 3_600_000).toISOString(), units: 3 } };
+    await expect(registrarVenta(ALCANCE, vigente, { items: [item()], recibido: 80 })).resolves.toMatchObject({ estado: 'LOCAL' });
+    const vencido = { ...vigente, quota: { ...vigente.quota, expiresAt: new Date(Date.now() - 1000).toISOString() } };
+    await expect(registrarVenta(ALCANCE, vencido, { items: [item()], recibido: 80 })).rejects.toThrow('cupo offline vencio');
+  });
+
+  it('aparta el cupo con el dispositivo y guarda la descarga con lo apartado', async () => {
+    const snap = snapshot();
+    let pedido: { url?: string; body?: Record<string, unknown> } = {};
+    instancia.defaults.adapter = async (config) => {
+      pedido = { url: config.url, body: JSON.parse(config.data) };
+      const { clave: _c, alcance: _a, branchId: _b, descargadoEn: _d, ...resto } = snap;
+      return respuesta(config, { ...resto, quota: { id: 9, expiresAt: '2100-01-01T00:00:00Z', units: 2 } });
+    };
+    const { apartarCupo } = await import('../src/offline/descarga');
+    const guardado = await apartarCupo(ALCANCE, { id_usuario: 12, nombre: 'Caja', email: 'c@x.bo', roles: [] } as never, 2);
+    expect(pedido.url).toBe('/sync/quota');
+    expect(pedido.body).toMatchObject({ perVariant: 2, deviceId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
+    expect(guardado.quota).toMatchObject({ id: 9, units: 2 });
+    expect((await leerSnapshot(ALCANCE))?.quota?.id).toBe(9);
+  });
+
   it('valida la reserva offline y exige una visita futura', async () => {
     const snap = snapshot();
     await expect(

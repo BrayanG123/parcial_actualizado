@@ -41,6 +41,8 @@ export interface SnapshotServidor {
   openShift: { id: number; register: { id: number; name: string } } | null;
   variants: VarianteDescarga[];
   clients: Array<{ id: number; name: string }>;
+  /** Cupo offline de esta caja: con cupo, `available` es lo apartado para este telefono. */
+  quota?: { id: number; expiresAt: string; units: number } | null;
 }
 
 export interface Descarga {
@@ -53,6 +55,9 @@ export interface Descarga {
   turno_id: number | null;
   caja: string | null;
   empresa_id?: number | null;
+  cupo_id?: number | null;
+  cupo_vence?: string | null;
+  cupo_unidades?: number | null;
 }
 
 export interface VarianteLocal {

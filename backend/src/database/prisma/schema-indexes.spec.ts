@@ -51,4 +51,5 @@ const REVIEWED_GLOBAL_UNIQUES = [
   'CashRegister(branchId, name)',
   'CashShift(userId, openingKey)',
   'Sale(createdById, idempotencyKey)',
+  'OfflineQuotaItem(quotaId, inventoryId)',
 ];

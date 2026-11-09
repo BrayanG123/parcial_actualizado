@@ -10,6 +10,7 @@ import { Prisma } from '../../generated/prisma/client.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { Role } from '../../common/enums/role.enum.js';
 import { SalesRepository } from '../sales/sales.repository.js';
+import { releaseQuotas } from '../sync/offline-quota.store.js';
 import {
   CloseShiftDto,
   CreateRegisterDto,
@@ -180,6 +181,8 @@ export class CashService {
       });
       if (updated.count !== 1)
         throw new ConflictException('El turno cambio. Consulta su estado.');
+      // Lo apartado para vender offline y no vendido vuelve al stock libre.
+      await releaseQuotas(tx, { shiftId: id });
       return this.present(
         await tx.cashShift.findUniqueOrThrow({ where: { id }, include }),
       );

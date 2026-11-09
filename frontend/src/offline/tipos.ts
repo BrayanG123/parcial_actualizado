@@ -98,7 +98,16 @@ export interface SnapshotOffline {
   variants: VarianteSnapshot[];
   clients: Array<{ id: number; name: string; wholesale: boolean }>;
   truncated?: boolean;
+  /**
+   * Cupo offline de esta caja: unidades apartadas que solo ella puede vender sin conexion.
+   * Con cupo, `available` de cada variante es lo apartado (no el stock libre de la sucursal).
+   */
+  quota?: { id: number; expiresAt: string; units: number } | null;
 }
+
+/** El cupo vencio: hay que reconectarse y volver a apartar antes de seguir vendiendo. */
+export const cupoVencido = (s: Pick<SnapshotOffline, 'quota'>, ahora = Date.now()) =>
+  Boolean(s.quota && Date.parse(s.quota.expiresAt) <= ahora);
 
 export const PENDIENTES: EstadoOperacion[] = ['LOCAL', 'SENDING', 'RETRY', 'CONFLICT'];
 

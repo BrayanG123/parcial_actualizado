@@ -206,3 +206,24 @@ test('migracion v2: una base v1 con datos conserva sus operaciones y agrega empr
   assert.equal(envio.tenantId, 1);
   assert.equal(envio.userId, 12);
 });
+
+test('cupo offline: guarda lo apartado y no deja vender con el cupo vencido', async () => {
+  const db = abrir();
+  await migrar(db);
+  const futuro = new Date(Date.now() + 3600_000).toISOString();
+  await guardarSnapshot(db, A, snapshot({ quota: { id: 5, expiresAt: futuro, units: 3 } }));
+  const info = await descarga(db, A, 2);
+  assert.equal(info.cupo_id, 5);
+  assert.equal(info.cupo_unidades, 3);
+  await registrar(db, A, { tipo: 'SALE_CASH', sucursalId: 2, items: [item()], recibido: 80 });
+  // Al volver a descargar con un cupo vencido no se puede seguir vendiendo.
+  const pasado = new Date(Date.now() - 1000).toISOString();
+  await guardarSnapshot(db, A, snapshot({ quota: { id: 5, expiresAt: pasado, units: 2 } }));
+  await assert.rejects(
+    registrar(db, A, { tipo: 'SALE_CASH', sucursalId: 2, items: [item()], recibido: 80 }),
+    /cupo offline vencio/,
+  );
+  // Sin cupo (liberado) se limpia la informacion.
+  await guardarSnapshot(db, A, snapshot());
+  assert.equal((await descarga(db, A, 2)).cupo_id, null);
+});

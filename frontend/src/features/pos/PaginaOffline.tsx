@@ -6,7 +6,8 @@ import { useAuth } from '../../context/AuthContext';
 import { fechaHora, moneda } from '../../lib/format';
 import { useAlcanceOffline, useDatosOffline, useSincronizacionAutomatica } from '../../hooks/useOffline';
 import { registrarVenta, totalSeleccion, type ItemSeleccion } from '../../offline/cola';
-import { descargarSnapshot } from '../../offline/descarga';
+import { apartarCupo, liberarCupo } from '../../offline/descarga';
+import { cupoVencido } from '../../offline/tipos';
 import type { OperacionLocal } from '../../offline/tipos';
 import { AvisoAntiguedad, BadgeOperacion, CatalogoOffline, DetalleConflicto } from '../offline/componentes';
 
@@ -33,6 +34,7 @@ function CajaOffline() {
   const candado = useRef(false);
   const [error, setError] = useState('');
   const [ticket, setTicket] = useState<OperacionLocal | null>(null);
+  const [porVariante, setPorVariante] = useState('2');
 
   async function accion(fn: () => Promise<unknown>) {
     if (candado.current) return;
@@ -83,17 +85,57 @@ function CajaOffline() {
       <section className="fs-tarjeta fs-tarjeta--pad fs-pila">
         <h2 className="fs-titulo-seccion">1. Preparar con conexion</h2>
         <p>
-          Abre tu turno en Punto de venta y descarga el catalogo de tu sucursal. Las ventas offline son de contado; el
-          servidor confirma precio y stock al sincronizar.
+          Abre tu turno en Punto de venta y aparta el stock que venderas sin internet. Lo apartado queda reservado
+          para esta caja: ni otra caja ni la tienda en linea pueden venderlo, asi una prenda nunca se vende dos veces.
+          Al cerrar el turno o liberar el cupo, lo no vendido vuelve al stock.
         </p>
-        <button
-          type="button"
-          className="fs-btn fs-btn--acento"
-          disabled={ocupado || !enLinea || !alcance}
-          onClick={() => accion(() => descargarSnapshot(alcance!, usuario!))}
-        >
-          {snapshot ? 'Actualizar datos descargados' : 'Descargar datos de mi sucursal'}
-        </button>
+        <div className="fs-fila" style={{ gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <label className="fs-campo" style={{ minWidth: 220 }}>
+            Apartar por talla y color
+            <select className="fs-select" value={porVariante} onChange={(e) => setPorVariante(e.target.value)}>
+              <option value="1">Hasta 1 unidad</option>
+              <option value="2">Hasta 2 unidades</option>
+              <option value="5">Hasta 5 unidades</option>
+              <option value="">Todo el stock libre</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            className="fs-btn fs-btn--acento"
+            disabled={ocupado || !enLinea || !alcance}
+            onClick={() => accion(() => apartarCupo(alcance!, usuario!, porVariante ? Number(porVariante) : undefined))}
+          >
+            {snapshot?.quota ? 'Volver a apartar y descargar' : 'Apartar stock y descargar'}
+          </button>
+          {snapshot?.quota && (
+            <button
+              type="button"
+              className="fs-btn fs-btn--contorno"
+              disabled={ocupado || !enLinea || pendientes.length > 0}
+              title={pendientes.length > 0 ? 'Sincroniza las ventas pendientes antes de liberar' : undefined}
+              onClick={() => accion(() => liberarCupo(alcance!, usuario!, snapshot))}
+            >
+              Liberar cupo
+            </button>
+          )}
+        </div>
+        {snapshot?.quota && !cupoVencido(snapshot) && (
+          <div className="fs-alerta fs-alerta--info">
+            Cupo de esta caja: {snapshot.quota.units} {snapshot.quota.units === 1 ? 'prenda apartada' : 'prendas apartadas'}{' '}
+            hasta {fechaHora(snapshot.quota.expiresAt)}. Solo esta caja puede venderlas.
+          </div>
+        )}
+        {snapshot && cupoVencido(snapshot) && (
+          <div className="fs-alerta fs-alerta--error">
+            El cupo offline vencio. Conectate, sincroniza y vuelve a apartar stock para seguir vendiendo.
+          </div>
+        )}
+        {snapshot?.openShift && !snapshot.quota && (
+          <div className="fs-alerta fs-alerta--error">
+            Sin cupo apartado: otra caja o la tienda en linea podrian vender las mismas prendas y la venta quedaria en
+            conflicto al sincronizar. Aparta stock antes de quedarte sin internet.
+          </div>
+        )}
         {snapshot && <AvisoAntiguedad snapshot={snapshot} />}
         {snapshot && !snapshot.openShift && (
           <div className="fs-alerta fs-alerta--error">

@@ -70,7 +70,15 @@ export const MIGRACIONES: string[] = [
   `ALTER TABLE descargas ADD COLUMN empresa_id INTEGER;
    ALTER TABLE operaciones ADD COLUMN empresa_id INTEGER;
    ALTER TABLE operaciones ADD COLUMN usuario_id INTEGER;`,
+  // v3: cupo offline de la caja (stock apartado en el servidor solo para este telefono).
+  `ALTER TABLE descargas ADD COLUMN cupo_id INTEGER;
+   ALTER TABLE descargas ADD COLUMN cupo_vence TEXT;
+   ALTER TABLE descargas ADD COLUMN cupo_unidades INTEGER;`,
 ];
+
+/** El cupo vencio: hay que reconectarse y volver a apartar antes de seguir vendiendo. */
+export const cupoVencido = (d: Pick<Descarga, 'cupo_vence'> | null, ahora = Date.now()) =>
+  Boolean(d?.cupo_vence && Date.parse(d.cupo_vence) <= ahora);
 
 export async function migrar(db: BaseDatos): Promise<number> {
   await db.ejecutar('PRAGMA foreign_keys = ON');
@@ -160,6 +168,11 @@ export async function guardarSnapshot(db: BaseDatos, alcance: string, s: Snapsho
     await tx.correr('UPDATE descargas SET empresa_id = ? WHERE alcance = ? AND sucursal_id = ?', [
       s.tenant?.id ?? null, alcance, s.branch.id,
     ]);
+    // Con cupo, `available` de cada variante ya es lo apartado para este telefono.
+    await tx.correr(
+      'UPDATE descargas SET cupo_id = ?, cupo_vence = ?, cupo_unidades = ? WHERE alcance = ? AND sucursal_id = ?',
+      [s.quota?.id ?? null, s.quota?.expiresAt ?? null, s.quota?.units ?? null, alcance, s.branch.id],
+    );
     await tx.correr(
       `INSERT INTO meta (clave, valor) VALUES (?, ?) ON CONFLICT (clave) DO UPDATE SET valor = excluded.valor`,
       [`ultima-sucursal:${alcance}`, String(s.branch.id)],
@@ -173,7 +186,7 @@ export async function descarga(db: BaseDatos, alcance: string, sucursalId?: numb
     Number((await db.primero<{ valor: string }>('SELECT valor FROM meta WHERE clave = ?', [`ultima-sucursal:${alcance}`]))?.valor ?? 0);
   return db.primero<Descarga>(
     `SELECT d.sucursal_id, s.nombre AS sucursal, d.version, d.generado_en, d.descargado_en, d.moneda, d.turno_id, d.caja,
-       d.empresa_id
+       d.empresa_id, d.cupo_id, d.cupo_vence, d.cupo_unidades
      FROM descargas d JOIN sucursales s ON s.alcance = d.alcance AND s.id = d.sucursal_id
      WHERE d.alcance = ? AND d.sucursal_id = ?`,
     [alcance, id],
@@ -265,6 +278,8 @@ export async function registrar(db: BaseDatos, alcance: string, datos: NuevaOper
     if (datos.tipo === 'SALE_CASH') {
       const turno = datos.turnoId ?? info.turno_id;
       if (!turno) throw new Error('Abre tu turno con conexion y vuelve a descargar los datos.');
+      if (cupoVencido(info))
+        throw new Error('Tu cupo offline vencio. Conectate, sincroniza y vuelve a apartar stock para seguir vendiendo.');
       datos.turnoId = turno;
       if (!Number.isFinite(datos.recibido) || (datos.recibido ?? 0) < total)
         throw new Error('El efectivo recibido debe cubrir el total.');

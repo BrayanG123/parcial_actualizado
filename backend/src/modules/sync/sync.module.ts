@@ -7,6 +7,8 @@ import { SyncSalesService } from './sync-sales.service.js';
 import { SyncSnapshotService } from './sync-snapshot.service.js';
 import { SyncController } from './sync.controller.js';
 import { SyncService } from './sync.service.js';
+import { OfflineQuotaService } from './offline-quota.service.js';
+import { OfflineQuotaExpirationService } from './offline-quota-expiration.service.js';
 
 @Module({
   imports: [
@@ -16,6 +18,12 @@ import { SyncService } from './sync.service.js';
     ExchangesModule,
   ],
   controllers: [SyncController],
-  providers: [SyncService, SyncSalesService, SyncSnapshotService],
+  providers: [
+    SyncService,
+    SyncSalesService,
+    SyncSnapshotService,
+    OfflineQuotaService,
+    OfflineQuotaExpirationService,
+  ],
 })
 export class SyncModule {}

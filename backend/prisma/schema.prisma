@@ -160,6 +160,8 @@ model Tenant {
   pushTokens         PushToken[]
   syncOperations     SyncOperation[]
   syncLogs           SyncLog[]
+  offlineQuotas      OfflineQuota[]
+  offlineQuotaItems  OfflineQuotaItem[]
   exchanges          Exchange[]
   creditNotes        CreditNote[]
 
@@ -540,21 +542,22 @@ model ProductColor {
 
 model Inventory {
   /// Empresa (tenant) propietaria.
-  tenantId         Int                 @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
-  tenant           Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  id               Int                 @id @default(autoincrement()) @map("id_inventario")
-  branchId         Int                 @map("id_sucursal")
-  productId        Int                 @map("id_producto")
-  sizeId           Int                 @map("id_talla")
-  colorId          Int                 @map("id_color")
-  physicalQuantity Int                 @default(0) @map("cantidad_fisica")
-  reservedQuantity Int                 @default(0) @map("cantidad_reservada")
-  updatedAt        DateTime            @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
-  branch           Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  product          Product             @relation(fields: [productId], references: [id], onDelete: Restrict)
-  size             Size                @relation(fields: [sizeId], references: [id], onDelete: Restrict)
-  color            Color               @relation(fields: [colorId], references: [id], onDelete: Restrict)
-  movements        InventoryMovement[]
+  tenantId          Int                 @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  id                Int                 @id @default(autoincrement()) @map("id_inventario")
+  branchId          Int                 @map("id_sucursal")
+  productId         Int                 @map("id_producto")
+  sizeId            Int                 @map("id_talla")
+  colorId           Int                 @map("id_color")
+  physicalQuantity  Int                 @default(0) @map("cantidad_fisica")
+  reservedQuantity  Int                 @default(0) @map("cantidad_reservada")
+  updatedAt         DateTime            @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
+  branch            Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  product           Product             @relation(fields: [productId], references: [id], onDelete: Restrict)
+  size              Size                @relation(fields: [sizeId], references: [id], onDelete: Restrict)
+  color             Color               @relation(fields: [colorId], references: [id], onDelete: Restrict)
+  movements         InventoryMovement[]
+  offlineQuotaItems OfflineQuotaItem[]
 
   @@unique([branchId, productId, sizeId, colorId])
   @@index([productId, sizeId, colorId])
@@ -719,6 +722,7 @@ model CashShift {
   user           User           @relation(fields: [userId], references: [id], onDelete: Restrict)
   sales          Sale[]
   offlineBatches OfflineBatch[]
+  offlineQuotas  OfflineQuota[]
 
   @@unique([userId, openingKey])
   @@index([registerId, openedAt])
@@ -1088,4 +1092,49 @@ model CreditNote {
   @@unique([tenantId, code])
   @@index([tenantId, clientId])
   @@map("notas_credito")
+}
+
+enum OfflineQuotaStatus {
+  ACTIVE
+  RELEASED
+}
+
+/// Cupo offline: unidades apartadas (cantidad_reservada) para que una caja venda sin
+/// conexion. Solo ese dispositivo puede venderlas, asi la ultima prenda no se vende dos veces.
+model OfflineQuota {
+  tenantId   Int                @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  id         Int                @id @default(autoincrement()) @map("id_cupo")
+  branchId   Int                @map("id_sucursal")
+  userId     Int                @map("id_usuario")
+  shiftId    Int                @map("id_turno")
+  deviceId   String             @map("id_dispositivo") @db.Uuid
+  status     OfflineQuotaStatus @default(ACTIVE) @map("estado")
+  expiresAt  DateTime           @map("fecha_vencimiento") @db.Timestamptz(3)
+  createdAt  DateTime           @default(now()) @map("fecha_creacion") @db.Timestamptz(3)
+  releasedAt DateTime?          @map("fecha_liberacion") @db.Timestamptz(3)
+  shift      CashShift          @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  items      OfflineQuotaItem[]
+
+  @@index([tenantId, status, expiresAt])
+  @@index([tenantId, userId, deviceId, status])
+  @@index([shiftId])
+  @@map("cupos_offline")
+}
+
+model OfflineQuotaItem {
+  tenantId    Int          @default(dbgenerated("(current_setting('app.tenant_id'::text))::integer")) @map("id_empresa")
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  id          Int          @id @default(autoincrement()) @map("id_detalle_cupo")
+  quotaId     Int          @map("id_cupo")
+  inventoryId Int          @map("id_inventario")
+  allocated   Int          @map("cantidad_apartada")
+  used        Int          @default(0) @map("cantidad_vendida")
+  quota       OfflineQuota @relation(fields: [quotaId], references: [id], onDelete: Cascade)
+  inventory   Inventory    @relation(fields: [inventoryId], references: [id], onDelete: Restrict)
+
+  @@unique([quotaId, inventoryId])
+  @@index([tenantId])
+  @@index([inventoryId])
+  @@map("detalles_cupo_offline")
 }

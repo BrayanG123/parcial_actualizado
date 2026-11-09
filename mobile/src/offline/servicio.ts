@@ -25,12 +25,40 @@ const transporte: Transporte = {
     api.post<{ results: ResultadoServidor[] }>('/sync/operations', { deviceId, operations }),
 };
 
+async function guardar(alcance: string, snapshot: SnapshotServidor) {
+  await nucleo.guardarSnapshot(await abrirBase(), alcance, snapshot);
+  notificar();
+  return snapshot;
+}
+
 export const offlineService = {
   async descargar(alcance: string, sucursalId?: number) {
-    const snapshot = await api.get<SnapshotServidor>('/sync/snapshot', sucursalId ? { branchId: sucursalId } : undefined);
-    await nucleo.guardarSnapshot(await abrirBase(), alcance, snapshot);
-    notificar();
-    return snapshot;
+    const db = await abrirBase();
+    const deviceId = await nucleo.idDispositivo(db);
+    const snapshot = await api.get<SnapshotServidor>('/sync/snapshot', {
+      ...(sucursalId ? { branchId: sucursalId } : {}),
+      deviceId,
+    });
+    return guardar(alcance, snapshot);
+  },
+  /**
+   * Cupo offline: el servidor aparta para este telefono hasta `porVariante` unidades de cada
+   * talla y color (todo el stock libre si no se indica). Solo esta caja puede venderlas sin
+   * conexion, asi otra caja o la tienda en linea no venden la misma ultima prenda.
+   */
+  async apartarCupo(alcance: string, porVariante?: number) {
+    const deviceId = await nucleo.idDispositivo(await abrirBase());
+    const snapshot = await api.post<SnapshotServidor>('/sync/quota', {
+      deviceId,
+      ...(porVariante ? { perVariant: porVariante } : {}),
+    });
+    return guardar(alcance, snapshot);
+  },
+  /** Devuelve al stock libre lo apartado y no vendido. */
+  async liberarCupo(alcance: string, cupoId: number) {
+    const deviceId = await nucleo.idDispositivo(await abrirBase());
+    const snapshot = await api.post<SnapshotServidor>(`/sync/quota/${cupoId}/release`, { deviceId });
+    return guardar(alcance, snapshot);
   },
   async datos(alcance: string, sucursalId?: number, busqueda = '') {
     const db = await abrirBase();

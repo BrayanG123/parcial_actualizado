@@ -142,4 +142,18 @@ export class SyncLogsQueryDto {
 
 export class SnapshotQueryDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) branchId?: number;
+  /** Con el dispositivo, el personal recibe como disponible su cupo offline activo. */
+  @IsOptional() @IsUUID('4') deviceId?: string;
+}
+
+/** Cupo offline: unidades que la caja aparta para vender sin conexion. */
+export class CreateQuotaDto {
+  @IsUUID('4') deviceId!: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) branchId?: number;
+  /** Maximo por variante (talla y color); sin valor se aparta todo el stock libre. */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) perVariant?: number;
+}
+
+export class ReleaseQuotaDto {
+  @IsOptional() @IsUUID('4') deviceId?: string;
 }

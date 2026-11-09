@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseIntPipe,
   ParseUUIDPipe,
   Post,
   Query,
@@ -22,12 +23,15 @@ import {
   RequiresFeature,
 } from '../tenancy/plan.decorators.js';
 import {
+  CreateQuotaDto,
+  ReleaseQuotaDto,
   SnapshotQueryDto,
   SyncBatchDto,
   SyncLogsQueryDto,
 } from './dto/sync.dto.js';
 import { SyncSnapshotService } from './sync-snapshot.service.js';
 import { SyncService } from './sync.service.js';
+import { OfflineQuotaService } from './offline-quota.service.js';
 
 /** Contrato unico de sincronizacion offline para la PWA y la app movil. */
 @Controller('sync')
@@ -38,6 +42,7 @@ export class SyncController {
   constructor(
     private readonly sync: SyncService,
     private readonly snapshots: SyncSnapshotService,
+    private readonly quotas: OfflineQuotaService,
   ) {}
 
   /** Datos para operar offline en una sucursal (catalogo, precios, stock, clientes). */
@@ -46,7 +51,32 @@ export class SyncController {
     @Query() query: SnapshotQueryDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.snapshots.snapshot(user, query.branchId);
+    return this.snapshots.snapshot(user, query.branchId, query.deviceId);
+  }
+
+  /**
+   * Aparta stock para vender sin conexion (cupo offline) y devuelve la descarga con el
+   * cupo como disponible. Solo esa caja puede vender esas unidades mientras este activo.
+   */
+  @Post('quota')
+  @Roles(Role.ADMINISTRATOR, Role.BRANCH_MANAGER, Role.CASHIER)
+  createQuota(
+    @Body() dto: CreateQuotaDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.quotas.create(user, dto);
+  }
+
+  /** Devuelve al stock libre lo apartado y no vendido. */
+  @Post('quota/:id/release')
+  @HttpCode(200)
+  @Roles(Role.ADMINISTRATOR, Role.BRANCH_MANAGER, Role.CASHIER)
+  releaseQuota(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ReleaseQuotaDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.quotas.release(user, id, dto.deviceId);
   }
 
   /**

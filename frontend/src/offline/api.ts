@@ -29,8 +29,20 @@ export interface ResultadoServidor {
 type SnapshotBackend = Omit<SnapshotOffline, 'clave' | 'alcance' | 'branchId' | 'descargadoEn'>;
 
 export const syncApi = {
-  snapshot: (branchId?: number) =>
-    api.get<SnapshotBackend>('/sync/snapshot', branchId ? { branchId } : undefined),
+  snapshot: (branchId?: number, deviceId?: string) =>
+    api.get<SnapshotBackend>('/sync/snapshot', {
+      ...(branchId ? { branchId } : {}),
+      ...(deviceId ? { deviceId } : {}),
+    }),
+  /** Aparta stock para esta caja (cupo offline) y devuelve la descarga con el cupo. */
+  apartarCupo: (deviceId: string, perVariant?: number, branchId?: number) =>
+    api.post<SnapshotBackend>('/sync/quota', {
+      deviceId,
+      ...(perVariant ? { perVariant } : {}),
+      ...(branchId ? { branchId } : {}),
+    }),
+  liberarCupo: (id: number, deviceId: string) =>
+    api.post<SnapshotBackend>(`/sync/quota/${id}/release`, { deviceId }),
   enviar: (deviceId: string, operations: OperacionEnvio[]) =>
     api.post<{ deviceId: string; serverTime: string; results: ResultadoServidor[] }>('/sync/operations', {
       deviceId,
