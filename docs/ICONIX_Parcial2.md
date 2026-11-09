@@ -1523,7 +1523,7 @@ web `frontend/test/`; móvil `mobile/test/`; ML `ml-service/tests/`.
 | RNF07 Mantenibilidad | Capas: páginas / servicios / repositorios / sincronizador; núcleo móvil puro con `BaseDatos` inyectada | Estructura de `src/offline` (web y móvil), §6 |
 | RNF08 Compatibilidad | PWA en navegadores modernos (Web Locks con respaldo); Expo SDK 57 conserva push, cámara y RA | Playwright (Chromium) F5/F7/F8/F9; `push.test.mjs` |
 | RNF09 Rendimiento | Índices por `tenantId`, índice de reportes `(id_empresa, estado, fecha_confirmacion)`, descarga offline acotada, paginación | `schema-indexes.spec.ts`; mediciones en `backend/README.md` |
-| RNF10 Observabilidad | `SyncLog` por intento (estado, código, latencia, sin payload); `GET /sync/logs`; logs sin datos de consulta | `sync.e2e-spec.ts`, `http-exception.filter.spec.ts` |
+| RNF10 Observabilidad | `SyncLog` por intento (estado, código, latencia, sin payload); `GET /sync/logs` (filtros por resultado, tipo, código y sucursal; nombre del personal y detalle del conflicto, sin payload ni correo); pantalla **Bitácora de sincronización** (`/admin/bitacora-sync`, `/sucursal/bitacora-sync`: el encargado solo ve su sucursal); logs sin datos de consulta | `sync.e2e-spec.ts`, `bitacora-sync.test.tsx`, `http-exception.filter.spec.ts` |
 | RNF11 Calidad | Backend 242 unitarias + 144 e2e; web 194; móvil 24; ml-service 12 | `PLAN_PARCIAL2.md` §1.4 |
 | RNF12 Coherencia documental | Revisión F12 de §1–4 contra el código (tabla 4.9); §5–8 con nombres reales | Este documento |
 

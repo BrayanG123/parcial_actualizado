@@ -1,29 +1,31 @@
 # Manual: desplegar el backend de FashionStore en Azure
 
-> **Despliegue vigente (01/10/2026)** — suscripción `Azure subscription 1`, grupo `fashionstore-rg`.
+> **Despliegue vigente (09/11/2026)** — cuenta nueva (prueba gratuita), suscripción `Azure subscription 1`, grupo `fashionstore-rg`.
 >
 > | Recurso | Nombre | Región |
 > |---|---|---|
-> | Registro de imágenes | `fashionstoreacr` (imágenes `backend` y `frontend`, etiqueta `20261001-1804`) | centralus |
-> | PostgreSQL 17 B1ms | `fashionstore-pg-3860`, base `tienda_ropa`, usuario `fsadmin` | centralus |
-> | Entorno Container Apps | `fashionstore-env` | eastus2 |
-> | API | `https://fashionstore-backend.delightfulflower-0ec0e697.eastus2.azurecontainerapps.io/api/v1` | eastus2 |
-> | Web | `https://fashionstore-frontend.delightfulflower-0ec0e697.eastus2.azurecontainerapps.io` | eastus2 |
-> | Identidad AcrPull | `fashionstore-acr-pull` | centralus |
+> | Registro de imágenes | `fsacr7765` (imágenes `backend`, `frontend` y `ml`, etiqueta `20261109-1637`) | eastus2 |
+> | PostgreSQL 17 B1ms | `fashionstore-pg-7765`, base `tienda_ropa`, usuario `fsadmin` | centralus |
+> | Entorno Container Apps | `fashionstore-env` | eastus |
+> | API | `https://fashionstore-backend.thankfulrock-c0942cba.eastus.azurecontainerapps.io/api/v1` | eastus |
+> | Web | `https://fashionstore-frontend.thankfulrock-c0942cba.eastus.azurecontainerapps.io` | eastus |
+> | ML (ingreso interno) | `fashionstore-ml` | eastus |
+> | Identidad AcrPull | `fashionstore-acr-pull` | eastus |
 >
-> Datos restaurados con `pg_restore` desde el respaldo en formato custom del 30/09/2026
-> (12 migraciones, 158 usuarios, 95 productos, 441 ventas, 18 reservas); el archivo de respaldo
-> no se versiona (`.gitignore`). Secretos (BD, JWT, Stripe, Gemini, Firebase) guardados como
-> secretos de la Container App; Cloudinary sin configurar.
+> Datos: respaldo SQL plano `respaldo_antes_cupo_offline_20261109.sql` (sin líneas `OWNER TO`) restaurado con
+> `psql`; al arrancar, el backend aplicó la migración `20261109000000_offline_quotas` (19 migraciones en total).
+> Secretos (BD, JWT, Stripe de prueba, Gemini, Cloudinary, Firebase, token del ML) guardados como secretos de
+> la Container App; el frontend llama a `/api` en su mismo origen y nginx reenvía al backend (`API_UPSTREAM`).
+> Una réplica por app (`min=max=1`). El ML no tiene volumen: los modelos entrenados se pierden al reiniciar.
 >
-> Limitaciones encontradas en esta suscripción, que cambian los pasos de este manual:
-> - `az acr build` está bloqueado (`TasksOperationsNotAllowed`): las imágenes se compilan con
->   Docker local (`docker build --platform linux/amd64`) y se suben con `az acr login` + `docker push`.
-> - Solo se permite **un** entorno de Container Apps por suscripción.
-> - centralus no tenía capacidad para entornos nuevos (`AKSCapacityHeavyUsage`); por eso el
->   entorno está en eastus2 y PostgreSQL en centralus (la regla `0.0.0.0` permite el acceso).
-> - En Azure CLI 2.90 `postgres flexible-server db create` usa `-n` para la base y
->   `firewall-rule create` usa `-s` para el servidor; `--high-availability` no existe en `create`.
+> Limitaciones de esta suscripción (prueba gratuita):
+> - `az acr build` bloqueado (`TasksOperationsNotAllowed`): construir con Docker local
+>   (`docker build --platform linux/amd64`), `az acr login` y `docker push`; reintentar el push si cae el DNS.
+> - eastus2 sin capacidad para el entorno y restringido para PostgreSQL (por eso eastus y centralus).
+> - `az role assignment create` falla con `MissingSubscription`; el rol AcrPull se asignó con `az rest`.
+> - Con Git Bash, usar `MSYS_NO_PATHCONV=1` o los IDs de recursos (`/subscriptions/...`) se rompen.
+> - La prueba gratuita caduca (normalmente a los 30 días) y desactiva los recursos.
+> - Pendiente: Stripe webhook apunta a la URL anterior; no se probó el login con usuarios reales.
 
 Esta guía despliega la imagen que ya está publicada:
 

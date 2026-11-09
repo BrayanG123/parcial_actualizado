@@ -325,10 +325,15 @@ export class SyncService {
       ? undefined
       : ((await this.prisma.employee.findUnique({ where: { userId: user.id } }))
           ?.branchId ?? -1);
+    const sucursal = branchId ?? query.branchId;
+    const operacion: Prisma.SyncOperationWhereInput = {
+      ...(sucursal !== undefined ? { branchId: sucursal } : {}),
+      ...(query.type ? { type: query.type } : {}),
+    };
     const where: Prisma.SyncLogWhereInput = {
       ...(query.status ? { status: query.status } : {}),
       ...(query.errorCode ? { errorCode: query.errorCode } : {}),
-      ...(branchId !== undefined ? { syncOperation: { branchId } } : {}),
+      ...(Object.keys(operacion).length ? { syncOperation: operacion } : {}),
     };
     const [data, total, summary] = await Promise.all([
       this.prisma.syncLog.findMany({
@@ -342,6 +347,14 @@ export class SyncService {
               deviceId: true,
               userId: true,
               status: true,
+              createdAtLocal: true,
+              attempts: true,
+              resultCode: true,
+              resultMessage: true,
+              // Detalle del conflicto (variantes, cantidades, precios): sin el payload ni datos personales.
+              resultDetail: true,
+              resourceType: true,
+              resourceId: true,
             },
           },
         },
@@ -352,12 +365,21 @@ export class SyncService {
       this.prisma.syncLog.count({ where }),
       this.prisma.syncOperation.groupBy({
         by: ['status', 'resultCode'],
-        where: branchId !== undefined ? { branchId } : {},
+        where: operacion,
         _count: { _all: true },
       }),
     ]);
+    // Nombre del personal que sincronizo (sin correo ni otros datos).
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: [...new Set(data.map((l) => l.syncOperation.userId))] } },
+      select: { id: true, name: true },
+    });
+    const names = new Map(users.map((u) => [u.id, u.name]));
     return {
-      data,
+      data: data.map((l) => ({
+        ...l,
+        syncOperation: { ...l.syncOperation, userName: names.get(l.syncOperation.userId) ?? null },
+      })),
       summary: summary.map((row) => ({
         status: row.status,
         code: row.resultCode,

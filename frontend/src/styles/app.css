@@ -439,3 +439,11 @@
 .fs-sucursal-opcion__accion { margin-top: 8px; color: var(--fs-acento); font-weight: 600; }
 .fs-otras-sucursales { list-style: none; padding: 0; margin: 8px 0 0; gap: 8px; }
 .fs-chip--agotado { background: var(--fs-crema-2); }
+
+/* ---------- bitacora de sincronizacion (RNF10) ---------- */
+.fs-bitacora__resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--fs-esp-3); margin-bottom: var(--fs-esp-4); }
+.fs-bitacora__dato { display: flex; flex-direction: column; gap: 2px; text-align: left; cursor: pointer; font: inherit; color: inherit; border: 1px solid var(--fs-borde); }
+.fs-bitacora__dato strong { font-family: var(--fs-fuente-titulo); font-size: 1.6rem; }
+.fs-bitacora__dato--activo { border: 2px solid var(--fs-acento); }
+.fs-bitacora__id { font-family: monospace; }
+.fs-bitacora__detalle td { background: var(--fs-crema); }

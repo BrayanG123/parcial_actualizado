@@ -46,6 +46,7 @@ const PaginaMovimientos = lazy(() => import('./features/inventory/PaginaMovimien
 const PaginaReportes = lazy(() => import('./features/reports/PaginaReportes'));
 const PaginaReporteIA = lazy(() => import('./features/reports/PaginaReporteIA'));
 const PaginaAnalitica = lazy(() => import('./features/analitica/PaginaAnalitica'));
+const PaginaBitacoraSync = lazy(() => import('./features/offline/PaginaBitacoraSync'));
 
 /* SaaS multitenant */
 const PaginaEmpresas = lazy(() => import('./features/saas/PaginaEmpresas'));
@@ -220,6 +221,7 @@ export default function App() {
           <Route path="reportes" element={<PaginaReportes />} />
           <Route path="reportes-ia" element={<PaginaReporteIA />} />
           <Route path="analitica" element={<PaginaAnalitica />} />
+          <Route path="bitacora-sync" element={<PaginaBitacoraSync />} />
         </Route>
 
         {/* --- sucursal --- */}
@@ -239,6 +241,7 @@ export default function App() {
           <Route path="reportes" element={<PaginaReportes />} />
           <Route path="reportes-ia" element={<PaginaReporteIA />} />
           <Route path="analitica" element={<PaginaAnalitica />} />
+          <Route path="bitacora-sync" element={<PaginaBitacoraSync />} />
         </Route>
 
         {/* --- caja --- */}

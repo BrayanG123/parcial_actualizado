@@ -135,6 +135,13 @@ export class SyncLogsQueryDto {
 
   @IsOptional() @IsString() @MaxLength(60) errorCode?: string;
 
+  @IsOptional()
+  @IsIn(['SALE_CASH', 'RESERVATION', 'EXCHANGE'])
+  type?: 'SALE_CASH' | 'RESERVATION' | 'EXCHANGE';
+
+  /** Solo el administrador: el encargado siempre ve su sucursal. */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) branchId?: number;
+
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit = 25;

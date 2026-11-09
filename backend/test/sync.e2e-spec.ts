@@ -449,6 +449,25 @@ describe.skipIf(!databaseUrl)('Offline sync (HTTP + PostgreSQL)', () => {
         expect.objectContaining({ status: 'CONFIRMED' }),
       ]),
     );
+    // Pantalla de bitacora: nombre del personal y detalle del conflicto, sin correo ni payload.
+    expect(entry.syncOperation).toEqual(
+      expect.objectContaining({ userName: 'Cajero', type: expect.any(String) }),
+    );
+    expect(JSON.stringify(logs.body.data)).not.toContain('cashier@sync.test');
+    const conflictos = await http()
+      .get('/api/v1/sync/logs?status=CONFLICT&type=SALE_CASH&limit=100')
+      .set(auth(admin))
+      .expect(200);
+    expect(conflictos.body.data.data.length).toBeGreaterThan(0);
+    for (const l of conflictos.body.data.data) {
+      expect(l.status).toBe('CONFLICT');
+      expect(l.syncOperation.type).toBe('SALE_CASH');
+    }
+    const reservas = await http()
+      .get('/api/v1/sync/logs?type=RESERVATION&limit=100')
+      .set(auth(admin))
+      .expect(200);
+    for (const l of reservas.body.data.data) expect(l.syncOperation.type).toBe('RESERVATION');
     await http().get('/api/v1/sync/logs').set(auth(customer)).expect(403);
     const mine = await http()
       .get(`/api/v1/sync/operations/${deviceId}`)
