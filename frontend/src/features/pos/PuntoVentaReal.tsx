@@ -1,30 +1,36 @@
-import { PanelTurno } from './PanelTurno';
-import { turnosService } from '../../services/turnos.service';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
+import { BASE_URL } from '../../api/config';
 import { revisionSesion } from '../../api/sesion';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useProducto, useProductos } from '../../hooks/useCatalogo';
-import { useDisponibilidad, useSucursales } from '../../hooks/useOperaciones';
+import { useDisponibilidad } from '../../hooks/useOperaciones';
 import { Cargando, ErrorEstado, Vacio } from '../../components/ui/Estados';
 import { Modal } from '../../components/ui/Modal';
 import { BadgeStock } from '../../components/ui/Badges';
 import { precioActual, stockDisponible } from '../../lib/domain';
-import { moneda } from '../../lib/format';
+import { fechaHora, moneda } from '../../lib/format';
 import { borrarCobro, guardarCobro, recuperarCobro, resultadoIncierto } from '../../lib/pos';
 import {
   posService,
   type ClientePOS,
   type CobroPOS,
   type CotizacionPOS,
+  type IntentoTarjetaPOS,
   type ItemPOS,
   type MetodoPOS,
   type ReservaPOS,
 } from '../../services/pos.service';
+import { turnosService, type Turno } from '../../services/turnos.service';
 import type { Venta } from '../../types/domain';
 import { ComprobanteVenta } from '../sales/ComprobanteVenta';
+import { CierreCaja } from './CierreCaja';
+import { CobroTarjeta } from './CobroTarjeta';
+import { HistorialCaja } from './HistorialCaja';
+import { PantallaCajas } from './PantallaCajas';
+import { ResumenTurno } from './ResumenTurno';
 
 interface Linea extends ItemPOS {
   productName: string;
@@ -39,6 +45,34 @@ const METODOS: Record<MetodoPOS, string> = {
   BANK_TRANSFER: 'Transferencia',
 };
 const clave = (i: ItemPOS) => `${i.productId}:${i.sizeId}:${i.colorId}`;
+
+/* --- Ticket en curso: sobrevive a navegar por el sistema mientras la caja siga abierta --- */
+interface TicketGuardado {
+  lineas: Linea[];
+  cliente: ClientePOS | null;
+  reserva: ReservaPOS | null;
+}
+const claveTicket = (userId: number, shiftId: number) =>
+  `fs.pos.ticket.v1:${BASE_URL}:${userId}:${shiftId}`;
+function leerTicket(userId: number, shiftId: number): TicketGuardado | null {
+  try {
+    const raw = localStorage.getItem(claveTicket(userId, shiftId));
+    const t = raw ? (JSON.parse(raw) as TicketGuardado) : null;
+    return t && Array.isArray(t.lineas) ? t : null;
+  } catch {
+    return null;
+  }
+}
+function escribirTicket(userId: number, shiftId: number, t: TicketGuardado | null) {
+  try {
+    if (!t || (!t.lineas.length && !t.cliente && !t.reserva))
+      localStorage.removeItem(claveTicket(userId, shiftId));
+    else localStorage.setItem(claveTicket(userId, shiftId), JSON.stringify(t));
+  } catch {
+    /* Sin almacenamiento el ticket solo vive en esta pantalla. */
+  }
+}
+
 function inicio(userId: number) {
   try {
     return { pendiente: recuperarCobro(userId), error: '' };
@@ -50,6 +84,7 @@ function inicio(userId: number) {
     };
   }
 }
+
 export default function PuntoVentaReal() {
   const auth = useAuth();
   if (!auth.usuario) return <Cargando texto="Cargando la caja..." />;
@@ -62,6 +97,8 @@ export default function PuntoVentaReal() {
     />
   );
 }
+
+/** Sin caja abierta: lista de cajas. Con caja abierta: venta e historial. */
 function Caja({
   userId,
   asignada,
@@ -72,94 +109,142 @@ function Caja({
   esAdmin: boolean;
 }) {
   const [params] = useSearchParams();
-  const [inicial] = useState(() => inicio(userId));
-  const [pendiente, setPendiente] = useState<CobroPOS | null>(inicial.pendiente);
-  const [sucursalElegida, setSucursal] = useState(
-    inicial.pendiente?.branchId ?? asignada ?? (esAdmin ? Number(params.get('sucursal')) || 0 : 0),
+  const [sucursal, setSucursal] = useState(
+    asignada ?? (esAdmin ? Number(params.get('sucursal')) || 0 : 0),
   );
+  const [cerrado, setCerrado] = useState<Turno | null>(null);
   const turno = useQuery({ queryKey: ['turno-actual', userId], queryFn: turnosService.actual });
-  const sucursal = turno.data?.branchId ?? sucursalElegida;
-  const [ocupadoTurno, setOcupadoTurno] = useState(false);
-  const puedeVender = Boolean(
-    turno.data &&
-    !turno.data.offlineActive &&
-    !turno.data.closedAt &&
-    !turno.isFetching &&
-    !turno.isError &&
-    !ocupadoTurno,
+
+  if (turno.isPending) return <Cargando texto="Consultando tu caja..." />;
+  if (turno.isError) return <ErrorEstado error={turno.error} onReintentar={() => turno.refetch()} />;
+  return (
+    <>
+      {turno.data && !turno.data.closedAt ? (
+        turno.data.offlineActive ? (
+          <section className="fs-panel fs-pila">
+            <h2>Caja en modo offline</h2>
+            <p>
+              Esta caja tiene ventas offline sin finalizar. Sincroniza y finaliza desde Ventas
+              offline antes de volver a la caja normal.
+            </p>
+            <Link to="/caja/offline" className="fs-btn fs-btn--acento">
+              Ir a Ventas offline
+            </Link>
+          </section>
+        ) : (
+          <CajaAbierta
+            key={turno.data.id}
+            userId={userId}
+            turno={turno.data}
+            onCerrada={setCerrado}
+          />
+        )
+      ) : (
+        <PantallaCajas
+          userId={userId}
+          branchId={sucursal}
+          esAdmin={esAdmin}
+          onSucursal={setSucursal}
+        />
+      )}
+      <Modal abierto={Boolean(cerrado)} titulo="Caja cerrada" onCerrar={() => setCerrado(null)}>
+        {cerrado && <ResumenTurno turno={cerrado} />}
+      </Modal>
+    </>
   );
+}
+
+function CajaAbierta({
+  userId,
+  turno,
+  onCerrada,
+}: {
+  userId: number;
+  turno: Turno;
+  onCerrada: (t: Turno) => void;
+}) {
+  const [params] = useSearchParams();
+  const [pestana, setPestana] = useState<'vender' | 'historial'>('vender');
+  const [inicial] = useState(() => inicio(userId));
+  const [guardado] = useState(() => leerTicket(userId, turno.id));
+  const [pendiente, setPendiente] = useState<CobroPOS | null>(inicial.pendiente);
+  const sucursal = turno.branchId;
   const [busqueda, setBusqueda] = useState('');
   const [pagina, setPagina] = useState(1);
   const [idProducto, setIdProducto] = useState<number>();
   const [idTalla, setIdTalla] = useState<number>();
   const [idColor, setIdColor] = useState<number>();
-  const [lineas, setLineas] = useState<Linea[]>([]);
+  const [lineas, setLineas] = useState<Linea[]>(guardado?.lineas ?? []);
   const [busquedaCliente, setBusquedaCliente] = useState('');
-  const [cliente, setCliente] = useState<ClientePOS | null>(null);
+  const [cliente, setCliente] = useState<ClientePOS | null>(guardado?.cliente ?? null);
   const [numeroReserva, setNumeroReserva] = useState(params.get('reserva') ?? '');
-  const [reserva, setReserva] = useState<ReservaPOS | null>(null);
+  const [reserva, setReserva] = useState<ReservaPOS | null>(guardado?.reserva ?? null);
   const [cotizacion, setCotizacion] = useState<CotizacionPOS | null>(null);
+  // Una clave por cobro: reintentar o volver a autorizar la tarjeta no duplica la venta.
+  const [claveCobro, setClaveCobro] = useState('');
   const [metodo, setMetodo] = useState<MetodoPOS>('CASH');
   const [referencia, setReferencia] = useState('');
   const [recibido, setRecibido] = useState('');
+  const [intento, setIntento] = useState<IntentoTarjetaPOS | null>(null);
   const [error, setError] = useState(inicial.error);
   const [ocupado, setOcupado] = useState(false);
   const [comprobante, setComprobante] = useState<Venta | null>(null);
   const lock = useRef(false);
   const qc = useQueryClient();
   const toast = useToast();
-  const sucursales = useSucursales();
+
+  useEffect(() => {
+    escribirTicket(userId, turno.id, { lineas, cliente, reserva });
+  }, [userId, turno.id, lineas, cliente, reserva]);
+
   const productos = useProductos({
     q: busqueda || undefined,
     page: pagina,
     page_size: 9,
-    id_sucursal: sucursal || undefined,
+    id_sucursal: sucursal,
   });
   const producto = useProducto(idProducto);
   const disponibilidad = useDisponibilidad(
-    idProducto && idTalla && idColor && sucursal
+    idProducto && idTalla && idColor
       ? { id_producto: idProducto, id_talla: idTalla, id_color: idColor, id_sucursal: sucursal }
       : null,
   );
   const clientes = useQuery({
     queryKey: ['pos-clientes', userId, sucursal, busquedaCliente.trim()],
     queryFn: () => posService.clientes(sucursal, busquedaCliente.trim()),
-    enabled: Boolean(sucursal && busquedaCliente.trim().length >= 2 && !reserva && !pendiente),
+    enabled: Boolean(busquedaCliente.trim().length >= 2 && !reserva && !pendiente),
   });
   const stock = Math.max(0, ...(disponibilidad.data ?? []).map(stockDisponible));
-  const bloqueado =
-    ocupadoTurno || ocupado || Boolean(pendiente) || Boolean(cotizacion) || Boolean(inicial.error);
+  const bloqueado = ocupado || Boolean(pendiente) || Boolean(cotizacion) || Boolean(inicial.error);
   const seleccion = {
     branchId: sucursal,
     clientId: cliente?.id,
     reservationId: reserva?.id,
     items: lineas
       .filter((i) => i.quantity > 0)
-      .map(({ productId, sizeId, colorId, quantity }) => ({
-        productId,
-        sizeId,
-        colorId,
-        quantity,
-      })),
+      .map(({ productId, sizeId, colorId, quantity }) => ({ productId, sizeId, colorId, quantity })),
   };
+  const unidades = seleccion.items.reduce((s, i) => s + i.quantity, 0);
+
   function limpiar() {
     setLineas([]);
     setCliente(null);
     setReserva(null);
     setCotizacion(null);
+    setIntento(null);
+    setClaveCobro('');
     setIdProducto(undefined);
     setIdTalla(undefined);
     setIdColor(undefined);
     setRecibido('');
     setReferencia('');
+    setMetodo('CASH');
     setBusquedaCliente('');
     setNumeroReserva('');
   }
   function agregar() {
     const p = producto.data;
     if (
-      !puedeVender ||
-      !sucursal ||
       !p?.activo ||
       !idTalla ||
       !idColor ||
@@ -174,7 +259,7 @@ function Caja({
     const item = { productId: p.id_producto, sizeId: idTalla, colorId: idColor, quantity: 1 };
     const anterior = lineas.find((l) => clave(l) === clave(item));
     if (stock <= (anterior?.quantity ?? 0)) {
-      setError('No hay mas stock disponible para esa variante.');
+      setError('No hay mas stock disponible para esa variante en esta sucursal.');
       return;
     }
     if (!anterior && lineas.length >= 50) {
@@ -208,16 +293,14 @@ function Caja({
       ),
     );
   }
+  function quitar(i: number) {
+    setLineas((ls) => ls.filter((_, index) => index !== i));
+  }
   async function cargarReserva() {
-    if (
-      lock.current ||
-      !Number.isInteger(Number(numeroReserva)) ||
-      Number(numeroReserva) < 1 ||
-      !sucursal
-    )
+    if (lock.current || !Number.isInteger(Number(numeroReserva)) || Number(numeroReserva) < 1)
       return;
     if (lineas.some((l) => l.quantity > 0)) {
-      setError('Vacia el ticket antes de cargar otra reserva.');
+      setError('Vacia el ticket antes de cargar una reserva.');
       return;
     }
     lock.current = true;
@@ -236,12 +319,15 @@ function Caja({
     }
   }
   async function revisar() {
-    if (lock.current || !puedeVender || !sucursal || !seleccion.items.length) return;
+    if (lock.current || !seleccion.items.length) return;
     lock.current = true;
     setOcupado(true);
     setError('');
     try {
       setCotizacion(await posService.revisar(seleccion));
+      setClaveCobro(crypto.randomUUID());
+      setMetodo('CASH');
+      setIntento(null);
       setRecibido('');
       setReferencia('');
     } catch (e) {
@@ -252,39 +338,35 @@ function Caja({
       setOcupado(false);
     }
   }
-  async function cobrar() {
-    if (lock.current || inicial.error) return;
-    let datos = pendiente;
-    if (!datos) {
-      if (!cotizacion || !puedeVender || !turno.data) return;
-      if (
-        metodo === 'CASH' &&
-        (!/^\d+(\.\d{1,2})?$/.test(recibido) ||
-          !Number.isFinite(Number(recibido)) ||
-          Number(recibido) < cotizacion.total)
-      ) {
-        setError('El efectivo recibido debe cubrir el total y tener hasta dos decimales.');
-        return;
-      }
-      if (metodo !== 'CASH' && !referencia.trim()) {
-        setError('Ingresa la referencia del pago realizado.');
-        return;
-      }
-      datos = {
-        ...seleccion,
-        shiftId: turno.data.id,
-        expectedTotal: cotizacion.total,
-        idempotencyKey: crypto.randomUUID(),
-        paymentMethod: metodo,
-        paymentReference: metodo === 'CASH' ? undefined : referencia.trim(),
-      };
+  async function elegirMetodo(m: MetodoPOS) {
+    setMetodo(m);
+    setError('');
+    if (m !== 'CARD' || intento || !cotizacion || lock.current) return;
+    lock.current = true;
+    setOcupado(true);
+    try {
+      setIntento(
+        await posService.intentoTarjeta({
+          ...seleccion,
+          shiftId: turno.id,
+          idempotencyKey: claveCobro,
+          expectedTotal: cotizacion.total,
+        }),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo preparar el cobro con tarjeta.');
+    } finally {
+      lock.current = false;
+      setOcupado(false);
     }
+  }
+
+  /** Registra la venta (descuenta stock, suma al turno) y vacia el ticket. */
+  async function registrar(datos: CobroPOS) {
     try {
       guardarCobro(userId, datos);
     } catch {
-      setError(
-        'No se pudo guardar el ticket en este navegador. Habilita el almacenamiento antes de cobrar.',
-      );
+      setError('No se pudo guardar el cobro en este navegador. Habilita el almacenamiento.');
       return;
     }
     const revision = revisionSesion();
@@ -293,11 +375,24 @@ function Caja({
     setPendiente(datos);
     setError('');
     try {
-      const venta = await posService.cobrar(datos);
+      const venta =
+        datos.paymentMethod === 'CARD'
+          ? await posService.cobrarTarjeta({
+              branchId: datos.branchId,
+              clientId: datos.clientId,
+              reservationId: datos.reservationId,
+              items: datos.items,
+              shiftId: datos.shiftId,
+              idempotencyKey: datos.idempotencyKey,
+              expectedTotal: datos.expectedTotal,
+              paymentIntentId: datos.paymentReference ?? '',
+            })
+          : await posService.cobrar(datos);
       borrarCobro(userId);
       setPendiente(null);
-      setComprobante(venta);
       limpiar();
+      escribirTicket(userId, turno.id, null);
+      setComprobante(venta);
       if (revision === revisionSesion()) {
         for (const k of [
           'turno-actual',
@@ -307,11 +402,11 @@ function Caja({
           'inventario',
           'movimientos',
           'disponibilidad',
-          'carrito',
           'reservas',
           'reserva',
           'reportes',
           'productos',
+          'producto',
         ])
           void qc.invalidateQueries({ queryKey: [k] });
         toast.exito('Venta registrada.');
@@ -321,6 +416,7 @@ function Caja({
         borrarCobro(userId);
         setPendiente(null);
         setCotizacion(null);
+        setIntento(null);
       }
       setError(e instanceof Error ? e.message : 'No se recibio confirmacion del servidor.');
     } finally {
@@ -328,392 +424,448 @@ function Caja({
       setOcupado(false);
     }
   }
+  function cobrar() {
+    if (lock.current || inicial.error) return;
+    if (pendiente) return void registrar(pendiente);
+    if (!cotizacion || metodo === 'CARD') return;
+    if (
+      metodo === 'CASH' &&
+      (!/^\d+(\.\d{1,2})?$/.test(recibido) || Number(recibido) < cotizacion.total)
+    ) {
+      setError('El efectivo recibido debe cubrir el total (hasta dos decimales).');
+      return;
+    }
+    if (metodo !== 'CASH' && !referencia.trim()) {
+      setError('Ingresa el numero de operacion del pago.');
+      return;
+    }
+    void registrar({
+      ...seleccion,
+      shiftId: turno.id,
+      expectedTotal: cotizacion.total,
+      idempotencyKey: claveCobro,
+      paymentMethod: metodo,
+      paymentReference: metodo === 'CASH' ? undefined : referencia.trim(),
+    });
+  }
+  function cobrarConTarjeta(paymentIntentId: string) {
+    if (!cotizacion) return;
+    void registrar({
+      ...seleccion,
+      shiftId: turno.id,
+      expectedTotal: cotizacion.total,
+      idempotencyKey: claveCobro,
+      paymentMethod: 'CARD',
+      paymentReference: paymentIntentId,
+    });
+  }
+
   return (
-    <>
-      <header className="fs-pagina-cabecera">
-        <div>
-          <p className="fs-eyebrow">Caja</p>
-          <h1>Punto de venta</h1>
-          <p className="fs-sub">Selecciona prendas, revisa el total y confirma el cobro.</p>
-        </div>
-        <Link to="/caja/ventas" className="fs-btn fs-btn--contorno">
-          Historial de ventas
-        </Link>
-      </header>
-      <Link to="/caja/offline" className="fs-btn fs-btn--contorno">
-        Ventas offline
-      </Link>
-      {turno.data?.offlineActive && (
-        <p>
-          Este turno tiene modo offline activo. Sincroniza y finaliza desde Ventas offline antes de
-          volver a la caja normal.
-        </p>
-      )}
-      {turno.isPending && <p>Cargando turno de caja...</p>}
-      {turno.isError && <ErrorEstado error={turno.error} onReintentar={() => turno.refetch()} />}
-      {!turno.isPending && !turno.isError && (
-        <PanelTurno
-          key={`${userId}:${sucursal}`}
-          userId={userId}
-          branchId={sucursal}
-          turno={turno.data ?? null}
-          esAdmin={esAdmin}
-          impedirCierre={
-            Boolean(turno.data?.offlineActive) ||
-            ocupado ||
-            Boolean(pendiente) ||
-            Boolean(cotizacion) ||
-            lineas.some((l) => l.quantity > 0)
-          }
-          onBloquear={setOcupadoTurno}
-          onSucursal={setSucursal}
-        />
-      )}
-      {error && (
-        <div role="alert" className="fs-alerta fs-alerta--error">
-          {error}
-        </div>
-      )}
-      {pendiente && (
-        <section className="fs-panel fs-pila">
-          <h3>Cobro pendiente de confirmacion</h3>
-          <p>
-            El ticket por {moneda(pendiente.expectedTotal)} puede haber sido registrado. Reintenta
-            para recuperar el resultado sin volver a cobrar al cliente.
-          </p>
-          <button
-            type="button"
-            className="fs-btn fs-btn--acento"
-            disabled={ocupado}
-            onClick={cobrar}
-          >
-            {ocupado ? 'Consultando...' : 'Reintentar confirmacion'}
-          </button>
-        </section>
-      )}
-      <fieldset disabled={bloqueado} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-        <section className="fs-panel fs-pila" style={{ marginBottom: 20 }}>
-          {esAdmin ? (
-            <div className="fs-campo">
-              <label htmlFor="sucursal-caja">Sucursal</label>
-              <select
-                id="sucursal-caja"
-                disabled={Boolean(turno.data)}
-                className="fs-select"
-                value={sucursal || ''}
-                onChange={(e) => {
-                  limpiar();
-                  setSucursal(Number(e.target.value));
-                  setPagina(1);
-                  setError('');
-                }}
-              >
-                <option value="">Selecciona una sucursal</option>
-                {sucursales.data?.map((s) => (
-                  <option key={s.id_sucursal} value={s.id_sucursal}>
-                    {s.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <p>
-              Sucursal:{' '}
-              {sucursales.data?.find((s) => s.id_sucursal === sucursal)?.nombre ??
-                asignada ??
-                'Sin asignar'}
+    <div className="fs-pila">
+      <header className="fs-panel fs-pos-cabecera">
+        <div className="fs-fila-entre" style={{ alignItems: 'flex-start' }}>
+          <div className="fs-pila" style={{ gap: 6 }}>
+            <span className="fs-pos-etiqueta">
+              {turno.branchName} · {turno.registerName}
+            </span>
+            <h1>Punto de venta</h1>
+            <p className="fs-sub">
+              Abierta por {turno.cashier} · {fechaHora(turno.openedAt)}
+              <br />
+              Registra ventas y consulta el historial de esta caja.
             </p>
-          )}
-          {sucursales.isError && (
-            <ErrorEstado error={sucursales.error} onReintentar={() => sucursales.refetch()} />
-          )}
-          <div className="fs-rejilla-form">
-            <div className="fs-campo">
-              <label htmlFor="cliente-pos">Buscar cliente (opcional)</label>
-              <input
-                id="cliente-pos"
-                className="fs-input"
-                placeholder="Nombre o correo, minimo 2 caracteres"
-                value={busquedaCliente}
-                disabled={Boolean(reserva) || !sucursal}
-                onChange={(e) => setBusquedaCliente(e.target.value)}
-              />
-              <p className="fs-sub">
-                {cliente
-                  ? `${cliente.name} · ${cliente.wholesale ? 'Mayorista' : 'Minorista'}`
-                  : 'Consumidor final · precio minorista'}
-              </p>
-              {cliente && !reserva && (
+          </div>
+          <div className="fs-fila-wrap">
+            <Link to="/caja/offline" className="fs-btn fs-btn--fantasma">
+              Ventas offline
+            </Link>
+            <CierreCaja
+              userId={userId}
+              turno={turno}
+              bloqueado={bloqueado || lineas.some((l) => l.quantity > 0)}
+              onCerrada={(t) => {
+                escribirTicket(userId, turno.id, null);
+                onCerrada(t);
+              }}
+            />
+          </div>
+        </div>
+        <dl className="fs-pos-kpis">
+          <div>
+            <dt>Ventas</dt>
+            <dd>{turno.saleCount}</dd>
+          </div>
+          <div>
+            <dt>Total vendido</dt>
+            <dd>{moneda(turno.totalSales, turno.currency)}</dd>
+          </div>
+          <div>
+            <dt>Efectivo en caja</dt>
+            <dd>{moneda(turno.expectedCash, turno.currency)}</dd>
+          </div>
+          <div>
+            <dt>Tarjeta / QR</dt>
+            <dd>{moneda(turno.cardTotal + turno.qrTotal + turno.transferTotal, turno.currency)}</dd>
+          </div>
+        </dl>
+      </header>
+
+      <section className="fs-panel fs-pila">
+        <div className="fs-pos-pestanas" role="tablist" aria-label="Caja">
+          {(
+            [
+              ['vender', 'Registrar ventas'],
+              ['historial', 'Historial de ventas'],
+            ] as const
+          ).map(([valor, texto]) => (
+            <button
+              key={valor}
+              type="button"
+              role="tab"
+              aria-selected={pestana === valor}
+              className={`fs-pos-pestana${pestana === valor ? ' fs-pos-pestana--activa' : ''}`}
+              onClick={() => setPestana(valor)}
+            >
+              {texto}
+              {valor === 'vender' && unidades > 0 && ` (${unidades})`}
+            </button>
+          ))}
+        </div>
+
+        {pestana === 'historial' ? (
+          <HistorialCaja userId={userId} shiftId={turno.id} />
+        ) : (
+          <>
+            {error && !cotizacion && (
+              <div role="alert" className="fs-alerta fs-alerta--error">
+                {error}
+              </div>
+            )}
+            {pendiente && (
+              <section className="fs-alerta fs-pila">
+                <strong>Cobro pendiente de confirmacion</strong>
+                <p>
+                  El ticket por {moneda(pendiente.expectedTotal)} puede haberse registrado.
+                  Reintenta para recuperar el resultado sin volver a cobrar al cliente.
+                </p>
                 <button
                   type="button"
-                  className="fs-btn fs-btn--fantasma"
-                  onClick={() => {
-                    setCliente(null);
-                    setBusquedaCliente('');
-                  }}
+                  className="fs-btn fs-btn--acento"
+                  disabled={ocupado}
+                  onClick={cobrar}
                 >
-                  Quitar cliente
+                  {ocupado ? 'Consultando...' : 'Reintentar confirmacion'}
                 </button>
-              )}
-              {clientes.isFetching && <p>Buscando clientes...</p>}
-              {clientes.isError && (
-                <ErrorEstado error={clientes.error} onReintentar={() => clientes.refetch()} />
-              )}
-              {!reserva &&
-                busquedaCliente.trim().length >= 2 &&
-                clientes.data?.map((c) => (
+              </section>
+            )}
+            <fieldset disabled={bloqueado} className="fs-pos-fieldset">
+              <div className="fs-pos">
+                <section className="fs-pila">
+                  {reserva ? (
+                    <>
+                      <h3>Reserva #{reserva.id}</h3>
+                      <p>
+                        Ajusta las cantidades que el cliente compra. Al cobrar se liberan las
+                        prendas restantes.
+                      </p>
+                      <p className="fs-sub">
+                        Si no compra ninguna prenda, cierra la atencion desde Reservas.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <h3>Buscar prenda</h3>
+                      <input
+                        aria-label="Buscar prenda"
+                        className="fs-input"
+                        value={busqueda}
+                        onChange={(e) => {
+                          setBusqueda(e.target.value);
+                          setPagina(1);
+                        }}
+                        placeholder="Nombre de la prenda"
+                      />
+                      {productos.isPending && <p>Cargando prendas...</p>}
+                      {productos.isError && (
+                        <ErrorEstado error={productos.error} onReintentar={() => productos.refetch()} />
+                      )}
+                      <div className="fs-pos__resultados">
+                        {productos.data?.items.map((p) => (
+                          <button
+                            type="button"
+                            key={p.id_producto}
+                            className={`fs-pos__item${idProducto === p.id_producto ? ' fs-pos__item--activo' : ''}`}
+                            onClick={() => {
+                              setIdProducto(p.id_producto);
+                              setIdTalla(undefined);
+                              setIdColor(undefined);
+                            }}
+                          >
+                            <strong>{p.nombre}</strong>
+                            <span>
+                              {moneda(
+                                cliente?.wholesale && p.precio_mayorista != null
+                                  ? p.precio_mayorista
+                                  : precioActual(p),
+                              )}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      {productos.data?.items.length === 0 && (
+                        <Vacio titulo="Sin prendas" mensaje="Prueba con otro nombre." />
+                      )}
+                      {productos.data && productos.data.total > 9 && (
+                        <div className="fs-fila-wrap">
+                          <button
+                            type="button"
+                            className="fs-btn fs-btn--contorno"
+                            disabled={pagina <= 1}
+                            onClick={() => setPagina(pagina - 1)}
+                          >
+                            Anterior
+                          </button>
+                          <span>
+                            Pagina {pagina} de {Math.ceil(productos.data.total / 9)}
+                          </span>
+                          <button
+                            type="button"
+                            className="fs-btn fs-btn--contorno"
+                            disabled={pagina * 9 >= productos.data.total}
+                            onClick={() => setPagina(pagina + 1)}
+                          >
+                            Siguiente
+                          </button>
+                        </div>
+                      )}
+                      {idProducto && producto.isPending && <p>Cargando tallas y colores...</p>}
+                      {producto.isError && (
+                        <ErrorEstado error={producto.error} onReintentar={() => producto.refetch()} />
+                      )}
+                      {producto.data && (
+                        <div className="fs-pila fs-pos-variante">
+                          <strong>{producto.data.nombre}</strong>
+                          <span className="fs-sub">Talla</span>
+                          <div className="fs-opciones">
+                            {producto.data.tallas.map((t) => (
+                              <button
+                                type="button"
+                                key={t.id_talla}
+                                className={`fs-chip${idTalla === t.id_talla ? ' fs-chip--activo' : ''}`}
+                                onClick={() => setIdTalla(t.id_talla)}
+                              >
+                                {t.nombre}
+                              </button>
+                            ))}
+                          </div>
+                          <span className="fs-sub">Color</span>
+                          <div className="fs-opciones">
+                            {producto.data.colores.map((c) => (
+                              <button
+                                type="button"
+                                key={c.id_color}
+                                className={`fs-chip${idColor === c.id_color ? ' fs-chip--activo' : ''}`}
+                                onClick={() => setIdColor(c.id_color)}
+                              >
+                                {c.nombre}
+                              </button>
+                            ))}
+                          </div>
+                          {disponibilidad.isFetching && <p>Consultando stock...</p>}
+                          {disponibilidad.isError && (
+                            <ErrorEstado
+                              error={disponibilidad.error}
+                              onReintentar={() => disponibilidad.refetch()}
+                            />
+                          )}
+                          {idTalla &&
+                            idColor &&
+                            !disponibilidad.isFetching &&
+                            !disponibilidad.isError && (
+                              <p>
+                                <BadgeStock disponible={stock} /> {stock} disponibles en esta
+                                sucursal
+                              </p>
+                            )}
+                          <button
+                            type="button"
+                            className="fs-btn fs-btn--acento"
+                            disabled={
+                              !idTalla ||
+                              !idColor ||
+                              stock < 1 ||
+                              disponibilidad.isFetching ||
+                              disponibilidad.isError
+                            }
+                            onClick={agregar}
+                          >
+                            Agregar al ticket
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </section>
+
+                <aside className="fs-pila fs-pos-ticket">
+                  <h3>Ticket</h3>
+                  <div className="fs-campo">
+                    <label htmlFor="cliente-pos">Cliente (opcional)</label>
+                    {cliente ? (
+                      <div className="fs-fila-entre">
+                        <span>
+                          {cliente.name} · {cliente.wholesale ? 'Mayorista' : 'Minorista'}
+                        </span>
+                        {!reserva && (
+                          <button
+                            type="button"
+                            className="fs-btn fs-btn--fantasma"
+                            onClick={() => setCliente(null)}
+                          >
+                            Quitar
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          id="cliente-pos"
+                          className="fs-input"
+                          placeholder="Nombre o correo (minimo 2 letras)"
+                          value={busquedaCliente}
+                          onChange={(e) => setBusquedaCliente(e.target.value)}
+                        />
+                        {clientes.isFetching && <span className="fs-sub">Buscando...</span>}
+                        {busquedaCliente.trim().length >= 2 &&
+                          clientes.data?.map((c) => (
+                            <button
+                              type="button"
+                              className="fs-btn fs-btn--contorno"
+                              key={c.id}
+                              onClick={() => {
+                                setCliente(c);
+                                setBusquedaCliente('');
+                              }}
+                            >
+                              {c.name} · {c.email}
+                              {c.wholesale && ' · Mayorista'}
+                            </button>
+                          ))}
+                        {busquedaCliente.trim().length >= 2 && clientes.data?.length === 0 && (
+                          <span className="fs-sub">No se encontraron clientes.</span>
+                        )}
+                        {!busquedaCliente && (
+                          <span className="fs-sub">Consumidor final · precio minorista</span>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  {!reserva && (
+                    <details>
+                      <summary>Cobrar una reserva</summary>
+                      <div className="fs-fila-wrap" style={{ marginTop: 8 }}>
+                        <input
+                          aria-label="Numero de reserva"
+                          type="number"
+                          min="1"
+                          className="fs-input"
+                          placeholder="N.º de reserva"
+                          value={numeroReserva}
+                          onChange={(e) => setNumeroReserva(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="fs-btn fs-btn--contorno"
+                          disabled={!numeroReserva}
+                          onClick={cargarReserva}
+                        >
+                          Cargar
+                        </button>
+                      </div>
+                    </details>
+                  )}
+                  {lineas.length === 0 && <p className="fs-sub">Todavia no hay prendas.</p>}
+                  {lineas.map((l, i) => (
+                    <div key={clave(l)} className="fs-fila-entre fs-pos-linea">
+                      <div>
+                        <strong>{l.productName}</strong>
+                        <p className="fs-sub">
+                          {l.sizeName} / {l.colorName}
+                          {reserva && ` · Reservadas: ${l.limite}`}
+                        </p>
+                      </div>
+                      <div className="fs-fila-wrap">
+                        <div className="fs-cantidad">
+                          <button
+                            type="button"
+                            aria-label={`Restar ${l.productName} ${l.sizeName}`}
+                            disabled={l.quantity <= 0}
+                            onClick={() => cantidad(i, -1)}
+                          >
+                            -
+                          </button>
+                          <span>{l.quantity}</span>
+                          <button
+                            type="button"
+                            aria-label={`Sumar ${l.productName} ${l.sizeName}`}
+                            disabled={l.quantity >= l.limite}
+                            onClick={() => cantidad(i, 1)}
+                          >
+                            +
+                          </button>
+                        </div>
+                        {!reserva && (
+                          <button
+                            type="button"
+                            className="fs-btn fs-btn--fantasma"
+                            aria-label={`Quitar ${l.productName} ${l.sizeName}`}
+                            onClick={() => quitar(i)}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <p className="fs-sub">
+                    {unidades} {unidades === 1 ? 'prenda' : 'prendas'}. El total se calcula con los
+                    precios vigentes al cobrar.
+                  </p>
                   <button
                     type="button"
-                    className="fs-btn fs-btn--contorno"
-                    key={c.id}
-                    onClick={() => {
-                      setCliente(c);
-                      setBusquedaCliente('');
-                    }}
+                    className="fs-btn fs-btn--acento"
+                    disabled={!seleccion.items.length}
+                    onClick={revisar}
                   >
-                    {c.name} · {c.email}
-                    {c.wholesale && ' · Mayorista'}
+                    Cobrar
                   </button>
-                ))}
-              {busquedaCliente.trim().length >= 2 && clientes.data?.length === 0 && (
-                <span>No se encontraron clientes.</span>
-              )}
-            </div>
-            <div className="fs-campo">
-              <label htmlFor="reserva-pos">Numero de reserva</label>
-              <input
-                id="reserva-pos"
-                type="number"
-                min="1"
-                className="fs-input"
-                value={numeroReserva}
-                onChange={(e) => setNumeroReserva(e.target.value)}
-                disabled={Boolean(reserva) || !sucursal}
-              />
-              <button
-                type="button"
-                className="fs-btn fs-btn--contorno"
-                disabled={!puedeVender || !sucursal || !numeroReserva || Boolean(reserva)}
-                onClick={cargarReserva}
-              >
-                Cargar reserva
-              </button>
-              <span className="fs-sub">
-                La sucursal debe haber marcado al cliente como presente.
-              </span>
-            </div>
-          </div>
-        </section>
-        <div className="fs-pos">
-          <section className="fs-panel fs-pila">
-            {reserva ? (
-              <>
-                <h3>Reserva #{reserva.id}</h3>
-                <p>
-                  Selecciona las cantidades que el cliente compra. Al finalizar se liberaran las
-                  prendas restantes.
-                </p>
-                <p className="fs-sub">
-                  Si no compra ninguna prenda, cierra la atencion desde Reservas.
-                </p>
-              </>
-            ) : (
-              <>
-                <h3>Buscar prenda</h3>
-                <input
-                  aria-label="Buscar prenda"
-                  className="fs-input"
-                  value={busqueda}
-                  onChange={(e) => {
-                    setBusqueda(e.target.value);
-                    setPagina(1);
-                  }}
-                  placeholder="Nombre de la prenda"
-                  disabled={!sucursal}
-                />
-                {productos.isPending && <p>Cargando prendas...</p>}
-                {productos.isError && (
-                  <ErrorEstado error={productos.error} onReintentar={() => productos.refetch()} />
-                )}
-                <div className="fs-pos__resultados">
-                  {productos.data?.items.map((p) => (
+                  {(lineas.length > 0 || cliente || reserva) && (
                     <button
                       type="button"
-                      key={p.id_producto}
-                      className="fs-pos__item"
-                      disabled={!sucursal}
+                      className="fs-btn fs-btn--fantasma"
                       onClick={() => {
-                        setIdProducto(p.id_producto);
-                        setIdTalla(undefined);
-                        setIdColor(undefined);
+                        limpiar();
+                        setError('');
                       }}
                     >
-                      <strong>{p.nombre}</strong>
-                      <span>
-                        {moneda(
-                          cliente?.wholesale && p.precio_mayorista != null
-                            ? p.precio_mayorista
-                            : precioActual(p),
-                        )}
-                      </span>
+                      Vaciar ticket
                     </button>
-                  ))}
-                </div>
-                {productos.data?.items.length === 0 && (
-                  <Vacio
-                    titulo="Sin prendas disponibles"
-                    mensaje="Intenta otra busqueda o sucursal."
-                  />
-                )}
-                {productos.data && (
-                  <div className="fs-fila-wrap">
-                    <button
-                      type="button"
-                      className="fs-btn fs-btn--contorno"
-                      disabled={pagina <= 1}
-                      onClick={() => setPagina(pagina - 1)}
-                    >
-                      Anterior
-                    </button>
-                    <span>Pagina {pagina}</span>
-                    <button
-                      type="button"
-                      className="fs-btn fs-btn--contorno"
-                      disabled={pagina * 9 >= productos.data.total}
-                      onClick={() => setPagina(pagina + 1)}
-                    >
-                      Siguiente
-                    </button>
-                  </div>
-                )}
-                {idProducto && producto.isPending && <p>Cargando variantes...</p>}
-                {producto.isError && (
-                  <ErrorEstado error={producto.error} onReintentar={() => producto.refetch()} />
-                )}
-                {producto.data && (
-                  <>
-                    <strong>{producto.data.nombre}</strong>
-                    <div className="fs-opciones">
-                      {producto.data.tallas.map((t) => (
-                        <button
-                          type="button"
-                          key={t.id_talla}
-                          className={`fs-chip${idTalla === t.id_talla ? ' fs-chip--activo' : ''}`}
-                          onClick={() => setIdTalla(t.id_talla)}
-                        >
-                          {t.nombre}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="fs-opciones">
-                      {producto.data.colores.map((c) => (
-                        <button
-                          type="button"
-                          key={c.id_color}
-                          className={`fs-chip${idColor === c.id_color ? ' fs-chip--activo' : ''}`}
-                          onClick={() => setIdColor(c.id_color)}
-                        >
-                          {c.nombre}
-                        </button>
-                      ))}
-                    </div>
-                    {disponibilidad.isFetching && <p>Consultando stock...</p>}
-                    {disponibilidad.isError && (
-                      <ErrorEstado
-                        error={disponibilidad.error}
-                        onReintentar={() => disponibilidad.refetch()}
-                      />
-                    )}
-                    {idTalla &&
-                      idColor &&
-                      !disponibilidad.isFetching &&
-                      !disponibilidad.isError && <BadgeStock disponible={stock} />}
-                    <button
-                      type="button"
-                      className="fs-btn fs-btn--acento"
-                      disabled={
-                        !puedeVender ||
-                        !idTalla ||
-                        !idColor ||
-                        stock < 1 ||
-                        disponibilidad.isFetching ||
-                        disponibilidad.isError
-                      }
-                      onClick={agregar}
-                    >
-                      Agregar al ticket
-                    </button>
-                  </>
-                )}
-              </>
-            )}
-          </section>
-          <aside className="fs-panel fs-pila">
-            <h3>Ticket</h3>
-            {lineas.length === 0 && <p className="fs-sub">Todavia no hay prendas.</p>}
-            {lineas.map((l, i) => (
-              <div key={clave(l)} className="fs-fila-entre">
-                <div>
-                  <strong>{l.productName}</strong>
-                  <p className="fs-sub">
-                    {l.sizeName} / {l.colorName}
-                    {reserva && ` · Reservadas: ${l.limite}`}
-                  </p>
-                </div>
-                <div className="fs-cantidad">
-                  <button
-                    type="button"
-                    aria-label={`Restar ${l.productName} ${l.sizeName}`}
-                    disabled={l.quantity <= 0}
-                    onClick={() => cantidad(i, -1)}
-                  >
-                    -
-                  </button>
-                  <span>{l.quantity}</span>
-                  <button
-                    type="button"
-                    aria-label={`Sumar ${l.productName} ${l.sizeName}`}
-                    disabled={l.quantity >= l.limite}
-                    onClick={() => cantidad(i, 1)}
-                  >
-                    +
-                  </button>
-                </div>
+                  )}
+                </aside>
               </div>
-            ))}
-            <p className="fs-sub">
-              El total se calcula con los precios vigentes al revisar el ticket.
-            </p>
-            <button
-              type="button"
-              className="fs-btn fs-btn--acento"
-              disabled={!puedeVender || !sucursal || !seleccion.items.length}
-              onClick={revisar}
-            >
-              Revisar total
-            </button>
-            {lineas.length > 0 && (
-              <button
-                type="button"
-                className="fs-btn fs-btn--fantasma"
-                onClick={() => {
-                  limpiar();
-                  setError('');
-                }}
-              >
-                Vaciar ticket
-              </button>
-            )}
-          </aside>
-        </div>
-      </fieldset>
+            </fieldset>
+          </>
+        )}
+      </section>
+
       <Modal
         abierto={Boolean(cotizacion) && !pendiente}
-        titulo="Confirmar cobro"
+        titulo="Cobrar venta"
         ancho
         onCerrar={() => {
           if (!ocupado) {
             setCotizacion(null);
+            setIntento(null);
             setError('');
           }
         }}
@@ -723,18 +875,24 @@ function Caja({
               type="button"
               disabled={ocupado}
               className="fs-btn fs-btn--contorno"
-              onClick={() => setCotizacion(null)}
+              onClick={() => {
+                setCotizacion(null);
+                setIntento(null);
+                setError('');
+              }}
             >
               Volver al ticket
             </button>
-            <button
-              type="button"
-              disabled={ocupado}
-              className="fs-btn fs-btn--acento"
-              onClick={cobrar}
-            >
-              Cobrar y finalizar
-            </button>
+            {metodo !== 'CARD' && (
+              <button
+                type="button"
+                disabled={ocupado}
+                className="fs-btn fs-btn--acento"
+                onClick={cobrar}
+              >
+                {ocupado ? 'Registrando...' : 'Confirmar pago'}
+              </button>
+            )}
           </>
         }
       >
@@ -760,25 +918,24 @@ function Caja({
             ))}
             <h3>Total: {moneda(cotizacion.total, cotizacion.currency)}</h3>
             <div className="fs-campo">
-              <label htmlFor="metodo-caja">Metodo de pago</label>
-              <select
-                id="metodo-caja"
-                className="fs-select"
-                value={metodo}
-                onChange={(e) => {
-                  setMetodo(e.target.value as MetodoPOS);
-                  setError('');
-                }}
-                disabled={ocupado}
-              >
-                {Object.entries(METODOS).map(([value, label]) => (
-                  <option key={value} value={value}>
+              <span className="fs-sub">Metodo de pago</span>
+              <div className="fs-opciones" role="radiogroup" aria-label="Metodo de pago">
+                {(Object.entries(METODOS) as [MetodoPOS, string][]).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={metodo === value}
+                    className={`fs-chip${metodo === value ? ' fs-chip--activo' : ''}`}
+                    disabled={ocupado}
+                    onClick={() => void elegirMetodo(value)}
+                  >
                     {label}
-                  </option>
+                  </button>
                 ))}
-              </select>
+              </div>
             </div>
-            {metodo === 'CASH' ? (
+            {metodo === 'CASH' && (
               <div className="fs-campo">
                 <label htmlFor="recibido">Efectivo recibido</label>
                 <input
@@ -787,38 +944,54 @@ function Caja({
                   type="number"
                   min="0"
                   step="0.01"
+                  inputMode="decimal"
+                  autoFocus
                   value={recibido}
                   onChange={(e) => setRecibido(e.target.value)}
                   disabled={ocupado}
                 />
                 <p>
                   Cambio:{' '}
-                  {moneda(
-                    Number.isFinite(Number(recibido))
-                      ? Math.max(0, Number(recibido) - cotizacion.total)
-                      : 0,
-                    cotizacion.currency,
-                  )}
+                  <strong>
+                    {moneda(
+                      Number.isFinite(Number(recibido))
+                        ? Math.max(0, Number(recibido) - cotizacion.total)
+                        : 0,
+                      cotizacion.currency,
+                    )}
+                  </strong>
                 </p>
               </div>
-            ) : (
+            )}
+            {(metodo === 'QR' || metodo === 'BANK_TRANSFER') && (
               <div className="fs-campo">
-                <label htmlFor="referencia-caja">Referencia del pago</label>
+                <label htmlFor="referencia-caja">Numero de operacion</label>
                 <input
                   id="referencia-caja"
                   className="fs-input"
                   maxLength={175}
+                  autoComplete="off"
                   value={referencia}
                   onChange={(e) => setReferencia(e.target.value)}
                   disabled={ocupado}
                 />
                 <p className="fs-sub">
-                  Confirma que el pago se realizo en el banco o terminal antes de registrarlo.
+                  Verifica en la app del banco que el pago llego antes de confirmarlo.
                 </p>
               </div>
             )}
+            {metodo === 'CARD' &&
+              (intento ? (
+                <CobroTarjeta
+                  intento={intento}
+                  deshabilitado={ocupado}
+                  onAutorizado={cobrarConTarjeta}
+                />
+              ) : (
+                <p className="fs-sub">{ocupado ? 'Preparando el cobro con tarjeta...' : ''}</p>
+              ))}
             {reserva && (
-              <p>Al confirmar se cerrara la reserva y se liberaran las prendas no compradas.</p>
+              <p>Al cobrar se cerrara la reserva y se liberaran las prendas no compradas.</p>
             )}
           </div>
         )}
@@ -840,6 +1013,6 @@ function Caja({
       >
         {comprobante && <ComprobanteVenta venta={comprobante} />}
       </Modal>
-    </>
+    </div>
   );
 }

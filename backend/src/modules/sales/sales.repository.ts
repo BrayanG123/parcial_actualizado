@@ -302,12 +302,18 @@ export class SalesRepository {
     return tx.payment.update({ where: { id }, data });
   }
 
-  async findAll(query: ListSalesQueryDto, clientUserId?: number) {
+  async findAll(
+    query: ListSalesQueryDto,
+    clientUserId?: number,
+    createdById?: number,
+  ) {
     const where: Prisma.SaleWhereInput = {
       branchId: query.branchId,
       status: query.status,
       channel: query.channel,
+      shiftId: query.shiftId,
       ...(clientUserId ? { client: { userId: clientUserId } } : {}),
+      ...(createdById ? { createdById } : {}),
       soldAt: {
         gte: query.from ? new Date(query.from) : undefined,
         lte: query.to ? new Date(query.to) : undefined,

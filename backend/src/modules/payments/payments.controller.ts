@@ -20,6 +20,7 @@ import { Role } from '../../common/enums/role.enum.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { CreateStripeIntentDto } from './dto/create-stripe-intent.dto.js';
+import { PosCardChargeDto, PosCardIntentDto } from './dto/pos-card.dto.js';
 import { PaymentsService } from './payments.service.js';
 import {
   AllowWhenReadOnly,
@@ -49,6 +50,32 @@ export class PaymentsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.payments.createIntent(dto.saleId, user);
+  }
+
+  /** Caja: autoriza el total del ticket con la tarjeta que se ingresa en el formulario. */
+  @Post('pos/card-intents')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRATOR, Role.BRANCH_MANAGER, Role.CASHIER)
+  @RequiresFeature('sales')
+  @Header('Cache-Control', 'no-store')
+  createPosCardIntent(
+    @Body() dto: PosCardIntentDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.payments.createPosCardIntent(dto, user);
+  }
+
+  /** Caja: registra la venta con el cobro autorizado y lo captura. */
+  @Post('pos/card-charges')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMINISTRATOR, Role.BRANCH_MANAGER, Role.CASHIER)
+  @RequiresFeature('sales')
+  @Header('Cache-Control', 'no-store')
+  chargePosCard(
+    @Body() dto: PosCardChargeDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.payments.chargePosCard(dto, user);
   }
 
   @Get('sales/:saleId')

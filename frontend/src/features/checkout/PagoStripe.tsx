@@ -96,6 +96,8 @@ function FormularioStripe({
         </p>
       )}
       <PaymentElement
+        // Sin Link: cada pago pide los datos de la tarjeta; no se guardan para la proxima compra.
+        options={{ wallets: { link: "never" } }}
         onReady={() => setListo(true)}
         onLoadError={() =>
           setError(

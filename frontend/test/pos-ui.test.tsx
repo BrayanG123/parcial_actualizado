@@ -18,10 +18,11 @@ import { turno } from './turnos-fixtures';
 let root: Root;
 let container: HTMLDivElement;
 let qc: QueryClient;
-let enviados: CobroPOS[];
+let enviados: Array<Record<string, unknown>>;
 let modo: 'network' | 'conflict' | 'success';
 beforeEach(() => {
   sessionStorage.clear();
+  localStorage.clear();
   guardarToken('admin-pos');
   container = document.createElement('div');
   document.body.append(container);
@@ -63,6 +64,10 @@ beforeEach(() => {
       if (modo === 'conflict') throw rechazo(c, 409, 'Prices changed; review the current total');
       return respuesta(c, venta);
     }
+    if (c.url === '/payments/pos/card-charges') {
+      enviados.push(JSON.parse(c.data));
+      return respuesta(c, venta);
+    }
     if (c.url === '/sales/71/receipt')
       return respuesta(c, { ...venta, receiptNumber: 'FS-00000071' });
     throw new Error(`Unexpected request: ${c.url}`);
@@ -95,13 +100,16 @@ async function montar(ruta = '/caja?reserva=9&sucursal=2') {
   );
   await esperar();
 }
-function boton(text: string) {
-  const b = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === text);
+function boton(text: string, ultimo = false) {
+  const todos = [...document.querySelectorAll('button')].filter(
+    (b) => b.textContent?.trim() === text,
+  );
+  const b = ultimo ? todos.at(-1) : todos[0];
   expect(b, text).toBeDefined();
   return b!;
 }
-async function click(text: string) {
-  await act(async () => boton(text).click());
+async function click(text: string, ultimo = false) {
+  await act(async () => boton(text, ultimo).click());
   await esperar();
 }
 async function input(id: string, value: string) {
@@ -115,25 +123,18 @@ async function input(id: string, value: string) {
     el.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
-async function select(id: string, value: string) {
-  await act(async () => {
-    const el = document.getElementById(id) as HTMLSelectElement;
-    el.value = value;
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-}
 async function revisarReservaParcial() {
   await montar();
-  await click('Cargar reserva');
+  await click('Cargar');
   await act(async () =>
     (
       document.querySelector('[aria-label="Restar Camisa original M"]') as HTMLButtonElement
     ).click(),
   );
-  await click('Revisar total');
+  await click('Cobrar');
 }
 describe('caja React real', () => {
-  it('requires opening a personal shift before selling and restores it from the server', async () => {
+  it('shows only the branch registers with "Abrir caja" until one is opened, then the sales tabs', async () => {
     const fallback = instancia.defaults.adapter as import('axios').AxiosAdapter;
     let actual: typeof turno | null = null;
     instancia.defaults.adapter = async (c) => {
@@ -141,6 +142,7 @@ describe('caja React real', () => {
       if (c.url === '/cash/registers')
         return respuesta(c, [
           { id: 1, branchId: 2, name: 'Caja 1', occupied: false, cashier: null },
+          { id: 2, branchId: 2, name: 'Caja 2', occupied: true, cashier: 'Luis' },
         ]);
       if (c.url === '/cash/shifts' && c.method === 'post') {
         expect(JSON.parse(c.data)).toMatchObject({
@@ -155,14 +157,22 @@ describe('caja React real', () => {
     };
     await montar();
     await esperar();
-    expect(boton('Cargar reserva').disabled).toBe(true);
-    expect(boton('Revisar total').disabled).toBe(true);
-    await select('caja-turno', '1');
-    await input('saldo-turno', '100');
-    await click('Abrir turno');
-    expect(document.body.textContent).toContain('Turno abierto #1');
-    expect(boton('Cargar reserva').disabled).toBe(false);
-    expect((document.getElementById('sucursal-caja') as HTMLSelectElement).disabled).toBe(true);
+    expect(document.body.textContent).toContain('CAJA-001');
+    expect(document.body.textContent).toContain('En uso · Luis');
+    expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Cobrar')).toBe(
+      false,
+    );
+    const abrir = [...document.querySelectorAll('button')].filter(
+      (b) => b.textContent === 'Abrir caja',
+    );
+    expect(abrir.map((b) => b.disabled)).toEqual([false, true]);
+    await click('Abrir caja');
+    await input('saldo-inicial', '100');
+    await click('Abrir caja', true);
+    expect(document.body.textContent).toContain('Punto de venta');
+    expect(boton('Registrar ventas').getAttribute('aria-selected')).toBe('true');
+    expect(boton('Historial de ventas')).toBeDefined();
+    expect(boton('Cargar').disabled).toBe(false);
   });
   it('requires a reason for a cash shortage and retries the exact closing payload after a lost response', async () => {
     const fallback = instancia.defaults.adapter as import('axios').AxiosAdapter;
@@ -188,27 +198,24 @@ describe('caja React real', () => {
       }
       return fallback(c);
     };
-    await montar('/caja');
-    await click('Cerrar y arquear turno');
-    await input('contado-turno', '250');
+    await montar('/caja?sucursal=2');
+    await click('Cerrar caja');
+    await input('contado-caja', '250');
     await click('Confirmar cierre');
     expect(requests).toHaveLength(0);
-    expect(document.body.textContent).toContain('Explica el faltante');
-    await input('nota-turno', 'Faltante contado');
+    expect(document.body.textContent).toContain('explica el faltante');
+    await input('nota-caja', 'Faltante contado');
     await click('Confirmar cierre');
-    expect(boton('Cargar reserva').disabled || document.querySelector('fieldset')!.disabled).toBe(
-      true,
-    );
-    await click('Reintentar turno');
+    await click('Reintentar cierre');
     expect(requests).toEqual([
       { countedCash: 250, note: 'Faltante contado' },
       { countedCash: 250, note: 'Faltante contado' },
     ]);
-    expect(document.body.textContent).toContain('Turno cerrado');
+    expect(document.body.textContent).toContain('Caja cerrada');
     expect(document.body.textContent).toContain('Faltante contado');
-    expect(boton('Cargar reserva').disabled).toBe(true);
+    expect(boton('Abrir caja')).toBeDefined();
   });
-  it('builds a ticket from available variants and sends only selected identifiers to server review', async () => {
+  it('builds a ticket from available variants, keeps it after leaving the caja and sends only identifiers to review', async () => {
     const fallback = instancia.defaults.adapter as import('axios').AxiosAdapter;
     let reviewed = false;
     instancia.defaults.adapter = async (c) => {
@@ -232,7 +239,7 @@ describe('caja React real', () => {
       }
       return fallback(c);
     };
-    await montar();
+    await montar('/caja');
     const productButton = [...document.querySelectorAll('button')].find(
       (b) => b.querySelector('strong')?.textContent === 'Camisa',
     )!;
@@ -247,20 +254,25 @@ describe('caja React real', () => {
     ).toBe(true);
     await click('Agregar al ticket');
     expect(document.body.textContent).toContain('No hay mas stock');
-    await click('Revisar total');
+    // Salir de la caja y volver: el ticket sigue ahi.
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    await montar('/caja');
+    expect(document.querySelector('[aria-label="Sumar Camisa M"]')).not.toBeNull();
+    await click('Cobrar');
     expect(reviewed).toBe(true);
-    expect(document.querySelector('[aria-label="Confirmar cobro"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="Cobrar venta"]')).not.toBeNull();
   });
-  it('validates cash, retains the exact request on network failure and recovers the receipt without a second charge', async () => {
+  it('validates cash, retains the exact request on network failure, shows the receipt and empties the ticket', async () => {
     const invalidar = vi.spyOn(qc, 'invalidateQueries').mockResolvedValue();
     await revisarReservaParcial();
     await input('recibido', '100');
-    await click('Cobrar y finalizar');
+    await click('Confirmar pago');
     expect(enviados).toHaveLength(0);
     expect(document.body.textContent).toContain('debe cubrir el total');
     await input('recibido', '200');
     modo = 'network';
-    await click('Cobrar y finalizar');
+    await click('Confirmar pago');
     expect(enviados).toHaveLength(1);
     expect(recuperarCobro(12)).toEqual(enviados[0]);
     expect(document.body.textContent).toContain('Cobro pendiente de confirmacion');
@@ -275,24 +287,27 @@ describe('caja React real', () => {
     const imprimir = vi.spyOn(window, 'print').mockImplementation(() => {});
     await click('Imprimir comprobante');
     expect(imprimir).toHaveBeenCalledOnce();
+    await click('Nueva venta');
+    expect(document.body.textContent).toContain('Todavia no hay prendas');
+    expect(Object.keys(localStorage).some((k) => k.startsWith('fs.pos.ticket'))).toBe(false);
   });
-  it('requires an external payment reference and returns to review when the backend rejects stale prices', async () => {
+  it('requires the operation number for QR and returns to review when the backend rejects stale prices', async () => {
     await revisarReservaParcial();
-    await select('metodo-caja', 'QR');
-    await click('Cobrar y finalizar');
+    await click('QR');
+    await click('Confirmar pago');
     expect(enviados).toHaveLength(0);
-    expect(document.body.textContent).toContain('Ingresa la referencia');
+    expect(document.body.textContent).toContain('numero de operacion');
     await input('referencia-caja', '  QR-123  ');
     modo = 'conflict';
-    await click('Cobrar y finalizar');
+    await click('Confirmar pago');
     expect(enviados[0]).toMatchObject({
       paymentMethod: 'QR',
       paymentReference: 'QR-123',
       expectedTotal: 160,
     });
     expect(recuperarCobro(12)).toBeNull();
-    expect(document.querySelector('[aria-label="Confirmar cobro"]')).toBeNull();
-    expect(boton('Revisar total').disabled).toBe(false);
+    expect(document.querySelector('[aria-label="Cobrar venta"]')).toBeNull();
+    expect(boton('Cobrar').disabled).toBe(false);
   });
   it('restores a pending confirmation after remount and prevents a new ticket until resolved', async () => {
     guardarCobro(12, cobro);
@@ -303,12 +318,31 @@ describe('caja React real', () => {
     expect(enviados).toEqual([cobro]);
     expect(recuperarCobro(12)).toBeNull();
   });
-  it('fixes the administrator branch while their shift is open', async () => {
+  it('retries an authorized card charge with its payment intent instead of a typed reference', async () => {
+    const tarjeta: CobroPOS = { ...cobro, paymentMethod: 'CARD', paymentReference: 'pi_123' };
+    guardarCobro(12, tarjeta);
     await montar();
-    await click('Cargar reserva');
+    await click('Reintentar confirmacion');
+    expect(enviados).toEqual([
+      {
+        branchId: cobro.branchId,
+        clientId: cobro.clientId,
+        reservationId: cobro.reservationId,
+        items: cobro.items,
+        shiftId: cobro.shiftId,
+        idempotencyKey: cobro.idempotencyKey,
+        expectedTotal: cobro.expectedTotal,
+        paymentIntentId: 'pi_123',
+      },
+    ]);
+    expect(recuperarCobro(12)).toBeNull();
+  });
+  it('keeps the open caja branch and blocks closing while the ticket has garments', async () => {
+    await montar();
+    await click('Cargar');
     expect(document.body.textContent).toContain('Reserva #9');
-    expect((document.getElementById('sucursal-caja') as HTMLSelectElement).disabled).toBe(true);
-    expect((document.getElementById('sucursal-caja') as HTMLSelectElement).value).toBe('2');
-    expect(boton('Cerrar y arquear turno').disabled).toBe(true);
+    expect(document.getElementById('sucursal-caja')).toBeNull();
+    expect(document.body.textContent).toContain('Centro · Caja 1');
+    expect(boton('Cerrar caja').disabled).toBe(true);
   });
 });

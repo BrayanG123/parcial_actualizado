@@ -50,7 +50,23 @@ export class SalesService {
     if (this.push) void this.push.notifySale(saleId);
   }
 
-  async createInStore(dto: CreateInStoreSaleDto, user: AuthenticatedUser) {
+  /**
+   * Con Stripe configurado, la tarjeta solo se registra desde el cobro de caja
+   * (PaymentsService.chargePosCard), que verifica la autorizacion real del pago.
+   */
+  async createInStore(
+    dto: CreateInStoreSaleDto,
+    user: AuthenticatedUser,
+    options: { cardVerified?: boolean } = {},
+  ) {
+    if (
+      dto.paymentMethod === 'CARD' &&
+      !options.cardVerified &&
+      this.config.get<string>('STRIPE_SECRET_KEY')
+    )
+      throw new BadRequestException(
+        'Card payments must be charged with the card form',
+      );
     const items = sortedItems(dto.items);
     const reference = dto.paymentReference?.trim();
     if (dto.paymentMethod !== 'CASH' && !reference)
@@ -683,7 +699,11 @@ export class SalesService {
         );
       scoped = { ...query, branchId: employee.branchId };
     }
-    const result = await this.repository.findAll(scoped);
+    const result = await this.repository.findAll(
+      scoped,
+      undefined,
+      query.mine ? user.id : undefined,
+    );
     return { ...result, data: result.data.map((sale) => this.present(sale)) };
   }
 

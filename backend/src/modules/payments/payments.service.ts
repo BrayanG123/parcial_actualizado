@@ -1,11 +1,16 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import type Stripe from 'stripe';
+import { Prisma } from '../../generated/prisma/client.js';
+import type { PosCardChargeDto, PosCardIntentDto } from './dto/pos-card.dto.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { Role } from '../../common/enums/role.enum.js';
 import { SalesService } from '../sales/sales.service.js';
@@ -80,6 +85,110 @@ export class PaymentsService {
       currency: latest.sale.currency,
       expiresAt: latest.sale.expiresAt,
     };
+  }
+
+  /** Caja: autoriza (sin capturar) el total del ticket para cobrarlo con tarjeta. */
+  async createPosCardIntent(dto: PosCardIntentDto, user: AuthenticatedUser) {
+    if (!this.gateway.isConfigured())
+      throw new ServiceUnavailableException('Stripe is not configured');
+    const quote = await this.sales.previewInStore(dto, user);
+    if (quote.total !== dto.expectedTotal)
+      throw new ConflictException(
+        'Prices changed; review the current total before recording the payment',
+      );
+    const amount = stripeAmount(new Prisma.Decimal(quote.total), quote.currency);
+    const intent = await this.gateway.createPosIntent({
+      amount,
+      currency: quote.currency,
+      // La clave incluye el importe: un ticket corregido genera otro intento.
+      requestKey: `${dto.idempotencyKey}:${amount}`,
+      metadata: {
+        kind: 'pos',
+        userId: String(user.id),
+        shiftId: String(dto.shiftId),
+        branchId: String(dto.branchId),
+        saleKey: dto.idempotencyKey,
+      },
+    });
+    return {
+      paymentIntentId: intent.id,
+      clientSecret: intent.client_secret,
+      publishableKey: this.gateway.publicConfig().publishableKey,
+      amount: quote.total,
+      currency: quote.currency,
+    };
+  }
+
+  /**
+   * Caja: con el cobro autorizado registra la venta (descuenta stock y suma al turno)
+   * y recien entonces captura el dinero. Si la venta se rechaza, libera la autorizacion.
+   */
+  async chargePosCard(dto: PosCardChargeDto, user: AuthenticatedUser) {
+    if (!this.gateway.isConfigured())
+      throw new ServiceUnavailableException('Stripe is not configured');
+    const intent = await this.gateway.retrieveIntent(dto.paymentIntentId);
+    const meta = intent.metadata ?? {};
+    if (
+      intent.livemode ||
+      meta.application !== 'fashionstore' ||
+      meta.kind !== 'pos' ||
+      meta.userId !== String(user.id) ||
+      meta.saleKey !== dto.idempotencyKey ||
+      meta.shiftId !== String(dto.shiftId) ||
+      intent.amount !==
+        stripeAmount(
+          new Prisma.Decimal(dto.expectedTotal),
+          intent.currency.toUpperCase(),
+        )
+    )
+      throw new BadRequestException('The card payment does not match this ticket');
+    if (!['requires_capture', 'succeeded'].includes(intent.status))
+      throw new BadRequestException('The card payment was not authorized');
+    let sale: Awaited<ReturnType<SalesService['createInStore']>>;
+    try {
+      sale = await this.sales.createInStore(
+        {
+          branchId: dto.branchId,
+          clientId: dto.clientId,
+          reservationId: dto.reservationId,
+          items: dto.items,
+          shiftId: dto.shiftId,
+          idempotencyKey: dto.idempotencyKey,
+          expectedTotal: dto.expectedTotal,
+          paymentMethod: 'CARD',
+          paymentReference: intent.id,
+        },
+        user,
+        { cardVerified: true },
+      );
+    } catch (error) {
+      // Rechazo definitivo (stock, precio, turno): no se cobra al cliente.
+      if (
+        intent.status === 'requires_capture' &&
+        error instanceof HttpException &&
+        error.getStatus() < 500
+      )
+        await this.gateway.cancelIntent(intent.id).catch((cancelError) =>
+          this.logger.error(
+            `No se pudo liberar el cobro ${intent.id}: ${String(cancelError)}`,
+          ),
+        );
+      throw error;
+    }
+    if (intent.status === 'requires_capture') {
+      try {
+        await this.gateway.captureIntent(intent.id);
+      } catch (error) {
+        // La venta ya existe: reintentar la misma operacion reutiliza la venta y captura.
+        this.logger.error(
+          `Venta ${sale.id} registrada sin capturar ${intent.id}: ${String(error)}`,
+        );
+        throw new ServiceUnavailableException(
+          'Stripe is unavailable; retry the same operation',
+        );
+      }
+    }
+    return sale;
   }
 
   async status(saleId: number, user: AuthenticatedUser) {

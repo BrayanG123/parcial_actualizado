@@ -1,5 +1,13 @@
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsISO8601, IsOptional, Max, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsISO8601,
+  IsOptional,
+  Max,
+  Min,
+} from 'class-validator';
 import { SaleChannel, SaleStatus } from '../../../generated/prisma/client.js';
 
 export class ListSalesQueryDto {
@@ -20,6 +28,20 @@ export class ListSalesQueryDto {
   @Min(1)
   @Max(2147483647)
   branchId?: number;
+
+  /** Ventas de un turno de caja. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(2147483647)
+  shiftId?: number;
+
+  /** true: solo las ventas registradas por quien consulta (historial del cajero). */
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  mine?: boolean;
 
   @IsOptional()
   @IsIn(Object.values(SaleStatus))

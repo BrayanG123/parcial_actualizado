@@ -1,6 +1,7 @@
 import { api } from '../api/http';
 import { endpoints } from '../api/endpoints';
 import { adaptarVenta, type VentaBackend } from '../api/ventas.contratos';
+import { adaptarPagina, type PaginaBackend } from '../api/contratos';
 
 export interface ItemPOS {
   productId: number;
@@ -53,7 +54,31 @@ export interface CobroPOS extends SeleccionPOS {
   paymentMethod: MetodoPOS;
   paymentReference?: string;
 }
+/** Cobro con tarjeta en caja: Stripe autoriza el total y el backend registra y captura. */
+export interface IntentoTarjetaPOS {
+  paymentIntentId: string;
+  clientSecret: string;
+  publishableKey: string;
+  amount: number;
+  currency: string;
+}
+export type TicketTarjetaPOS = Omit<CobroPOS, 'paymentMethod' | 'paymentReference'>;
 export const posService = {
+  intentoTarjeta: (datos: TicketTarjetaPOS) =>
+    api.post<IntentoTarjetaPOS>('/payments/pos/card-intents', datos),
+  cobrarTarjeta: async (datos: TicketTarjetaPOS & { paymentIntentId: string }) =>
+    adaptarVenta(await api.post<VentaBackend>('/payments/pos/card-charges', datos)),
+  /** Ventas registradas por el cajero; con turno, solo las de esa caja abierta. */
+  historial: async (page: number, shiftId?: number) =>
+    adaptarPagina(
+      await api.get<PaginaBackend<VentaBackend>>(endpoints.ventas.lista, {
+        page,
+        limit: 10,
+        mine: true,
+        shiftId,
+      }),
+      adaptarVenta,
+    ),
   clientes: (branchId: number, search: string) =>
     api.get<ClientePOS[]>(endpoints.ventas.clientes, { branchId, search }),
   reserva: (id: number, branchId: number) =>

@@ -97,6 +97,41 @@ export class PaymentGatewayService {
     );
   }
 
+  /**
+   * Cobro con tarjeta en caja: solo se autoriza (captura manual). La venta se registra
+   * con el cobro autorizado y recien entonces se captura; si la venta falla se libera.
+   */
+  createPosIntent(input: {
+    amount: number;
+    currency: string;
+    requestKey: string;
+    metadata: Record<string, string>;
+  }): Promise<Stripe.PaymentIntent> {
+    return this.call(() =>
+      this.client().paymentIntents.create(
+        {
+          amount: input.amount,
+          currency: input.currency.toLowerCase(),
+          payment_method_types: ['card'],
+          capture_method: 'manual',
+          description: 'Venta en caja FashionStore',
+          metadata: { application: 'fashionstore', ...input.metadata },
+        },
+        { idempotencyKey: 'fashionstore:pos-intent:' + input.requestKey },
+      ),
+    );
+  }
+
+  captureIntent(id: string): Promise<Stripe.PaymentIntent> {
+    return this.call(() =>
+      this.client().paymentIntents.capture(
+        id,
+        {},
+        { idempotencyKey: 'fashionstore:capture:' + id },
+      ),
+    );
+  }
+
   retrieveIntent(id: string): Promise<Stripe.PaymentIntent> {
     return this.call(() => this.client().paymentIntents.retrieve(id));
   }

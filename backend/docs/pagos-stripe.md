@@ -77,10 +77,35 @@ Contrato importable: [payments.openapi.json](./payments.openapi.json).
 | POST | `/payments/stripe/intents` | JWT cliente propietario; crear/reutilizar intento |
 | GET | `/payments/sales/:saleId` | Propietario o personal autorizado; estado local |
 | POST | `/payments/stripe/webhook` | Sin JWT; firma Stripe obligatoria |
+| POST | `/payments/pos/card-intents` | JWT personal de caja; autoriza el total del ticket |
+| POST | `/payments/pos/card-charges` | JWT personal de caja; registra la venta y captura |
 
 Las respuestas autenticadas de Pagos llevan `Cache-Control: no-store`.
 La consulta de estado también permite pagos presenciales y respeta los permisos
 por sucursal del módulo Ventas. No devuelve `clientSecret` ni la clave interna.
+
+## Cobro con tarjeta en caja
+
+La caja cobra la tarjeta con Stripe (captura manual) y no con una referencia escrita:
+
+1. `POST /payments/pos/card-intents` recibe el ticket (`branchId`, `items`,
+   `clientId?`, `reservationId?`, `shiftId`, `idempotencyKey`, `expectedTotal`),
+   recalcula el total y crea un Payment Intent solo de tarjeta con
+   `capture_method: manual` y metadatos `kind=pos`, cajero, turno y clave del ticket.
+2. El navegador confirma la tarjeta con el Payment Element (Link, Apple Pay y
+   Google Pay desactivados: cada cobro pide los datos de la tarjeta). Stripe deja
+   el pago en `requires_capture` (autorizado, sin cobrar).
+3. `POST /payments/pos/card-charges` (mismo ticket + `paymentIntentId`) verifica
+   que el intento sea de prueba, del mismo cajero, turno, ticket e importe y que
+   este autorizado. Registra la venta (stock, pago `CARD` con referencia
+   `IN_STORE:CARD:pi_...`, totales del turno) y **despues** captura el cobro.
+   Si la venta se rechaza (stock, precio o caja cerrada) se cancela la
+   autorizacion y el cliente no paga. Reintentar con la misma clave devuelve la
+   misma venta y vuelve a intentar la captura.
+
+Con Stripe configurado, `POST /sales/in-store` rechaza `paymentMethod: CARD`
+(`Card payments must be charged with the card form`). Sin Stripe se mantiene el
+registro manual con referencia. Las ventas offline no cambian.
 
 ## Flujo web/móvil
 

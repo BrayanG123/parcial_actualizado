@@ -6,19 +6,28 @@ Los turnos de caja requieren la migracion explicada en [turnos y arqueo](turnos-
 ## Recorrido para la presentacion
 
 1. Iniciar el backend y React con `VITE_USE_MOCKS=false`.
-2. Entrar como administrador, encargado o cajero. El administrador selecciona
-   sucursal; los empleados usan la de su perfil activo.
-3. Abrir un turno propio seleccionando caja y saldo inicial. En **Punto de venta**, buscar una prenda, elegir talla y color y agregar
-   cantidades segun disponibilidad. Se puede vender a consumidor final o buscar
-   un cliente por nombre/correo. El backend aplica su condicion mayorista.
-4. Pulsar **Revisar total**. NestJS calcula los precios vigentes, descuentos,
-   moneda y total. Esta consulta no modifica stock ni registra pagos.
-5. Para efectivo, introducir el importe recibido y revisar el cambio. Para
-   tarjeta, QR o transferencia, confirmar el pago externo e introducir su
-   referencia. Estos metodos registran un pago ya realizado; no ejecutan una
-   transaccion bancaria desde React.
-6. Confirmar el cobro. Se registra venta, pago y movimiento de stock en la misma
-   transaccion. Ver o imprimir el comprobante y consultar el historial.
+2. Entrar como cajero, encargado o administrador. Sin caja abierta, **Punto de
+   venta** muestra solo la lista **Cajas** de la sucursal (codigo, nombre, estado y
+   si esta disponible o en uso) con la accion **Abrir caja**. El administrador elige
+   antes la sucursal.
+3. **Abrir caja** pide el efectivo inicial. La caja queda abierta en el servidor
+   (`GET /cash/shifts/current`) hasta cerrarla con el arqueo: recargar o navegar
+   por el sistema no la cierra.
+4. Con la caja abierta aparecen dos pestanas: **Registrar ventas** e **Historial de
+   ventas** (las de esta caja o todas las del cajero: `GET /sales?mine=true&shiftId=`).
+5. Buscar la prenda, elegir talla y color y agregarla al ticket (se ve el stock de
+   la sucursal). El ticket se guarda en el navegador por caja y usuario, asi que
+   sobrevive a navegar a otra seccion. Cliente opcional; el backend aplica su
+   condicion mayorista.
+6. **Cobrar** pide al backend el total vigente (no modifica stock). Metodos:
+   - Efectivo: importe recibido y cambio.
+   - Tarjeta: formulario de Stripe en modo prueba, sin tarjetas guardadas (Link
+     desactivado). Ver [cobro con tarjeta en caja](pagos-stripe.md#cobro-con-tarjeta-en-caja).
+   - QR o transferencia: numero de operacion del pago ya recibido.
+7. Al confirmar se registran venta, pago, descuento de stock y totales del turno en
+   la misma transaccion. Se muestra el comprobante y el ticket queda vacio.
+8. **Cerrar caja** (deshabilitado con prendas en el ticket) hace el arqueo; si el
+   efectivo contado no coincide hay que explicar la diferencia.
 
 ## Venta desde una reserva
 
