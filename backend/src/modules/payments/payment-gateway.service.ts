@@ -122,6 +122,28 @@ export class PaymentGatewayService {
     );
   }
 
+  /** Suscripcion SaaS: cobro inmediato con tarjeta (sin guardar el medio de pago). */
+  createSubscriptionIntent(input: {
+    amount: number;
+    currency: string;
+    requestKey: string;
+    description: string;
+    metadata: Record<string, string>;
+  }): Promise<Stripe.PaymentIntent> {
+    return this.call(() =>
+      this.client().paymentIntents.create(
+        {
+          amount: input.amount,
+          currency: input.currency.toLowerCase(),
+          payment_method_types: ['card'],
+          description: input.description,
+          metadata: { application: 'fashionstore', ...input.metadata },
+        },
+        { idempotencyKey: 'fashionstore:subscription:' + input.requestKey },
+      ),
+    );
+  }
+
   captureIntent(id: string): Promise<Stripe.PaymentIntent> {
     return this.call(() =>
       this.client().paymentIntents.capture(

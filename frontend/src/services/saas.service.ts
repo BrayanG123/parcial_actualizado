@@ -1,6 +1,7 @@
 /** Landing SaaS publica: planes disponibles y alta autoservicio de una empresa. */
 import { api } from '../api/http';
 import { endpoints } from '../api/endpoints';
+import type { CobroSuscripcion } from './suscripcion.service';
 
 export interface PlanPublico {
   codigo: string;
@@ -42,8 +43,11 @@ export const saasService = {
     }));
   },
 
-  async registrarEmpresa(datos: NuevaEmpresaPublica): Promise<{ slug: string; nombre: string }> {
-    const e = await api.post<{ slug: string; name: string }>(endpoints.saas.registro, {
+  /** Plan gratuito: crea la empresa. Plan de pago: devuelve el cobro a completar con Stripe. */
+  async registrarEmpresa(
+    datos: NuevaEmpresaPublica,
+  ): Promise<{ slug: string; nombre: string } | CobroSuscripcion> {
+    const e = await api.post<{ slug: string; name: string } | CobroSuscripcion>(endpoints.saas.registro, {
       name: datos.nombre.trim(),
       slug: datos.slug.trim().toLowerCase(),
       planCode: datos.plan,
@@ -53,7 +57,9 @@ export const saasService = {
         password: datos.admin.password,
       },
     });
-    return { slug: e.slug, nombre: e.name };
+    if ('paymentRequired' in e && e.paymentRequired) return e;
+    const creada = e as { slug: string; name: string };
+    return { slug: creada.slug, nombre: creada.name };
   },
 };
 

@@ -107,6 +107,21 @@ enum SubscriptionStatus {
   CANCELLED
 }
 
+enum SubscriptionPaymentKind {
+  SIGNUP
+  NEW_TENANT
+  CHANGE_PLAN
+  RENEW
+}
+
+enum SubscriptionPaymentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  REFUNDED
+}
+
 enum SubscriptionAction {
   ASSIGN
   CHANGE_PLAN
@@ -129,6 +144,7 @@ model Tenant {
   createdAt          DateTime            @default(now()) @map("fecha_creacion") @db.Timestamptz(3)
   updatedAt          DateTime            @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
   subscription       Subscription?
+  subscriptionPayments SubscriptionPayment[]
   users              User[]
   clients            Client[]
   employees          Employee[]
@@ -182,6 +198,7 @@ model Plan {
   createdAt         DateTime              @default(now()) @map("fecha_creacion") @db.Timestamptz(3)
   updatedAt         DateTime              @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
   subscriptions     Subscription[]
+  subscriptionPayments SubscriptionPayment[]
   historyFrom       SubscriptionHistory[] @relation("HistoryFromPlan")
   historyTo         SubscriptionHistory[] @relation("HistoryToPlan")
 
@@ -260,6 +277,36 @@ model User {
   @@map("usuarios")
 }
 
+/// Pago de una suscripcion SaaS con Stripe (alta de empresa, empresa nueva de un dueño,
+/// cambio de plan o renovacion). Tabla de plataforma: no pertenece a una empresa hasta que
+/// el pago crea o modifica una. El efecto se aplica solo con el pago confirmado por Stripe.
+model SubscriptionPayment {
+  id             Int                       @id @default(autoincrement()) @map("id_pago_suscripcion")
+  publicId       String                    @unique @default(uuid()) @map("clave_publica") @db.Uuid
+  kind           SubscriptionPaymentKind   @map("tipo")
+  status         SubscriptionPaymentStatus @default(PENDING) @map("estado")
+  tenantId       Int?                      @map("id_empresa")
+  planId         Int                       @map("id_plan")
+  ownerAccountId Int?                      @map("id_cuenta_propietario")
+  requestedById  Int?                      @map("id_usuario")
+  months         Int                       @default(1) @map("meses")
+  amount         Decimal                   @map("monto") @db.Decimal(12, 2)
+  currency       String                    @map("moneda") @db.VarChar(3)
+  /// Datos para crear la empresa al confirmar el pago (contraseña ya cifrada).
+  signupData     Json?                     @map("datos_registro")
+  stripeIntentId String?                   @unique @map("stripe_intent_id") @db.VarChar(200)
+  failureReason  String?                   @map("motivo_fallo") @db.VarChar(250)
+  createdAt      DateTime                  @default(now()) @map("fecha_creacion") @db.Timestamptz(3)
+  paidAt         DateTime?                 @map("fecha_pago") @db.Timestamptz(3)
+  tenant         Tenant?                   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  plan           Plan                      @relation(fields: [planId], references: [id], onDelete: Restrict)
+  ownerAccount   OwnerAccount?             @relation(fields: [ownerAccountId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([tenantId])
+  @@map("pagos_suscripcion")
+}
+
 /// Cuenta global de un dueño de empresas (F14): no pertenece a ninguna empresa. Un dueño puede
 /// tener varias empresas, cada una con su propio administrador (usuario de esa empresa).
 model OwnerAccount {
@@ -271,6 +318,7 @@ model OwnerAccount {
   createdAt    DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @map("fecha_actualizacion") @db.Timestamptz(3)
   users        User[]
+  subscriptionPayments SubscriptionPayment[]
 
   @@map("cuentas_propietario")
 }

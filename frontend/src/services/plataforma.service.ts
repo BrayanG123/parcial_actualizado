@@ -11,6 +11,7 @@ import {
 } from '../api/saas.contratos';
 import type { SesionBackend } from '../api/auth.contratos';
 import { ErrorApi } from '../types/api';
+import type { PagoSuscripcion } from './suscripcion.service';
 import type { EmpresaPlataforma, Funcionalidades, MovimientoSuscripcion, Plan } from '../types/saas';
 
 export interface NuevaEmpresa {
@@ -30,7 +31,32 @@ export interface CambiosPlan {
 
 const empresa = (e: EmpresaPlataformaBackend) => adaptarEmpresaPlataforma(e);
 
+/** Superadmin: resumen del negocio SaaS. */
+export interface ResumenPlataforma {
+  currency: string;
+  tenants: { total: number; active: number; inactive: number };
+  subscriptions: { active: number; expired: number; suspended: number; cancelled: number };
+  byPlan: Array<{ code: string; name: string; count: number }>;
+  revenue: {
+    mrr: number;
+    month: number;
+    monthPayments: number;
+    total: number;
+    totalPayments: number;
+    failedOrRefunded: number;
+  };
+  expiringSoon: Array<{ tenant: { id: number; name: string; slug: string }; plan: string; endsAt: string }>;
+}
+export type PagoPlataforma = PagoSuscripcion & { owner: string | null; requestedSlug: string | null };
+
 export const plataformaService = {
+  resumen: () => apiPlataforma.get<ResumenPlataforma>('/platform/dashboard'),
+
+  pagos: (page: number, estado?: string) =>
+    apiPlataforma.get<{ data: PagoPlataforma[]; meta: { page: number; total: number; totalPages: number } }>(
+      `/platform/payments?page=${page}${estado ? `&status=${estado}` : ''}`,
+    ),
+
   async login(email: string, password: string): Promise<string> {
     const sesion = await apiPlataforma.post<SesionBackend>(endpoints.plataforma.login, {
       email: email.trim().toLowerCase(),

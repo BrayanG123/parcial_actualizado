@@ -258,6 +258,7 @@ describe('caja React real', () => {
     await act(async () => root.unmount());
     root = createRoot(container);
     await montar('/caja');
+    await esperar();
     expect(document.querySelector('[aria-label="Sumar Camisa M"]')).not.toBeNull();
     await click('Cobrar');
     expect(reviewed).toBe(true);

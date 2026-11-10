@@ -1,5 +1,6 @@
 /** Cuenta de dueño (F14): sus empresas, crear otra y entrar a una de ellas. */
 import { apiCuenta, guardarTokenCuenta } from '../api/http';
+import type { CobroSuscripcion } from './suscripcion.service';
 import { endpoints } from '../api/endpoints';
 import { ErrorApi } from '../types/api';
 
@@ -102,8 +103,9 @@ export const cuentaService = {
     return (await apiCuenta.get<EmpresaDuenoBackend[]>(endpoints.cuenta.empresas)).map(adaptar);
   },
 
+  /** Plan gratuito: crea la empresa. Plan de pago: devuelve el cobro a completar con Stripe. */
   crearEmpresa(datos: { nombre: string; slug: string; plan: string }) {
-    return apiCuenta.post<{ id: number; slug: string; name: string }>(endpoints.cuenta.empresas, {
+    return apiCuenta.post<{ id: number; slug: string; name: string } | CobroSuscripcion>(endpoints.cuenta.empresas, {
       name: datos.nombre.trim(),
       slug: datos.slug.trim().toLowerCase(),
       planCode: datos.plan,

@@ -353,6 +353,12 @@
 .fs-pos-linea { border-bottom: 1px dashed var(--fs-borde); padding-bottom: var(--fs-esp-2); }
 .fs-pos-variante { border-top: 1px solid var(--fs-borde); padding-top: var(--fs-esp-3); }
 .fs-pos-tarjeta { border: 1px solid var(--fs-borde); border-radius: var(--fs-radio-m); padding: var(--fs-esp-4); background: var(--fs-blanco); }
+.fs-planes-empresa { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--fs-esp-3); }
+.fs-plan-empresa { border: 1px solid var(--fs-borde); border-radius: var(--fs-radio-m); padding: var(--fs-esp-4); display: flex; flex-direction: column; gap: var(--fs-esp-2); background: var(--fs-blanco); }
+.fs-plan-empresa--actual { border-color: var(--fs-exito); box-shadow: inset 0 0 0 1px var(--fs-exito); }
+.fs-plan-empresa__precio { font-family: var(--fs-fuente-titulo); font-size: 1.4rem; margin: 0; }
+.fs-plan-empresa .fs-btn { margin-top: auto; }
+.fs-pago-suscripcion { max-width: 560px; }
 @media (max-width: 860px) {
   .fs-pos { grid-template-columns: 1fr; }
   .fs-pos-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }

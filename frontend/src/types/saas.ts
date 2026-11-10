@@ -58,7 +58,16 @@ export interface EmpresaPlataforma {
   slug: string;
   estado: 'ACTIVE' | 'INACTIVE';
   suscripcion: (Suscripcion & { plan: Plan }) | null;
-  uso: { sucursales_activas: number; sucursales: number; usuarios: number };
+  uso: {
+    sucursales_activas: number;
+    sucursales: number;
+    usuarios: number;
+    productos: number;
+    clientes: number;
+    ventas_30d: number;
+    total_ventas_30d: number;
+  };
+  dueno: { nombre: string; email: string } | null;
 }
 
 export interface MovimientoSuscripcion {

@@ -7,6 +7,9 @@ import { Modal } from '../../components/ui/Modal';
 import { useToast } from '../../context/ToastContext';
 import { fecha } from '../../lib/format';
 import { plataformaService, type NuevaEmpresa } from '../../services/plataforma.service';
+import { ETIQUETA_PAGO, precioUsd } from '../../services/suscripcion.service';
+import { fechaHora, moneda } from '../../lib/format';
+import { TarjetaKPI } from '../reports/componentes';
 import { ErrorApi } from '../../types/api';
 import { ETIQUETA_ESTADO, NOMBRE_FUNCION, type EmpresaPlataforma, type Plan } from '../../types/saas';
 
@@ -19,7 +22,7 @@ const SUSCRIPCION_CLASE: Record<string, string> = {
   CANCELLED: 'fs-badge--error',
 };
 
-/** F3.2: empresas, planes y suscripciones (administrador de plataforma). */
+/** Superadmin (cuenta de desarrollador): negocio SaaS, empresas, planes, suscripciones y pagos. */
 export default function PaginaPlataforma() {
   const navegar = useNavigate();
   const qc = useQueryClient();
@@ -28,6 +31,14 @@ export default function PaginaPlataforma() {
   const [historialDe, setHistorialDe] = useState<EmpresaPlataforma | null>(null);
   const empresas = useQuery({ queryKey: [...CLAVE, 'empresas'], queryFn: plataformaService.empresas, enabled: Boolean(tokenPlataforma()) });
   const planes = useQuery({ queryKey: [...CLAVE, 'planes'], queryFn: plataformaService.planes, enabled: Boolean(tokenPlataforma()) });
+  const resumen = useQuery({ queryKey: [...CLAVE, 'resumen'], queryFn: plataformaService.resumen, enabled: Boolean(tokenPlataforma()) });
+  const [paginaPagos, setPaginaPagos] = useState(1);
+  const [estadoPagos, setEstadoPagos] = useState('');
+  const pagos = useQuery({
+    queryKey: [...CLAVE, 'pagos', paginaPagos, estadoPagos],
+    queryFn: () => plataformaService.pagos(paginaPagos, estadoPagos || undefined),
+    enabled: Boolean(tokenPlataforma()),
+  });
   const accion = useMutation({
     mutationFn: (operacion: () => Promise<unknown>) => operacion(),
     onSuccess: () => {
@@ -49,9 +60,9 @@ export default function PaginaPlataforma() {
     <div className="fs-contenedor" style={{ paddingBlock: 24 }}>
       <header className="fs-pagina-cabecera">
         <div>
-          <p className="fs-eyebrow">FashionStore SaaS</p>
+          <p className="fs-eyebrow">FashionStore SaaS · Superadmin</p>
           <h1>Plataforma</h1>
-          <p className="fs-sub">Empresas contratantes, planes y suscripciones.</p>
+          <p className="fs-sub">Negocio, empresas contratantes, planes, suscripciones y pagos.</p>
         </div>
         <div className="fs-fila">
           <button type="button" className="fs-btn fs-btn--acento fs-btn--s" onClick={() => setCreando(true)}>
@@ -62,6 +73,55 @@ export default function PaginaPlataforma() {
           </button>
         </div>
       </header>
+
+      {resumen.isError && <ErrorEstado error={resumen.error} onReintentar={() => resumen.refetch()} />}
+      {resumen.data && (
+        <>
+          <section className="fs-kpis" style={{ marginBottom: 16 }}>
+            <TarjetaKPI
+              etiqueta="Ingreso mensual recurrente"
+              valor={precioUsd(resumen.data.revenue.mrr, resumen.data.currency)}
+              detalle={`${resumen.data.subscriptions.active} suscripciones vigentes`}
+            />
+            <TarjetaKPI
+              etiqueta="Cobrado este mes"
+              valor={precioUsd(resumen.data.revenue.month, resumen.data.currency)}
+              detalle={`${resumen.data.revenue.monthPayments} pagos · total historico ${precioUsd(resumen.data.revenue.total, resumen.data.currency)}`}
+            />
+            <TarjetaKPI
+              etiqueta="Empresas"
+              valor={String(resumen.data.tenants.total)}
+              detalle={`${resumen.data.tenants.active} activas · ${resumen.data.tenants.inactive} inactivas`}
+            />
+            <TarjetaKPI
+              etiqueta="Suscripciones con problemas"
+              valor={String(resumen.data.subscriptions.expired + resumen.data.subscriptions.suspended)}
+              detalle={`${resumen.data.subscriptions.expired} vencidas · ${resumen.data.subscriptions.suspended} suspendidas · ${resumen.data.revenue.failedOrRefunded} pagos fallidos`}
+            />
+          </section>
+          <section className="fs-tarjeta fs-tarjeta--pad fs-pila" style={{ marginBottom: 24 }}>
+            <h2 className="fs-titulo-seccion">Suscripciones por plan y vencimientos</h2>
+            <div className="fs-fila-wrap">
+              {resumen.data.byPlan.map((p) => (
+                <span key={p.code} className="fs-badge fs-badge--acento">
+                  {p.name}: {p.count}
+                </span>
+              ))}
+            </div>
+            {resumen.data.expiringSoon.length === 0 ? (
+              <p className="fs-sub">Ninguna suscripcion vence en los proximos 7 dias.</p>
+            ) : (
+              <ul className="fs-pila" style={{ gap: 4 }}>
+                {resumen.data.expiringSoon.map((e) => (
+                  <li key={e.tenant.id}>
+                    <strong>{e.tenant.name}</strong> ({e.tenant.slug}) · plan {e.plan} · vence {fecha(e.endsAt)}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </>
+      )}
 
       <section className="fs-tarjeta fs-tarjeta--pad">
         <h2 className="fs-titulo-seccion">Empresas</h2>
@@ -78,6 +138,7 @@ export default function PaginaPlataforma() {
                   <th>Vence</th>
                   <th className="fs-tabla-num">Sucursales activas</th>
                   <th className="fs-tabla-num">Usuarios</th>
+                  <th className="fs-tabla-num">Actividad 30 dias</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -91,6 +152,11 @@ export default function PaginaPlataforma() {
                         <span className="fs-sub" style={{ display: 'block' }}>
                           {empresa.slug} {empresa.estado === 'INACTIVE' && '· inactiva'}
                         </span>
+                        {empresa.dueno && (
+                          <span className="fs-sub" style={{ display: 'block' }}>
+                            Dueño: {empresa.dueno.email}
+                          </span>
+                        )}
                       </td>
                       <td>
                         <select
@@ -117,6 +183,13 @@ export default function PaginaPlataforma() {
                         {empresa.uso.sucursales_activas} / {s?.plan.max_sucursales_activas ?? '-'}
                       </td>
                       <td className="fs-tabla-num">{empresa.uso.usuarios}</td>
+                      <td className="fs-tabla-num">
+                        {empresa.uso.ventas_30d} ventas
+                        <span className="fs-sub" style={{ display: 'block' }}>
+                          {moneda(empresa.uso.total_ventas_30d)} · {empresa.uso.productos} prendas ·{' '}
+                          {empresa.uso.clientes} clientes
+                        </span>
+                      </td>
                       <td>
                         <div className="fs-fila-wrap">
                           <button
@@ -148,6 +221,21 @@ export default function PaginaPlataforma() {
                           )}
                           <button
                             type="button"
+                            className="fs-btn fs-btn--contorno fs-btn--s"
+                            disabled={accion.isPending}
+                            onClick={() =>
+                              accion.mutate(() =>
+                                plataformaService.cambiarEstado(
+                                  empresa.id,
+                                  empresa.estado === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE',
+                                ),
+                              )
+                            }
+                          >
+                            {empresa.estado === 'ACTIVE' ? 'Desactivar empresa' : 'Activar empresa'}
+                          </button>
+                          <button
+                            type="button"
                             className="fs-btn fs-btn--fantasma fs-btn--s"
                             onClick={() => setHistorialDe(empresa)}
                           >
@@ -160,6 +248,95 @@ export default function PaginaPlataforma() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+      </section>
+
+      <section className="fs-tarjeta fs-tarjeta--pad fs-pila" style={{ marginTop: 24 }}>
+        <div className="fs-fila-entre">
+          <h2 className="fs-titulo-seccion">Pagos de suscripciones</h2>
+          <select
+            className="fs-input"
+            style={{ maxWidth: 200 }}
+            aria-label="Filtrar pagos por estado"
+            value={estadoPagos}
+            onChange={(e) => {
+              setEstadoPagos(e.target.value);
+              setPaginaPagos(1);
+            }}
+          >
+            <option value="">Todos (sin pendientes)</option>
+            <option value="PAID">Pagados</option>
+            <option value="PENDING">Pendientes</option>
+            <option value="FAILED">Fallidos</option>
+            <option value="REFUNDED">Reembolsados</option>
+          </select>
+        </div>
+        {pagos.isError && <ErrorEstado error={pagos.error} onReintentar={() => pagos.refetch()} />}
+        {pagos.data && pagos.data.data.length === 0 && <p className="fs-sub">No hay pagos con ese filtro.</p>}
+        {pagos.data && pagos.data.data.length > 0 && (
+          <div className="fs-tabla-scroll">
+            <table className="fs-tabla">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Empresa</th>
+                  <th>Concepto</th>
+                  <th>Plan</th>
+                  <th>Estado</th>
+                  <th className="fs-tabla-num">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagos.data.data.map((p) => (
+                  <tr key={p.paymentId}>
+                    <td>{fechaHora(p.paidAt ?? p.createdAt)}</td>
+                    <td>
+                      {p.tenant?.name ?? p.requestedSlug ?? '-'}
+                      <span className="fs-sub" style={{ display: 'block' }}>
+                        {p.owner ?? ''}
+                      </span>
+                    </td>
+                    <td>
+                      {p.kindLabel} · {p.months} {p.months === 1 ? 'mes' : 'meses'}
+                    </td>
+                    <td>{p.plan?.name ?? '-'}</td>
+                    <td>
+                      {ETIQUETA_PAGO[p.status]}
+                      {p.failureReason && (
+                        <span className="fs-sub" style={{ display: 'block' }}>
+                          {p.failureReason}
+                        </span>
+                      )}
+                    </td>
+                    <td className="fs-tabla-num">{precioUsd(p.amount, p.currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {pagos.data && pagos.data.meta.totalPages > 1 && (
+          <div className="fs-fila-wrap">
+            <button
+              type="button"
+              className="fs-btn fs-btn--contorno fs-btn--s"
+              disabled={paginaPagos <= 1}
+              onClick={() => setPaginaPagos(paginaPagos - 1)}
+            >
+              Anterior
+            </button>
+            <span>
+              Pagina {paginaPagos} de {pagos.data.meta.totalPages}
+            </span>
+            <button
+              type="button"
+              className="fs-btn fs-btn--contorno fs-btn--s"
+              disabled={paginaPagos >= pagos.data.meta.totalPages}
+              onClick={() => setPaginaPagos(paginaPagos + 1)}
+            >
+              Siguiente
+            </button>
           </div>
         )}
       </section>

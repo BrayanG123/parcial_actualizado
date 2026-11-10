@@ -11,6 +11,7 @@ import { PrismaService } from '../../database/prisma/prisma.service.js';
 import { LoginDto } from '../auth/dto/login.dto.js';
 import { AuthService } from '../auth/auth.service.js';
 import { PlatformService } from '../platform/platform.service.js';
+import { SubscriptionBillingService } from '../platform/subscription-billing.service.js';
 import type { OwnerCreateTenantDto } from './dto/owner.dto.js';
 import type { OwnerJwtPayload } from './owner-jwt.guard.js';
 
@@ -37,6 +38,7 @@ export class OwnerService {
     private readonly jwt: JwtService,
     private readonly auth: AuthService,
     private readonly platform: PlatformService,
+    private readonly billing: SubscriptionBillingService,
     private readonly config: ConfigService,
   ) {}
 
@@ -178,7 +180,14 @@ export class OwnerService {
   }
 
   /** Otra empresa con su plan (pago simulado, 1 mes); el dueño queda como administrador. */
-  async createTenant(accountId: number, dto: OwnerCreateTenantDto) {
+  /** Empresa adicional: el plan gratuito se crea al instante; uno de pago, al confirmar Stripe. */
+  createTenant(accountId: number, dto: OwnerCreateTenantDto) {
+    return this.billing.ownerTenant(accountId, dto, () =>
+      this.createFreeTenant(accountId, dto),
+    );
+  }
+
+  private async createFreeTenant(accountId: number, dto: OwnerCreateTenantDto) {
     const tenant = await this.platform.createTenant(
       {
         ...dto,

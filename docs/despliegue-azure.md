@@ -39,6 +39,10 @@
 > | FashionStore (`fashionstore`) | `administrador@fashionstore.com` | `encargado@fashionstore.com` | `cajero@fashionstore.com` |
 > | Moda Andina (`moda-andina`) | `administrador@modaandina.com` | `encargado@modaandina.com` | `cajero@modaandina.com` |
 >
+> Superadmin (cuenta de desarrollador, panel `/plataforma`): `superadmin@fashionstore.com`.
+> Gestiona planes, empresas (activar/desactivar), suscripciones (cambiar, renovar, suspender,
+> reactivar), ingresos y pagos de suscripciones, y ve la actividad agregada de cada empresa.
+>
 > Encargado y cajero trabajan en la primera sucursal de cada empresa. Las contraseñas de demo se
 > comparten dentro del equipo y no se versionan. El login acepta contraseñas de 6+ caracteres
 > (`LoginDto`); el registro sigue exigiendo 8+ con mayúscula, minúscula y número.

@@ -107,6 +107,8 @@ export class PlatformService {
     dto: CreateTenantDto,
     performedById: number | null,
     owner?: { accountId: number },
+    /** Contraseña ya cifrada (alta pagada: se guardo cifrada al iniciar el pago). */
+    passwordHashed?: string,
   ) {
     if (RESERVED_SLUGS.has(dto.slug))
       throw new BadRequestException('El codigo de empresa esta reservado');
@@ -134,6 +136,7 @@ export class PlatformService {
       const adminName = account?.name ?? dto.admin.name;
       const passwordHash =
         account?.passwordHash ??
+        passwordHashed ??
         (await hash(dto.admin.password, this.saltRounds));
       const startsAt = new Date();
       const endsAt = addMonths(startsAt, dto.months ?? 12);
@@ -257,6 +260,84 @@ export class PlatformService {
     });
   }
 
+  /** Cambio de plan pagado (Stripe): nuevo periodo desde hoy y suscripcion activa. */
+  applyPaidPlanChange(
+    tenantId: number,
+    planId: number,
+    months: number,
+    note: string,
+    performedById: number | null,
+  ) {
+    return tenantContext.runAsSystem(async () => {
+      const subscription = await this.findSubscription(tenantId);
+      const plan = await this.findPlan(planId);
+      await this.assertBranchesFit(tenantId, plan);
+      const now = new Date();
+      await this.record(subscription, 'CHANGE_PLAN', performedById, note, {
+        planId: plan.id,
+        status: 'ACTIVE',
+        startsAt: now,
+        endsAt: addMonths(now, months),
+      });
+      this.tenants.invalidate();
+      return this.getTenant(tenantId);
+    });
+  }
+
+  /** Renovacion pagada (Stripe): extiende desde el vencimiento vigente o desde hoy. */
+  applyPaidRenewal(
+    tenantId: number,
+    months: number,
+    note: string,
+    performedById: number | null,
+  ) {
+    return tenantContext.runAsSystem(async () => {
+      const subscription = await this.findSubscription(tenantId);
+      const now = new Date();
+      const vigente =
+        subscription.endsAt > now && subscription.status === 'ACTIVE';
+      await this.record(subscription, 'RENEW', performedById, note, {
+        status: 'ACTIVE',
+        startsAt: vigente ? subscription.startsAt : now,
+        endsAt: addMonths(vigente ? subscription.endsAt : now, months),
+      });
+      this.tenants.invalidate();
+      return this.getTenant(tenantId);
+    });
+  }
+
+  /** Falla si la empresa usa mas sucursales activas de las que permite el plan. */
+  async assertBranchesFit(
+    tenantId: number,
+    plan: { name: string; maxActiveBranches: number },
+  ) {
+    const activeBranches = await tenantContext.runAsSystem(() =>
+      this.prisma.branch.count({ where: { tenantId, active: true } }),
+    );
+    if (activeBranches > plan.maxActiveBranches)
+      throw new ConflictException({
+        code: 'PLAN_LIMIT_EXCEEDED',
+        message: `La empresa tiene ${activeBranches} sucursales activas y el plan ${plan.name} permite ${plan.maxActiveBranches}; desactive ${activeBranches - plan.maxActiveBranches} antes de cambiar`,
+      });
+  }
+
+  /** Plan activo por codigo (para cobros y altas). */
+  activePlan(code: string) {
+    return tenantContext.runAsSystem(() => this.findActivePlan(code));
+  }
+
+  /** Validaciones del alta antes de cobrar: codigo libre y no reservado. */
+  async assertSlugAvailable(slug: string) {
+    if (RESERVED_SLUGS.has(slug))
+      throw new BadRequestException('El codigo de empresa esta reservado');
+    if (
+      await tenantContext.runAsSystem(() =>
+        this.prisma.tenant.findUnique({ where: { slug } }),
+      )
+    )
+      throw new ConflictException('El codigo de empresa ya existe');
+  }
+
   /** CU03: cambio de plan verificando que el uso actual quepa en el nuevo limite. */
   changePlan(id: number, dto: ChangePlanDto, performedById: number) {
     return tenantContext.runAsSystem(async () => {
@@ -336,7 +417,7 @@ export class PlatformService {
   private async record(
     subscription: { id: number; planId: number; startsAt: Date; endsAt: Date },
     action: SubscriptionAction,
-    performedById: number,
+    performedById: number | null,
     note: string | undefined,
     changes: Prisma.SubscriptionUncheckedUpdateInput & {
       planId?: number;
@@ -369,14 +450,48 @@ export class PlatformService {
   private async withUsage(
     tenant: Prisma.TenantGetPayload<{ include: typeof tenantInclude }>,
   ) {
-    const [activeBranches, branches, users] = await Promise.all([
-      this.prisma.branch.count({
-        where: { tenantId: tenant.id, active: true },
-      }),
-      this.prisma.branch.count({ where: { tenantId: tenant.id } }),
-      this.prisma.user.count({ where: { tenantId: tenant.id } }),
-    ]);
-    return { ...tenant, usage: { activeBranches, branches, users } };
+    // Superadmin: solo totales de actividad, sin datos de clientes ni de ventas individuales.
+    const since = new Date(Date.now() - 30 * 86400_000);
+    const [activeBranches, branches, users, products, clients, sales, owner] =
+      await Promise.all([
+        this.prisma.branch.count({
+          where: { tenantId: tenant.id, active: true },
+        }),
+        this.prisma.branch.count({ where: { tenantId: tenant.id } }),
+        this.prisma.user.count({ where: { tenantId: tenant.id } }),
+        this.prisma.product.count({ where: { tenantId: tenant.id } }),
+        this.prisma.client.count({ where: { tenantId: tenant.id } }),
+        this.prisma.sale.aggregate({
+          where: {
+            tenantId: tenant.id,
+            status: 'COMPLETED',
+            soldAt: { gte: since },
+          },
+          _count: true,
+          _sum: { total: true },
+        }),
+        this.prisma.user.findFirst({
+          where: {
+            tenantId: tenant.id,
+            ownerAccountId: { not: null },
+            roles: { some: { role: { name: 'ADMINISTRATOR' } } },
+          },
+          select: { ownerAccount: { select: { name: true, email: true } } },
+        }),
+      ]);
+    return {
+      ...tenant,
+      owner: owner?.ownerAccount ?? null,
+      usage: {
+        activeBranches,
+        branches,
+        users,
+        products,
+        clients,
+        sales30d: sales._count,
+        salesTotal30d: sales._sum.total?.toNumber() ?? 0,
+      },
+    };
   }
 
   private async findTenant(id: number) {

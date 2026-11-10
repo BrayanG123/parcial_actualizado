@@ -4,15 +4,19 @@ import {
   Controller,
   ExecutionContext,
   Get,
+  HttpCode,
   HttpException,
   HttpStatus,
   Injectable,
+  Param,
+  ParseUUIDPipe,
   Post,
   UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { SignupTenantDto } from './dto/platform.dto.js';
 import { PlatformService } from './platform.service.js';
+import { SubscriptionBillingService } from './subscription-billing.service.js';
 
 const SIGNUP_WINDOW_MS = 15 * 60 * 1000;
 const SIGNUPS_PER_WINDOW = 5;
@@ -46,11 +50,15 @@ export class SignupRateLimitGuard implements CanActivate {
 
 /**
  * Landing SaaS publica: planes disponibles y alta autoservicio de una empresa con su
- * administrador. El pago es simulado (no hay cobro real en el prototipo academico).
+ * administrador. Los planes de pago se cobran con Stripe (modo prueba) y la empresa se
+ * crea recien cuando el pago se confirma.
  */
 @Controller('saas')
 export class SaasController {
-  constructor(private readonly platform: PlatformService) {}
+  constructor(
+    private readonly platform: PlatformService,
+    private readonly billing: SubscriptionBillingService,
+  ) {}
 
   @Get('plans')
   plans() {
@@ -60,6 +68,13 @@ export class SaasController {
   @Post('signup')
   @UseGuards(SignupRateLimitGuard)
   signup(@Body() dto: SignupTenantDto) {
-    return this.platform.signup(dto);
+    return this.billing.signup(dto);
+  }
+
+  /** Estado de un pago de suscripcion; si Stripe ya lo cobro, aplica su efecto. */
+  @Post('payments/:id/confirm')
+  @HttpCode(200)
+  confirm(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
+    return this.billing.confirm(id);
   }
 }

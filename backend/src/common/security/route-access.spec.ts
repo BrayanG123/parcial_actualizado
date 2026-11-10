@@ -33,6 +33,8 @@ const PUBLIC_ROUTES = [
   'POST /owner/auth/login', // cuenta de dueño (sin empresa)
   'GET /saas/plans', // planes activos de la landing (sin datos de empresas)
   'POST /saas/signup', // alta autoservicio de empresa: limitado por SignupRateLimitGuard
+  // Consulta un pago de suscripcion en Stripe (UUID aleatorio); solo un cobro real lo completa.
+  'POST /saas/payments/:id/confirm',
   'POST /payments/stripe/webhook', // autenticado por la firma de Stripe
   'GET /tenant/directory', // empresas activas (nombre y codigo)
   'GET /tenant/public',
@@ -104,6 +106,7 @@ describe('autorizacion de las rutas', () => {
       'POST /owner/auth/login',
       'POST /payments/stripe/webhook',
       'POST /platform/auth/login',
+      'POST /saas/payments/:id/confirm',
       'POST /saas/signup',
     ]);
   });
@@ -177,6 +180,10 @@ describe('autorizacion de las rutas', () => {
       'DELETE /push/tokens',
       'POST /ai/reports', // solo consulta
       'POST /auth/login',
+      // Pagar el plan es la forma de salir del modo solo lectura.
+      'POST /billing/payments/:id/confirm',
+      'POST /billing/subscription/change',
+      'POST /billing/subscription/renew',
       'POST /payments/stripe/webhook', // confirma pagos ya iniciados
       'POST /push/tokens',
       // Acepta el lote y marca cada operacion como conflicto SUBSCRIPTION_INVALID.

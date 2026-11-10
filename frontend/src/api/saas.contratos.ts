@@ -40,7 +40,16 @@ export interface EmpresaPlataformaBackend {
   slug: string;
   status: 'ACTIVE' | 'INACTIVE';
   subscription: (SuscripcionBackend & { plan: PlanBackend }) | null;
-  usage: { activeBranches: number; branches: number; users: number };
+  usage: {
+    activeBranches: number;
+    branches: number;
+    users: number;
+    products?: number;
+    clients?: number;
+    sales30d?: number;
+    salesTotal30d?: number;
+  };
+  owner?: { name: string; email: string } | null;
 }
 
 export interface MovimientoBackend {
@@ -105,7 +114,12 @@ export function adaptarEmpresaPlataforma(e: EmpresaPlataformaBackend): EmpresaPl
       sucursales_activas: e.usage.activeBranches,
       sucursales: e.usage.branches,
       usuarios: e.usage.users,
+      productos: e.usage.products ?? 0,
+      clientes: e.usage.clients ?? 0,
+      ventas_30d: e.usage.sales30d ?? 0,
+      total_ventas_30d: e.usage.salesTotal30d ?? 0,
     },
+    dueno: e.owner ? { nombre: e.owner.name, email: e.owner.email } : null,
   };
 }
 

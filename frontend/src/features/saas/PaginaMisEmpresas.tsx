@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { CobroSuscripcion } from '../../services/suscripcion.service';
+import { PagoSuscripcion } from './PagoSuscripcion';
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { esSlugValido, fijarEmpresa } from '../../api/empresa';
@@ -191,6 +193,7 @@ function NuevaEmpresa({ onCancelar, onCreada }: { onCancelar: () => void; onCrea
   const [codigoEditado, setCodigoEditado] = useState(false);
   const [error, setError] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [cobro, setCobro] = useState<CobroSuscripcion | null>(null);
   const elegido = planes.data?.find((p) => p.codigo === plan) ?? planes.data?.[0];
 
   async function enviar(e: FormEvent) {
@@ -202,7 +205,11 @@ function NuevaEmpresa({ onCancelar, onCreada }: { onCancelar: () => void; onCrea
     setEnviando(true);
     setError('');
     try {
-      await cuentaService.crearEmpresa({ nombre, slug, plan: elegido.codigo });
+      const resultado = await cuentaService.crearEmpresa({ nombre, slug, plan: elegido.codigo });
+      if ('paymentRequired' in resultado && resultado.paymentRequired) {
+        setCobro(resultado);
+        return;
+      }
       await onCreada();
     } catch (err) {
       setError(err instanceof ErrorApi ? err.mensajes.join(' ') : 'No pudimos crear la empresa.');
@@ -210,6 +217,18 @@ function NuevaEmpresa({ onCancelar, onCreada }: { onCancelar: () => void; onCrea
       setEnviando(false);
     }
   }
+
+  if (cobro)
+    return (
+      <div className="fs-tarjeta fs-tarjeta--pad">
+        <PagoSuscripcion
+          cobro={cobro}
+          titulo={`Pago de ${nombre.trim()}`}
+          onPagado={() => void onCreada()}
+          onCancelar={() => setCobro(null)}
+        />
+      </div>
+    );
 
   return (
     <form className="fs-tarjeta fs-tarjeta--pad fs-pila" onSubmit={enviar} noValidate>
@@ -264,7 +283,11 @@ function NuevaEmpresa({ onCancelar, onCreada }: { onCancelar: () => void; onCrea
       </div>
       <div className="fs-fila" style={{ gap: 8 }}>
         <button type="submit" className="fs-btn fs-btn--acento" disabled={enviando || !elegido}>
-          {enviando ? 'Creando...' : `Crear con plan ${elegido?.nombre ?? ''}`}
+          {enviando
+            ? 'Procesando...'
+            : elegido && elegido.precio_mensual > 0
+              ? `Pagar y crear con plan ${elegido.nombre}`
+              : `Crear con plan ${elegido?.nombre ?? ''}`}
         </button>
         <button type="button" className="fs-btn fs-btn--fantasma" onClick={onCancelar}>
           Cancelar

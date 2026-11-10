@@ -21,6 +21,6 @@ import { PaymentsService } from './payments.service.js';
     PaymentsRepository,
     PaymentReconciliationService,
   ],
-  exports: [PaymentsService],
+  exports: [PaymentsService, PaymentGatewayService],
 })
 export class PaymentsModule {}

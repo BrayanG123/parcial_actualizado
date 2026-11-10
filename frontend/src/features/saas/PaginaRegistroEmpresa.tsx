@@ -15,6 +15,8 @@ import {
 import { saasService, sugerirCodigo } from '../../services/saas.service';
 import { cuentaService } from '../../services/cuenta.service';
 import { ErrorApi } from '../../types/api';
+import type { CobroSuscripcion } from '../../services/suscripcion.service';
+import { PagoSuscripcion } from './PagoSuscripcion';
 import '../../styles/landing.css';
 
 interface Campos {
@@ -28,7 +30,8 @@ interface Campos {
 
 /**
  * Alta autoservicio de una empresa (landing SaaS): plan + datos de la tienda + administrador.
- * Al terminar inicia sesion con la cuenta nueva y abre el panel de administracion.
+ * Un plan de pago se cobra con Stripe antes de crear la empresa; despues se inicia sesion
+ * con la cuenta nueva y se abre "Mis empresas".
  */
 export default function PaginaRegistroEmpresa() {
   const [params] = useSearchParams();
@@ -49,6 +52,8 @@ export default function PaginaRegistroEmpresa() {
   const [errores, setErrores] = useState<Errores<Campos>>({});
   const [errorGeneral, setErrorGeneral] = useState('');
   const [enviando, setEnviando] = useState(false);
+  // Plan de pago: la empresa se crea recien cuando Stripe confirma el cobro.
+  const [cobro, setCobro] = useState<CobroSuscripcion | null>(null);
 
   const planElegido = planes.data?.find((p) => p.codigo === plan) ?? planes.data?.[0];
 
@@ -83,17 +88,17 @@ export default function PaginaRegistroEmpresa() {
     setEnviando(true);
     setErrorGeneral('');
     try {
-      const empresa = await saasService.registrarEmpresa({
+      const resultado = await saasService.registrarEmpresa({
         nombre: campos.empresa,
         slug: codigo,
         plan: planElegido.codigo,
         admin: { nombre: campos.nombre, email: campos.email, password: campos.password },
       });
-      // F14: el registro crea la cuenta de dueño; se entra a "Mis empresas" con ella.
-      if (autenticado) await cerrarSesion();
-      fijarEmpresa({ slug: empresa.slug, nombre: empresa.nombre });
-      await cuentaService.login(campos.email.trim(), campos.password);
-      navegar('/cuenta', { replace: true });
+      if ('paymentRequired' in resultado) {
+        setCobro(resultado);
+        return;
+      }
+      await entrar(resultado.slug, resultado.nombre);
     } catch (error) {
       setErrorGeneral(
         error instanceof ErrorApi
@@ -105,6 +110,14 @@ export default function PaginaRegistroEmpresa() {
     } finally {
       setEnviando(false);
     }
+  }
+
+  /** F14: el registro crea la cuenta de dueño; se entra a "Mis empresas" con ella. */
+  async function entrar(slug: string, nombre: string) {
+    if (autenticado) await cerrarSesion();
+    fijarEmpresa({ slug, nombre });
+    await cuentaService.login(campos.email.trim(), campos.password);
+    navegar('/cuenta', { replace: true });
   }
 
   function campo(id: keyof Campos, etiqueta: string, tipo = 'text', extra?: { autoComplete?: string; ayuda?: string }) {
@@ -148,6 +161,30 @@ export default function PaginaRegistroEmpresa() {
       </aside>
 
       <div className="fs-auth__form">
+        {cobro ? (
+          <div className="fs-auth__caja">
+            <div>
+              <p className="fs-eyebrow">Paso final</p>
+              <h1>Paga tu suscripcion</h1>
+              <p className="fs-sub">
+                {campos.empresa} · codigo {campos.codigo}. Tu empresa se crea en cuanto se confirme el pago.
+              </p>
+            </div>
+            {errorGeneral && <div className="fs-alerta fs-alerta--error">{errorGeneral}</div>}
+            <PagoSuscripcion
+              cobro={cobro}
+              titulo="Datos de la tarjeta"
+              onPagado={async (pago) => {
+                try {
+                  await entrar(pago.tenant?.slug ?? campos.codigo, pago.tenant?.name ?? campos.empresa);
+                } catch {
+                  setErrorGeneral('Tu empresa ya esta creada. Inicia sesion con tu correo y contrasena.');
+                }
+              }}
+              onCancelar={() => setCobro(null)}
+            />
+          </div>
+        ) : (
         <form className="fs-auth__caja" onSubmit={enviar} noValidate>
           <div>
             <p className="fs-eyebrow">Nueva empresa</p>
@@ -198,7 +235,11 @@ export default function PaginaRegistroEmpresa() {
           {campo('confirmacion', 'Repite la contrasena', 'password', { autoComplete: 'new-password' })}
 
           <button type="submit" className="fs-btn fs-btn--acento fs-btn--bloque" disabled={enviando || !planElegido}>
-            {enviando ? 'Creando tu empresa...' : 'Crear empresa y entrar'}
+            {enviando
+              ? 'Procesando...'
+              : planElegido && planElegido.precio_mensual > 0
+                ? `Continuar al pago (${planElegido.precio_mensual.toFixed(0)} USD)`
+                : 'Crear empresa y entrar'}
           </button>
 
           <p className="fs-sub">
@@ -208,6 +249,7 @@ export default function PaginaRegistroEmpresa() {
             <Link to="/" style={{ color: 'var(--fs-acento)' }}>Volver al inicio</Link>
           </p>
         </form>
+        )}
       </div>
     </div>
   );

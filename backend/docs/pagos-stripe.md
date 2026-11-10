@@ -107,6 +107,32 @@ Con Stripe configurado, `POST /sales/in-store` rechaza `paymentMethod: CARD`
 (`Card payments must be charged with the card form`). Sin Stripe se mantiene el
 registro manual con referencia. Las ventas offline no cambian.
 
+## Suscripciones SaaS
+
+Los planes de pago (precio en USD, `SAAS_CURRENCY`, por defecto `USD`) se cobran con Stripe
+antes de aplicar el cambio. Cada cobro crea una fila en `pagos_suscripcion` (migración
+`20261110000000_subscription_payments`) con una clave pública UUID y un Payment Intent solo de
+tarjeta (sin Link). El efecto se aplica una sola vez, cuando Stripe confirma el cobro:
+
+| Tipo | Origen | Efecto al pagar |
+|---|---|---|
+| `SIGNUP` | `POST /saas/signup` (landing) | Crea empresa, suscripción y cuenta de dueño. La contraseña se guarda cifrada en el pago, nunca en claro. |
+| `NEW_TENANT` | `POST /owner/tenants` (Mis empresas) | Crea otra empresa del mismo dueño. |
+| `CHANGE_PLAN` | `POST /billing/subscription/change` (administrador) | Cambia el plan; el nuevo periodo de un mes empieza ese día. |
+| `RENEW` | `POST /billing/subscription/renew` (1 a 12 meses) | Extiende desde el vencimiento vigente o desde hoy. |
+
+- Un plan gratuito no pasa por Stripe: el alta o el cambio se aplican al instante.
+- `POST /saas/payments/:id/confirm` (público) y `POST /billing/payments/:id/confirm` consultan
+  Stripe; si el cobro está hecho aplican el efecto. Son idempotentes y solo un cobro real de ese
+  mismo intento (importe, moneda y metadatos) completa el pago.
+- Un proceso cada 2 minutos completa los pagos cobrados cuyo navegador se cerró (últimas 48 h).
+- Si el efecto ya no es posible (código de empresa tomado, demasiadas sucursales para el plan),
+  el cobro se reembolsa y el pago queda `REFUNDED` con el motivo.
+- `/billing/*` está permitido con la suscripción vencida: pagar es la forma de salir del modo
+  solo lectura.
+- Superadmin: `GET /platform/dashboard` (ingreso recurrente, cobrado del mes, suscripciones por
+  estado y plan, vencimientos en 7 días) y `GET /platform/payments` (pagos de todas las empresas).
+
 ## Flujo web/móvil
 
 1. Crear carrito, cotizar y ejecutar `/sales/checkout` según la

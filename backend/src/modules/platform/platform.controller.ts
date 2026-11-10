@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
@@ -27,7 +28,9 @@ import {
   UpdatePlanDto,
   UpdateTenantDto,
 } from './dto/platform.dto.js';
+import { ListSubscriptionPaymentsDto } from './dto/billing.dto.js';
 import { PlatformService } from './platform.service.js';
+import { SubscriptionBillingService } from './subscription-billing.service.js';
 
 /** Login del administrador de la plataforma SaaS (sin empresa). */
 @Controller('platform/auth')
@@ -47,7 +50,22 @@ export class PlatformAuthController {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.PLATFORM_ADMIN)
 export class PlatformController {
-  constructor(private readonly platform: PlatformService) {}
+  constructor(
+    private readonly platform: PlatformService,
+    private readonly billing: SubscriptionBillingService,
+  ) {}
+
+  /** Superadmin: ingresos, suscripciones y vencimientos proximos. */
+  @Get('dashboard')
+  dashboard() {
+    return this.billing.dashboard();
+  }
+
+  /** Superadmin: pagos de suscripciones de todas las empresas. */
+  @Get('payments')
+  payments(@Query() query: ListSubscriptionPaymentsDto) {
+    return this.billing.platformPayments(query.page, 20, query.status);
+  }
 
   @Get('plans')
   listPlans() {
