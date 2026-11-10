@@ -25,7 +25,23 @@
 > - `az role assignment create` falla con `MissingSubscription`; el rol AcrPull se asignó con `az rest`.
 > - Con Git Bash, usar `MSYS_NO_PATHCONV=1` o los IDs de recursos (`/subscriptions/...`) se rompen.
 > - La prueba gratuita caduca (normalmente a los 30 días) y desactiva los recursos.
-> - Pendiente: Stripe webhook apunta a la URL anterior; no se probó el login con usuarios reales.
+> - Stripe (modo prueba): webhook `FashionStore Azure (cuenta nueva)` hacia
+>   `/api/v1/payments/stripe/webhook` con eventos `payment_intent.*` y `refund.*`; su `whsec_` está
+>   solo en el secreto `stripe-webhook` de la Container App (el `backend/.env` local conserva el de
+>   `stripe listen`). Verificado el 09/11/2026 con un cobro de prueba (entrega correcta).
+>
+> **Datos de demostración (09/11/2026).** La base de Azure se dejó con 2 empresas y 6 cuentas
+> (respaldo previo con `pg_dump`). Se borraron ventas, pagos, reservas, carritos, clientes,
+> proveedores-usuario y las empresas sobrantes; se conservan catálogo, sucursales e inventario.
+>
+> | Empresa (código) | Administrador / dueño | Encargado | Cajero |
+> |---|---|---|---|
+> | FashionStore (`fashionstore`) | `administrador@fashionstore.com` | `encargado@fashionstore.com` | `cajero@fashionstore.com` |
+> | Moda Andina (`moda-andina`) | `administrador@modaandina.com` | `encargado@modaandina.com` | `cajero@modaandina.com` |
+>
+> Encargado y cajero trabajan en la primera sucursal de cada empresa. Las contraseñas de demo se
+> comparten dentro del equipo y no se versionan. El login acepta contraseñas de 6+ caracteres
+> (`LoginDto`); el registro sigue exigiendo 8+ con mayúscula, minúscula y número.
 
 Esta guía despliega la imagen que ya está publicada:
 

@@ -10,7 +10,8 @@ export class LoginDto {
   email: string;
 
   @IsString()
-  @MinLength(8)
+  // El registro exige 8+ caracteres; el login acepta 6+ para cuentas de demostracion.
+  @MinLength(6)
   @MaxLength(72)
   password: string;
 }
